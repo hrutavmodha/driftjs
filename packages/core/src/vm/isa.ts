@@ -13,6 +13,7 @@ export const Opcodes = {
   JUMP_IF: 12,
   RETURN: 13,
   CALL: 14,
+  EXEC_THUNK_GUARDED: 15,
 } as const;
 
 export type Opcode = typeof Opcodes[keyof typeof Opcodes];

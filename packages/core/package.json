@@ -1,0 +1,33 @@
+{
+  "name": "@register-vm-reactivity-engine/core",
+  "version": "0.0.0",
+  "description": "Core reactivity engine containing Parser, Compiler, and VM modules",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./parser": {
+      "types": "./dist/parser/index.d.ts",
+      "default": "./dist/parser/index.js"
+    },
+    "./compiler": {
+      "types": "./dist/compiler/index.d.ts",
+      "default": "./dist/compiler/index.js"
+    },
+    "./vm": {
+      "types": "./dist/vm/index.d.ts",
+      "default": "./dist/vm/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "acorn": "^8.17.0",
+    "estree-walker": "^3.0.3"
+  },
+  "type": "module"
+}
