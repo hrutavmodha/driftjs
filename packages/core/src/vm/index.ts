@@ -1,2 +1,2 @@
 export * from './isa.js';
-export * from './vm.js';
+export * from './client/index.js';

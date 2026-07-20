@@ -1,4 +1,4 @@
-import { Opcodes, type Opcode } from './isa.js';
+import { Opcodes, type Opcode } from '../isa.js';
 
 export interface VMProgram {
   bytecode: Uint32Array;
@@ -9,7 +9,7 @@ export interface VMProgram {
 /**
  * DriftJS Virtual Machine for executing bytecode programs against a target HTML element.
  */
-export class DriftJSVM {
+export class DriftJSClientVM {
   private bytecode: Uint32Array;
   private constants: unknown[];
   private nodes: (Node | null)[];
@@ -379,7 +379,7 @@ export class DriftJSVM {
 export interface DriftJSComponent {
   program: VMProgram;
   ast?: unknown[];
-  mount?: (target: HTMLElement) => DriftJSVM;
+  mount?: (target: HTMLElement) => DriftJSClientVM;
 }
 
 export type DriftComponent = DriftJSComponent;
@@ -391,8 +391,8 @@ export type DriftComponent = DriftJSComponent;
  * @param rootElement - Target HTML element to mount into.
  * @returns Mounted DriftJSVM instance.
  */
-export function mountApp(program: VMProgram, rootElement: HTMLElement): DriftJSVM {
-  const vm = new DriftJSVM(program, rootElement);
+export function mountApp(program: VMProgram, rootElement: HTMLElement): DriftJSClientVM {
+  const vm = new DriftJSClientVM(program, rootElement);
   vm.mount();
   return vm;
 }
@@ -404,7 +404,7 @@ export function mountApp(program: VMProgram, rootElement: HTMLElement): DriftJSV
  * @param target - Target HTML element to mount into.
  * @returns Mounted DriftJSVM instance.
  */
-export function mount(component: DriftComponent, target: HTMLElement): DriftJSVM {
+export function mount(component: DriftComponent, target: HTMLElement): DriftJSClientVM {
   if (typeof component.mount === 'function') {
     return component.mount(target);
   }

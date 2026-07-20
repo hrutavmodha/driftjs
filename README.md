@@ -2,14 +2,17 @@
 
 > **A Register VM-Based Reactivity Engine & AOT Compiler for High-Performance UI**
 
-DriftJS replaces traditional JavaScript-object-level reactivity (such as Virtual DOM diffing, proxy trees, or heavy signal graph allocations) with an **Ahead-Of-Time (AOT) Bytecode Compiler** and a lightweight **Register Virtual Machine (VM)** runtime interpreter.
+> [!IMPORTANT]
+> **Project Status**
+> DriftJS is currently in an **early experimental stage**, *and not yet production-ready.*
+> The core bytecode architecture, register VM, and AOT compiler foundation are functional. I warmly invite the open-source community to collaborate, test, and help evolve DriftJS into a production-grade framework!
 
 ---
 
 ## 🌟 Key Architectural Features
 
 - **Bytecode & Register VM Architecture**: Replaces VDOM diffing and proxy overhead with a linear 32-bit instruction stream running on a low-latency fetch-decode-execute loop.
-- **$O(1)$ Direct DOM Patching**: State updates mutate register slots directly. Guarded thunk execution (`EXEC_THUNK_GUARDED`) skips unneeded DOM updates using bitfield dependency masks (`dirtyMask`).
+- **Direct DOM Patching**: State updates mutate register slots directly. Guarded thunk execution (`EXEC_THUNK_GUARDED`) skips unneeded DOM updates using bitfield dependency masks (`dirtyMask`).
 - **Single-File Component (`.drift`) Support**: Author components in single `.drift` files combining `<script>` logic and template markup.
 - **Build-Time AOT Compiler (`vite-plugin-drift`)**: Compiles `.drift` templates into binary `Uint32Array` bytecode streams at build time in Vite/Rollup—shipping zero parser overhead to the client browser.
 - **Cross-Platform Potential**: Because templates compile down to raw 32-bit instruction streams, the VM can be re-implemented natively in Kotlin (Android) or Swift (iOS) to drive native mobile UI views with zero bridge serialization overhead.
@@ -67,29 +70,24 @@ mount(App, appElement);
 
 ## 📦 Packages in this Monorepo
 
-| Package | Version | Description |
-| :--- | :--- | :--- |
-| **`driftjs`** | `0.0.0` | Core reactivity engine containing Parser, AST Compiler, and Register VM |
-| **`vite-plugin-drift`** | `0.0.0` | Vite plugin for compiling `.drift` templates to VM bytecode AOT |
+| Package                         | Version   | Description                                                             |
+| :------------------------------ | :-------- | :---------------------------------------------------------------------- |
+| **`driftjs`**           | `0.0.0` | Core reactivity engine containing Parser, AST Compiler, and Register VM |
+| **`vite-plugin-drift`** | `0.0.0` | Vite plugin for compiling`.drift` templates to VM bytecode AOT        |
 
 ---
 
 ## ⚙️ How It Works Under The Hood
 
+```mermaid
+flowchart TD
+    A[".drift Single File Component"] -->|AOT Build Step: vite-plugin-drift| B["DriftJSParser"]
+    B --> C["AST Node Tree"]
+    C --> D["DriftJSCompiler"]
+    D --> E["32-bit Uint32Array Bytecode & Constants Pool"]
+    E -->|Browser Runtime Execution| F["DriftJSVM Interpreter"]
+    F -->|Direct Bitmask Filtered Patches| G["Direct Browser DOM Updates"]
 ```
-[ .drift Template ] 
-       │
-       ▼ (AOT Build Step: vite-plugin-drift)
-[ DriftJSParser ] ──> [ AST Node Tree ] ──> [ DriftJSCompiler ]
-                                                   │
-                                                   ▼
-                                 [ 32-bit Uint32Array Bytecode + Constants ]
-                                                   │
-                                                   ▼ (Runtime Execution)
-                                            [ DriftJSVM ] ──> Direct DOM Patches
-```
-
-### VM Instruction Set (ISA)
 
 Instructions are encoded into fixed-width 32-bit words:
 `[ Opcode (8-bit) | Register A / Node (8-bit) | Register B / Constant (8-bit) | Register C / Offset (8-bit) ]`
@@ -116,15 +114,6 @@ pnpm test
 
 ---
 
-## 📄 Theoretical & Architectural References
-
-The design of DriftJS draws from foundational research in register-based virtual machines and AOT reactive UI compilation:
-- **Register VM Architecture**: Inspired by *The Implementation of Lua 5.0* (Ierusalimschy et al., 2005) for linear instruction dispatch and reduced stack manipulation overhead compared to stack-based VMs.
-- **Interpreters & ISA Design**: Based on principles from *Crafting Interpreters* (Nystrom, R., 2021) and *Engineering a Compiler* (Cooper & Torczon, 2011).
-- **Compile-Time Reactive Dependency Tracking**: Inspired by the AOT compilation model of *Svelte* and the fine-grained reactivity guarantees of *SolidJS*.
-
----
-
 ## 📜 License
 
-MIT © Hrutav Modha
+MIT
