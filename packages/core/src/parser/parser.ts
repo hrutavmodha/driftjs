@@ -1,4 +1,9 @@
-import type { ASTNode, ElementNode, TextNode, InterpolationNode } from './ast.js';
+import type { ASTNode, ElementNode, TextNode, InterpolationNode, ScriptNode } from './ast.js';
+
+const VOID_ELEMENTS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+  'link', 'meta', 'param', 'source', 'track', 'wbr'
+]);
 
 /**
  * DriftJS Parser for transforming template source strings into AST node arrays.
@@ -24,6 +29,9 @@ export class DriftJSParser {
     while (!this.isEOF()) {
       const node = this.parseNode();
       if (node) {
+        if (node.type === 'Text' && node.content.trim() === '') {
+          continue; // Strip whitespace-only formatting text nodes
+        }
         nodes.push(node);
       }
     }
@@ -37,7 +45,7 @@ export class DriftJSParser {
     
     if (this.match('<')) {
       if (this.source.charCodeAt(this.cursor) === 47 /* '/' */) {
-        // Closing tag, should be handled by parseElement
+        // Closing tag, handled by parent parseElement
         return null;
       }
       return this.parseElement();
@@ -80,12 +88,13 @@ export class DriftJSParser {
     }
 
     const isSelfClosing = this.match('/>');
+    const isVoidTag = VOID_ELEMENTS.has(tag.toLowerCase());
+
     if (!isSelfClosing && !this.match('>')) {
-      // It should have matched '>' above
       this.consume('>');
     }
 
-    if (tag === 'script') {
+    if (tag.toLowerCase() === 'script') {
       const endScriptIdx = this.source.indexOf('</script>', this.cursor);
       if (endScriptIdx === -1) {
         throw new Error('Unclosed script tag');
@@ -93,31 +102,38 @@ export class DriftJSParser {
       const content = this.source.slice(this.cursor, endScriptIdx);
       this.cursor = endScriptIdx;
       this.consume('</script>');
-      return { type: 'Script', content: content.trim() } as any;
+      const scriptNode: ScriptNode = { type: 'Script', content: content.trim() };
+      return scriptNode;
     }
 
     const children: ASTNode[] = [];
-    if (!isSelfClosing) {
+    if (!isSelfClosing && !isVoidTag) {
       while (!this.isEOF() && !this.startsWith('</')) {
         const child = this.parseNode();
-        if (child) children.push(child);
+        if (child) {
+          if (child.type === 'Text' && child.content.trim() === '') {
+            continue; // Strip whitespace-only formatting text nodes inside elements
+          }
+          children.push(child);
+        }
       }
       this.consume('</');
       const closingTag = this.parseTagName();
-      if (closingTag !== tag) {
+      if (closingTag.toLowerCase() !== tag.toLowerCase()) {
         throw new Error(`Expected closing tag </${tag}> but got </${closingTag}>`);
       }
       this.consumeWhitespace();
       this.consume('>');
     }
 
-    return {
+    const elementNode: ElementNode = {
       type: 'Element',
       tag,
       attributes,
       events,
       children
     };
+    return elementNode;
   }
 
   private parseText(): TextNode {
@@ -135,15 +151,38 @@ export class DriftJSParser {
 
   private parseInterpolation(): InterpolationNode {
     const start = this.cursor;
-    while (!this.isEOF()) {
+    let depth = 1;
+
+    while (!this.isEOF() && depth > 0) {
       const ch = this.source.charCodeAt(this.cursor);
-      if (ch === 125 /* '}' */) {
-        break;
+      if (ch === 34 /* '"' */ || ch === 39 /* "'" */ || ch === 96 /* '`' */) {
+        const quote = ch;
+        this.cursor++;
+        while (!this.isEOF() && this.source.charCodeAt(this.cursor) !== quote) {
+          if (this.source.charCodeAt(this.cursor) === 92 /* '\' */) {
+            this.cursor++;
+          }
+          this.cursor++;
+        }
+        if (!this.isEOF()) this.cursor++;
+        continue;
       }
-      this.cursor++;
+      if (ch === 123 /* '{' */) {
+        depth++;
+      } else if (ch === 125 /* '}' */) {
+        depth--;
+      }
+      if (depth > 0) {
+        this.cursor++;
+      }
     }
+
     const expression = this.source.substring(start, this.cursor).trim();
-    this.consume('}');
+    if (depth === 0) {
+      this.cursor++; // consume closing '}'
+    } else {
+      throw new Error(`Unclosed interpolation expression starting at index ${start}`);
+    }
     return { type: 'Interpolation', expression };
   }
 
@@ -162,7 +201,7 @@ export class DriftJSParser {
         break;
       }
     }
-    if (this.cursor === start) throw new Error('Expected tag name');
+    if (this.cursor === start) throw new Error(`Expected tag name at index ${start}`);
     return this.source.substring(start, this.cursor);
   }
 
@@ -192,7 +231,7 @@ export class DriftJSParser {
       let depth = 1;
       while (!this.isEOF() && depth > 0) {
         const ch = this.source.charCodeAt(this.cursor);
-        if (ch === 34 /* '"' */ || ch === 39 /* "'" */) {
+        if (ch === 34 /* '"' */ || ch === 39 /* "'" */ || ch === 96 /* '`' */) {
           const quote = ch;
           this.cursor++;
           while (!this.isEOF() && this.source.charCodeAt(this.cursor) !== quote) {

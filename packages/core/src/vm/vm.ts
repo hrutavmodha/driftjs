@@ -2,7 +2,7 @@ import { Opcodes, type Opcode } from './isa.js';
 
 export interface VMProgram {
   bytecode: Uint32Array;
-  constants: any[];
+  constants: unknown[];
   updateBlockOffset?: number;
 }
 
@@ -11,15 +11,15 @@ export interface VMProgram {
  */
 export class DriftJSVM {
   private bytecode: Uint32Array;
-  private constants: any[];
+  private constants: unknown[];
   private nodes: (Node | null)[];
-  private registers: any[];
+  private registers: unknown[];
   private callStack: number[];
   private pc: number;
-  private dirtyMask: number = ~0; // ~0 means all registers dirty initially
-  private prevRegBuffer: any[];
-  private updateBlockOffset: number = 0;
-  private updatePending: boolean = false;
+  private dirtyMask = 0;
+  private prevRegBuffer: unknown[];
+  private updateBlockOffset = 0;
+  private updatePending = false;
   
   private eventDelegationTable: Map<string, number>;
   private registeredEvents: Map<string, (e: Event) => void>;
@@ -70,7 +70,7 @@ export class DriftJSVM {
       let target = event.target as Node | null;
       
       while (target && target !== this.rootElement) {
-        const nodeIdx = (target as any).__vm_idx;
+        const nodeIdx = (target as unknown as { __vm_idx?: number }).__vm_idx;
 
         if (nodeIdx !== undefined && nodeIdx !== -1) {
           const key = `${nodeIdx}:${eventType}`;
@@ -97,9 +97,6 @@ export class DriftJSVM {
    * @param regIdx - Index of the register that was mutated.
    */
   public markDirty(regIdx: number): void {
-    if (this.dirtyMask === ~0) {
-      this.dirtyMask = 0;
-    }
     this.dirtyMask |= (1 << (regIdx % 32));
     this.requestUpdate();
   }
@@ -108,9 +105,6 @@ export class DriftJSVM {
    * Schedules a microtask DOM update frame if an update is not already pending.
    */
   public requestUpdate(): void {
-    if (this.dirtyMask === 0) {
-      this.dirtyMask = ~0;
-    }
     if (this.updatePending) return;
     this.updatePending = true;
     queueMicrotask(() => {
@@ -148,8 +142,43 @@ export class DriftJSVM {
    * Jumps to a specific bytecode offset, typically used for event handlers.
    */
   public dispatchEvent(offset: number) {
+    const prevPc = this.pc;
     this.pc = offset;
-    this.execute();
+    try {
+      this.execute();
+    } finally {
+      if (this.callStack.length > 0) {
+        this.pc = prevPc;
+      }
+    }
+  }
+
+  private getRegister(idx: number): unknown {
+    if (idx < 0 || idx >= this.registers.length) {
+      throw new Error(`Register index out of bounds: ${idx} (total registers: ${this.registers.length})`);
+    }
+    return this.registers[idx];
+  }
+
+  private setRegister(idx: number, value: unknown): void {
+    if (idx < 0 || idx >= this.registers.length) {
+      throw new Error(`Register index out of bounds: ${idx} (total registers: ${this.registers.length})`);
+    }
+    this.registers[idx] = value;
+  }
+
+  private getConstant(idx: number): unknown {
+    if (idx < 0 || idx >= this.constants.length) {
+      throw new Error(`Constant pool index out of bounds: ${idx} (constant pool size: ${this.constants.length})`);
+    }
+    return this.constants[idx];
+  }
+
+  private getNode(idx: number): Node | null {
+    if (idx < 0 || idx >= this.nodes.length) {
+      return null;
+    }
+    return this.nodes[idx] ?? null;
   }
 
   private execute() {
@@ -170,10 +199,11 @@ export class DriftJSVM {
 
       switch (op) {
         case Opcodes.LOAD_CONST:
-          registers[a] = constants[b];
+          this.setRegister(a, this.getConstant(b));
           break;
+
         case Opcodes.LOAD_NODE:
-          registers[a] = nodes[b];
+          this.setRegister(a, this.getNode(b));
           break;
 
         case Opcodes.EXEC_THUNK: {
@@ -182,7 +212,14 @@ export class DriftJSVM {
           const depMask = c;
 
           if (depMask !== 0 && this.dirtyMask !== ~0 && (this.dirtyMask & depMask) === 0) {
-            this.pc++;
+            // Verify next opcode before skipping
+            const nextInst = bytecode[this.pc];
+            if (nextInst !== undefined) {
+              const nextOp = (nextInst >>> 24) & 0xFF;
+              if (nextOp === Opcodes.SET_TEXT || nextOp === Opcodes.SET_ATTRIBUTE || nextOp === Opcodes.SET_PROPERTY) {
+                this.pc++;
+              }
+            }
             break;
           }
 
@@ -191,85 +228,106 @@ export class DriftJSVM {
             prevRegBuffer[i] = registers[i];
           }
 
-          const res = constants[thunkIdx](registers, this);
-          if (destReg !== 0) {
-            registers[destReg] = res;
-          } else {
-            let mask = 0;
-            for (let i = 0; i < limit; i++) {
-              if (registers[i] !== prevRegBuffer[i]) {
-                mask |= (1 << i);
+          const thunk = this.getConstant(thunkIdx);
+          if (typeof thunk === 'function') {
+            const res = thunk(registers, this);
+            if (destReg !== 0) {
+              this.setRegister(destReg, res);
+            } else {
+              let mask = 0;
+              for (let i = 0; i < limit; i++) {
+                if (registers[i] !== prevRegBuffer[i]) {
+                  mask |= (1 << i);
+                }
               }
-            }
-            if (mask !== 0) {
-              this.dirtyMask = mask;
+              if (mask !== 0) {
+                this.dirtyMask = mask;
+              }
             }
           }
           break;
         }
 
         case Opcodes.CREATE_ELEMENT: {
-          const tag = constants[a] as string;
+          const tag = this.getConstant(a) as string;
           const el = document.createElement(tag);
           nodes[b] = el;
-          (el as any).__vm_idx = b; 
+          (el as unknown as { __vm_idx?: number }).__vm_idx = b; 
           break;
         }
+
         case Opcodes.CREATE_TEXT: {
-          const text = constants[a] as string;
+          const text = this.getConstant(a) as string;
           nodes[b] = document.createTextNode(text);
           break;
         }
+
         case Opcodes.APPEND_CHILD: {
-          const parent = nodes[a] as Node;
-          const child = nodes[b] as Node;
-          parent.appendChild(child);
+          const parent = this.getNode(a);
+          const child = this.getNode(b);
+          if (parent && child) {
+            parent.appendChild(child);
+          }
           break;
         }
+
         case Opcodes.REMOVE_CHILD: {
-          const parent = nodes[a] as Node;
-          const child = nodes[b] as Node;
+          const parent = this.getNode(a);
+          const child = this.getNode(b);
           if (parent && child && child.parentNode === parent) {
             parent.removeChild(child);
           }
           break;
         }
+
         case Opcodes.MOUNT: {
-          const child = nodes[a] as Node;
-          this.rootElement.appendChild(child);
+          const child = this.getNode(a);
+          if (child) {
+            this.rootElement.appendChild(child);
+          }
           break;
         }
 
         case Opcodes.SET_TEXT: {
-          const node = nodes[a] as Node;
-          const val = registers[b] == null ? '' : String(registers[b]);
-          if (node.nodeValue !== val) {
-            node.nodeValue = val;
+          const node = this.getNode(a);
+          if (node) {
+            const regVal = this.getRegister(b);
+            const val = regVal == null ? '' : String(regVal);
+            if (node.nodeValue !== val) {
+              node.nodeValue = val;
+            }
           }
           break;
         }
+
         case Opcodes.SET_ATTRIBUTE: {
-          const node = nodes[a] as Element;
-          const attr = constants[b] as string;
-          const val = registers[c] == null ? '' : String(registers[c]);
-          if (node.getAttribute(attr) !== val) {
-            node.setAttribute(attr, val);
+          const node = this.getNode(a) as Element | null;
+          if (node && typeof node.setAttribute === 'function') {
+            const attr = this.getConstant(b) as string;
+            const regVal = this.getRegister(c);
+            const val = regVal == null ? '' : String(regVal);
+            if (node.getAttribute(attr) !== val) {
+              node.setAttribute(attr, val);
+            }
           }
           break;
         }
+
         case Opcodes.SET_PROPERTY: {
-          const node = nodes[a] as any;
-          const prop = constants[b] as string;
-          const val = registers[c];
-          if (node && node[prop] !== val) {
-            node[prop] = val;
+          const node = this.getNode(a) as Record<string, unknown> | null;
+          if (node) {
+            const prop = this.getConstant(b) as string;
+            const val = this.getRegister(c);
+            if (node[prop] !== val) {
+              node[prop] = val;
+            }
           }
           break;
         }
 
         case Opcodes.BIND_EVENT: {
           const nodeIdx = a;
-          const eventType = constants[b] as string;
+          const eventType = this.getConstant(b) as string;
           const jumpOffset = c;
 
           const key = `${nodeIdx}:${eventType}`;
@@ -285,9 +343,25 @@ export class DriftJSVM {
           break;
         }
 
+        case Opcodes.JUMP_IF_TRUE: {
+          const reg = a;
+          const offset = inst & 0xFFFFFF; // 24-bit jump offset matching ISA spec
+          if (this.getRegister(reg)) {
+            this.pc = offset;
+          }
+          break;
+        }
+
+        case Opcodes.CALL: {
+          const offset = inst & 0xFFFFFF;
+          callStack.push(this.pc);
+          this.pc = offset;
+          break;
+        }
+
         case Opcodes.RETURN: {
-          registers[0] = null; // Free event object reference for GC
-          this.dirtyMask = 0;  // Reset for next execution
+          this.setRegister(0, null); // Free event object reference for GC
+          this.dirtyMask = 0;        // Reset dirty mask for next update cycle
           if (callStack.length > 0) {
             this.pc = callStack.pop()!;
             break;
@@ -304,7 +378,7 @@ export class DriftJSVM {
 
 export interface DriftJSComponent {
   program: VMProgram;
-  ast?: any[];
+  ast?: unknown[];
   mount?: (target: HTMLElement) => DriftJSVM;
 }
 

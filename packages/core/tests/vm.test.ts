@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { DriftJSVM, mountApp } from '../src/vm/index.js';
 import { parseTemplate } from '../src/parser/index.js';
 import { compile } from '../src/compiler/index.js';
+import { Opcodes, encodeInstruction, encodeInstruction24 } from '../src/vm/isa.js';
 
 describe('DriftJSVM', () => {
   describe('constructor input data passing', () => {
@@ -27,6 +28,84 @@ describe('DriftJSVM', () => {
 
       expect(root.innerHTML).toBe('<p>App VM</p>');
       vm.unmount();
+    });
+  });
+
+  describe('ISA opcodes: SET_PROPERTY, REMOVE_CHILD, JUMP_IF_TRUE, CALL', () => {
+    it('should set DOM property directly via SET_PROPERTY', () => {
+      const template = '<input type="text" value={val} /><script>let val = "initial";</script>';
+      const ast = parseTemplate(template);
+      const program = compile(ast);
+      const root = document.createElement('div');
+
+      const vm = mountApp(program, root);
+      const input = root.querySelector('input') as HTMLInputElement;
+
+      expect(input.value).toBe('initial');
+      vm.unmount();
+    });
+
+    it('should remove child node via REMOVE_CHILD opcode', () => {
+      const bytecode = new Uint32Array([
+        encodeInstruction(Opcodes.CREATE_ELEMENT, 0, 1), // parent div (node 1)
+        encodeInstruction(Opcodes.CREATE_ELEMENT, 1, 2), // child span (node 2)
+        encodeInstruction(Opcodes.APPEND_CHILD, 1, 2),    // append node 2 to node 1
+        encodeInstruction(Opcodes.MOUNT, 1),              // mount node 1
+        encodeInstruction(Opcodes.REMOVE_CHILD, 1, 2),    // remove node 2 from node 1
+        encodeInstruction(Opcodes.RETURN)
+      ]);
+
+      const program = {
+        bytecode,
+        constants: ['div', 'span'],
+        updateBlockOffset: 5
+      };
+
+      const root = document.createElement('div');
+      const vm = mountApp(program, root);
+
+      expect(root.innerHTML).toBe('<div></div>');
+      vm.unmount();
+    });
+
+    it('should execute CALL and RETURN subroutines and JUMP_IF_TRUE conditional branching', () => {
+      const bytecode = new Uint32Array([
+        encodeInstruction(Opcodes.LOAD_CONST, 1, 0),        // regs[1] = true
+        encodeInstruction(Opcodes.CREATE_ELEMENT, 1, 1),    // node 1 = div
+        encodeInstruction(Opcodes.MOUNT, 1),                // mount node 1
+        encodeInstruction24(Opcodes.CALL, 5),               // CALL subroutine at offset 5
+        encodeInstruction24(Opcodes.JUMP, 8),               // JUMP to end (offset 8)
+        // Subroutine (offset 5):
+        encodeInstruction(Opcodes.CREATE_TEXT, 2, 2),       // node 2 = text 'Subroutine'
+        encodeInstruction(Opcodes.APPEND_CHILD, 1, 2),      // append text to node 1
+        encodeInstruction(Opcodes.RETURN),                  // RETURN from subroutine
+        // Offset 8:
+        encodeInstruction(Opcodes.RETURN)
+      ]);
+
+      const program = {
+        bytecode,
+        constants: [true, 'div', 'Subroutine'],
+        updateBlockOffset: 8
+      };
+
+      const root = document.createElement('div');
+      const vm = mountApp(program, root);
+
+      expect(root.innerHTML).toBe('<div>Subroutine</div>');
+      vm.unmount();
+    });
+
+    it('should clean up event listeners, node references, and innerHTML on unmount', () => {
+      const ast = parseTemplate('<button onclick={handleClick}>Click</button><script>function handleClick() {}</script>');
+      const program = compile(ast);
+      const root = document.createElement('div');
+
+      const vm = mountApp(program, root);
+      expect(root.innerHTML).toBe('<button>Click</button>');
+
+      vm.unmount();
+      expect(root.innerHTML).toBe('');
     });
   });
 

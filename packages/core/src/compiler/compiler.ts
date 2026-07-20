@@ -1,11 +1,11 @@
 import { Opcodes, encodeInstruction } from '../vm/index.js';
-import type { ASTNode } from '../parser/index.js';
+import type { ASTNode, ElementNode, TextNode, InterpolationNode, ScriptNode } from '../parser/index.js';
 import * as acorn from 'acorn';
 import { walk } from 'estree-walker';
 
 export interface CompiledProgram {
   bytecode: Uint32Array;
-  constants: any[];
+  constants: unknown[];
   updateBlockOffset: number;
 }
 
@@ -18,13 +18,19 @@ const JS_GLOBALS = new Set([
   'setInterval', 'clearInterval'
 ]);
 
+interface Replacement {
+  start: number;
+  end: number;
+  text: string;
+}
+
 /**
  * DriftJS Compiler for compiling AST nodes into VM bytecode programs.
  */
 export class DriftJSCompiler {
   private bytecode: number[] = [];
-  private constants: any[] = [];
-  private constantMap: Map<any, number> = new Map();
+  private constants: unknown[] = [];
+  private constantMap: Map<unknown, number> = new Map();
   private nextNodeIdx = 0;
   private nextRegIdx = 1;
   private varToReg: Map<string, number> = new Map();
@@ -43,19 +49,13 @@ export class DriftJSCompiler {
     return this.varToReg.get(name)!;
   }
 
-  private createThunk(code: string): Function {
-    const thunk = new Function('regs', 'vm', code);
-    // Eagerly execute thunk once to force V8 JIT compilation at compile time
-    try {
-      const dummy = new Array(Math.max(256, this.nextRegIdx + 16)).fill(0);
-      thunk(dummy, null);
-    } catch (_) {}
-    return thunk;
+  private createThunk(code: string): (regs: unknown[], vm: unknown) => unknown {
+    return new Function('regs', 'vm', code) as (regs: unknown[], vm: unknown) => unknown;
   }
 
   private rewriteExpression(expr: string, isEventHandler = false): { rewritten: string, depMask: number } {
     const jsAst = acorn.parse(expr, { ecmaVersion: 2020, allowReturnOutsideFunction: true });
-    const replacements: { start: number, end: number, text: string }[] = [];
+    const replacements: Replacement[] = [];
     let depMask = 0;
 
     const localScopes: Set<string>[] = [new Set()];
@@ -183,7 +183,7 @@ export class DriftJSCompiler {
     return { rewritten, depMask };
   }
 
-  private compileScript(scriptNode: any): number {
+  private compileScript(scriptNode: ScriptNode): number {
     const jsAst = acorn.parse(scriptNode.content, { ecmaVersion: 2020 });
     
     // First pass: Discover all top-level state variables, functions, and classes
@@ -209,7 +209,7 @@ export class DriftJSCompiler {
     }
 
     // Second pass: Collect replacements for declarations, functions, and identifiers
-    const replacements: { start: number, end: number, text: string }[] = [];
+    const replacements: Replacement[] = [];
     const localScopes: Set<string>[] = [new Set()];
 
     const isLocal = (name: string): boolean => {
@@ -304,12 +304,6 @@ export class DriftJSCompiler {
           }
         }
 
-        if (node.type === 'ExpressionStatement') {
-          if (node.expression && node.expression.type === 'CallExpression') {
-            replacements.push({ start: node.end, end: node.end, text: `; vm?.requestUpdate();` });
-          }
-        }
-
         if (node.type === 'Identifier') {
           if (parent && parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return;
           if (parent && parent.type === 'Property' && parent.key === node && !parent.computed) return;
@@ -373,7 +367,7 @@ export class DriftJSCompiler {
     this.updates = [];
     this.eventHandlers = [];
 
-    const scriptNodes = this.ast.filter(n => n.type === 'Script');
+    const scriptNodes = this.ast.filter((n): n is ScriptNode => n.type === 'Script');
     
     // First, compile scripts to populate varToReg
     const scriptThunkIndices: number[] = [];
@@ -381,7 +375,7 @@ export class DriftJSCompiler {
       scriptThunkIndices.push(this.compileScript(script));
     }
 
-    const rootNodes = this.ast.filter(n => n.type !== 'Script').map(node => this.compileNode(node));
+    const rootNodes = this.ast.filter((n): n is ElementNode | TextNode | InterpolationNode => n.type !== 'Script').map(node => this.compileNode(node));
 
     // Emit script thunks at the beginning
     for (const thunkIdx of scriptThunkIndices) {
@@ -426,7 +420,9 @@ export class DriftJSCompiler {
           if (typeof fn === 'function') {
             fn(regs[0], vm);
           }
-        } catch (_) {}
+        } catch (err) {
+          console.error('[DriftJS Event Handler Error]', err);
+        }
       `;
       const thunk = this.createThunk(thunkCode);
       const thunkIdx = this.getConstant(thunk);
@@ -445,7 +441,7 @@ export class DriftJSCompiler {
     };
   }
 
-  private compileNode(node: ASTNode): number {
+  private compileNode(node: ElementNode | TextNode | InterpolationNode): number {
     switch (node.type) {
       case 'Element': return this.compileElement(node);
       case 'Text': return this.compileText(node);
@@ -454,7 +450,7 @@ export class DriftJSCompiler {
     }
   }
 
-  private compileElement(node: any): number {
+  private compileElement(node: ElementNode): number {
     const nodeIdx = this.nextNodeIdx++;
     const tagIdx = this.getConstant(node.tag);
     
@@ -462,7 +458,7 @@ export class DriftJSCompiler {
 
     for (const [key, value] of Object.entries(node.attributes)) {
       const keyIdx = this.getConstant(key);
-      const valStr = (value as string).trim();
+      const valStr = value.trim();
       const isProperty = key === 'value' || key === 'checked' || key === 'disabled' || key === 'selected';
       const setOpcode = isProperty ? Opcodes.SET_PROPERTY : Opcodes.SET_ATTRIBUTE;
 
@@ -485,28 +481,30 @@ export class DriftJSCompiler {
     }
 
     for (const child of node.children) {
-      const childIdx = this.compileNode(child);
-      this.emit(Opcodes.APPEND_CHILD, nodeIdx, childIdx);
+      if (child.type !== 'Script') {
+        const childIdx = this.compileNode(child);
+        this.emit(Opcodes.APPEND_CHILD, nodeIdx, childIdx);
+      }
     }
 
     for (const [event, handlerStr] of Object.entries(node.events)) {
       const eventIdx = this.getConstant(event);
       const bindInstIdx = this.bytecode.length;
       this.emit(Opcodes.BIND_EVENT, nodeIdx, eventIdx, 0); 
-      this.eventHandlers.push({ nodeIdx, eventIdx, handlerStr: handlerStr as string, bindInstIdx });
+      this.eventHandlers.push({ nodeIdx, eventIdx, handlerStr, bindInstIdx });
     }
 
     return nodeIdx;
   }
 
-  private compileText(node: any): number {
+  private compileText(node: TextNode): number {
     const nodeIdx = this.nextNodeIdx++;
     const textIdx = this.getConstant(node.content);
     this.emit(Opcodes.CREATE_TEXT, textIdx, nodeIdx);
     return nodeIdx;
   }
 
-  private compileInterpolation(node: any): number {
+  private compileInterpolation(node: InterpolationNode): number {
     const nodeIdx = this.nextNodeIdx++;
     
     const textIdx = this.getConstant('');
@@ -523,7 +521,7 @@ export class DriftJSCompiler {
     return nodeIdx;
   }
 
-  private getConstant(value: any): number {
+  private getConstant(value: unknown): number {
     const existing = this.constantMap.get(value);
     if (existing !== undefined) return existing;
     const idx = this.constants.length;
