@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { driftPlugin } from '../src/index.js';
-import { mountApp } from '@driftjs/vm';
+import { interpret } from '@driftjs/vm';
 
 describe('vite-plugin-drift', () => {
   const plugin = driftPlugin() as any;
@@ -18,7 +18,7 @@ describe('vite-plugin-drift', () => {
     expect(result).not.toBeNull();
     expect(typeof result.code).toBe('string');
     expect(result.code).toContain('export const program');
-    expect(result.code).toContain('export const mount');
+    expect(result.code).toContain('export const render');
     expect(result.code).toContain('updateBlockOffset:');
   });
 
@@ -28,18 +28,18 @@ describe('vite-plugin-drift', () => {
 
     // Dynamically evaluate transformed plugin output code
     const cleanJsCode = transformResult.code
-      .replace("import { mountApp } from '@driftjs/vm';", "")
+      .replace("import { interpret } from '@driftjs/vm';", "")
       .replace("export const program =", "const program =")
-      .replace("export const mount = function mount(target) {", "const mount = function mount(target) {")
+      .replace("export const render = function render(target) {", "const render = function render(target) {")
       .replace("export default component;", "");
 
-    const evaluator = new Function('mountApp', 'target', `
+    const evaluator = new Function('interpret', 'target', `
       ${cleanJsCode}
-      return mount(target);
+      return render(target);
     `);
 
     const root = document.createElement('div');
-    evaluator(mountApp, root);
+    evaluator(interpret, root);
 
     expect(root.innerHTML).toBe('<p>Count: 0</p>');
 

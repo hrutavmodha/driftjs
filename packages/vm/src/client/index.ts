@@ -42,9 +42,9 @@ export class DriftJSClientVM {
   }
 
   /**
-   * Mounts the application by running the initial mount block of the bytecode.
+   * Boots the application by running the initial mount block of the bytecode.
    */
-  public mount(): void {
+  public boot(): void {
     this.execute(0);
     this.dirtyMask = 0;
     this.prevRegBuffer = [...this.registers];
@@ -290,28 +290,28 @@ export class DriftJSClientVM {
 }
 
 /**
- * Convenience function to instantiate and mount a VM program.
+ * Instantiates a VM and interprets/executes a VMProgram against a target HTML element.
  *
- * @param program - Compiled VM program.
- * @param rootElement - Target HTML element to mount into.
- * @returns Mounted VM instance.
+ * @param program - Compiled VM program bytecode and constants.
+ * @param target - Target HTML element to mount into.
+ * @returns Active DriftJSClientVM instance.
  */
-export function mountApp(program: VMProgram, rootElement: HTMLElement): DriftJSClientVM {
-  const vm = new DriftJSClientVM(program, rootElement);
-  vm.mount();
+export function interpret(program: VMProgram, target: HTMLElement): DriftJSClientVM {
+  const vm = new DriftJSClientVM(program, target);
+  vm.boot();
   return vm;
 }
 
 /**
  * Mounts a DriftComponent into a target HTML element.
  *
- * @param component - The component containing compiled program bytecode.
+ * @param component - Compiled component object containing program bytecode.
  * @param target - Target HTML element to mount into.
- * @returns Mounted DriftJSClientVM instance.
+ * @returns Active DriftJSClientVM instance.
  */
 export function mount(component: DriftComponent, target: HTMLElement): DriftJSClientVM {
-  if (typeof component.mount === 'function') {
-    return component.mount(target);
+  if (typeof component.render === 'function') {
+    return component.render(target);
   }
-  return mountApp(component.program, target);
+  return interpret(component.program, target);
 }

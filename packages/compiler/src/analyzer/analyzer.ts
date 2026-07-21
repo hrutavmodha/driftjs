@@ -1,5 +1,4 @@
-import type { ASTNode, ScriptNode } from '../../types/index.js';
-import type { AnalyzedExpression, AnalysisResult } from '../../types/index.js';
+import type { ASTNode, ScriptNode, AnalyzedExpression, AnalysisResult, Replacement } from '../../types/index.js';
 import * as acorn from 'acorn';
 import { walk } from 'estree-walker';
 
@@ -11,12 +10,6 @@ const JS_GLOBALS = new Set([
   'null', 'true', 'false', 'this', 'NaN', 'Infinity', 'setTimeout', 'clearTimeout',
   'setInterval', 'clearInterval'
 ]);
-
-interface Replacement {
-  start: number;
-  end: number;
-  text: string;
-}
 
 /**
  * DriftJS Analyzer for performing AST scope resolution, reactive variable tracking,
@@ -42,7 +35,7 @@ export class DriftJSAnalyzer {
     this.varToReg = new Map();
     this.nextRegIdx = 1;
 
-    const scriptNodes = this.ast.filter((n): n is ScriptNode => n.type === 'Script');
+    const scriptNodes = this.collectScriptNodes(this.ast);
     const scriptThunkCodes: string[] = [];
 
     for (const script of scriptNodes) {
@@ -54,6 +47,18 @@ export class DriftJSAnalyzer {
       nextRegIdx: this.nextRegIdx,
       scriptThunkCodes
     };
+  }
+
+  private collectScriptNodes(nodes: ASTNode[]): ScriptNode[] {
+    const scripts: ScriptNode[] = [];
+    for (const node of nodes) {
+      if (node.type === 'Script') {
+        scripts.push(node);
+      } else if (node.type === 'Element' && node.children) {
+        scripts.push(...this.collectScriptNodes(node.children));
+      }
+    }
+    return scripts;
   }
 
   public getRegForVar(name: string): number {

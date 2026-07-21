@@ -24,15 +24,15 @@
 ### 1. Installation
 
 ```bash
-npm install driftjs
-npm install -D vite-plugin-drift
+npm install @driftjs/vm
+npm install -D @driftjs/vite-plugin
 ```
 
 ### 2. Configure Vite (`vite.config.ts`)
 
 ```typescript
 import { defineConfig } from 'vite';
-import { driftPlugin } from 'vite-plugin-drift';
+import { driftPlugin } from '@driftjs/vite-plugin';
 
 export default defineConfig({
   plugins: [driftPlugin()]
@@ -59,7 +59,7 @@ export default defineConfig({
 ### 4. Mount the Component (`main.ts`)
 
 ```typescript
-import { mount } from 'driftjs';
+import { mount } from '@driftjs/vm';
 import App from './App.drift';
 
 const appElement = document.getElementById('app')!;
@@ -70,11 +70,11 @@ mount(App, appElement);
 
 ## 📦 Packages in this Monorepo
 
-| Package                         | Version   | Description                                                             |
-| :------------------------------ | :-------- | :---------------------------------------------------------------------- |
-| **`@driftjs/compiler`**         | `0.0.0`   | Parser and AST bytecode generator                                       |
-| **`@driftjs/vm`**               | `0.0.0`   | Bytecode-driven Register VM runtime reactivity engine                   |
-| **`vite-plugin-drift`**         | `0.0.0`   | Vite plugin for compiling `.drift` templates to VM bytecode AOT         |
+| Package | Description |
+| :--- | :--- |
+| **`@driftjs/compiler`** | Lexer, parser, analyzer, and AST bytecode generator |
+| **`@driftjs/vm`** | Bytecode-driven Register VM runtime reactivity engine |
+| **`@driftjs/vite-plugin`** | Vite plugin for compiling `.drift` templates to VM bytecode AOT |
 
 ---
 

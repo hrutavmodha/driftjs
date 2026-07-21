@@ -2,8 +2,6 @@ import type { Plugin } from 'vite';
 import { parseTemplate, generate } from '@driftjs/compiler';
 import type { DriftPluginOptions } from '../types/index.js';
 
-export * from '../types/index.js';
-
 /**
  * Vite plugin for compiling .drift single-file component templates into reactive VM bytecode AOT at build time.
  *
@@ -37,7 +35,7 @@ export function driftPlugin(options: DriftPluginOptions = {}): Plugin {
       });
 
       const jsCode = `
-import { mountApp } from '@driftjs/vm';
+import { interpret } from '@driftjs/vm';
 
 export const program = {
   bytecode: new Uint32Array([${bytecodeArray.join(', ')}]),
@@ -45,13 +43,13 @@ export const program = {
   updateBlockOffset: ${program.updateBlockOffset ?? 0}
 };
 
-export const mount = function mount(target) {
-  return mountApp(program, target);
+export const render = function render(target) {
+  return interpret(program, target);
 };
 
 const component = {
   program,
-  mount
+  render
 };
 
 export default component;

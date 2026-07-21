@@ -8,17 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./types": {
-      "types": "./dist/types/index.d.ts",
-      "default": "./dist/types/index.js"
     }
   },
   "scripts": {
     "build": "tsc"
-  },
-  "devDependencies": {
-    "@driftjs/compiler": "workspace:*"
   },
   "type": "module"
 }

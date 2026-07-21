@@ -8,37 +8,15 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./lexer": {
-      "types": "./dist/lexer/index.d.ts",
-      "default": "./dist/lexer/index.js"
-    },
-    "./parser": {
-      "types": "./dist/parser/index.d.ts",
-      "default": "./dist/parser/index.js"
-    },
-    "./analyzer": {
-      "types": "./dist/analyzer/index.d.ts",
-      "default": "./dist/analyzer/index.js"
-    },
-    "./generator": {
-      "types": "./dist/generator/index.d.ts",
-      "default": "./dist/generator/index.js"
-    },
-    "./types": {
-      "types": "./dist/types/index.d.ts",
-      "default": "./dist/types/index.js"
     }
   },
   "scripts": {
     "build": "tsc"
   },
   "dependencies": {
+    "@driftjs/vm": "workspace:*",
     "acorn": "^8.17.0",
     "estree-walker": "^3.0.3"
-  },
-  "peerDependencies": {
-    "@driftjs/vm": "workspace:*"
   },
   "type": "module"
 }

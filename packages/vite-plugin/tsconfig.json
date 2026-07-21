@@ -3,11 +3,13 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "./dist",
+    "declarationDir": "./dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "noEmit": false,
     "paths": {
       "@driftjs/vm": ["../vm/dist/index.d.ts"],
       "@driftjs/compiler": ["../compiler/dist/index.d.ts"]
     }
   },
-  "include": ["src/**/*", "types/**/*"]
+  "include": ["index.ts", "src/**/*", "types/**/*"]
 }

@@ -3,15 +3,10 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "./dist",
-    "noEmit": false,
-    "paths": {
-      "@driftjs/compiler": ["../compiler/dist/index.d.ts"],
-      "@driftjs/compiler/parser": ["../compiler/dist/parser/index.d.ts"],
-      "@driftjs/compiler/generator": ["../compiler/dist/generator/index.d.ts"],
-      "@driftjs/compiler/types": ["../compiler/dist/types/index.d.ts"],
-      "@driftjs/compiler/*": ["../compiler/dist/*"]
-    }
+    "declarationDir": "./dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "noEmit": false
   },
-  "include": ["src/**/*", "types/**/*"],
+  "include": ["index.ts", "src/**/*", "types/**/*"],
   "exclude": ["src/**/*.test.ts", "tests/**/*"]
 }

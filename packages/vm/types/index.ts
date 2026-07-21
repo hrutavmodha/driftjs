@@ -11,7 +11,7 @@ export interface VMProgram {
 export interface DriftJSComponent {
   program: VMProgram;
   ast?: unknown[];
-  mount?: (target: HTMLElement) => any;
+  render?: (target: HTMLElement) => any;
 }
 
 export type DriftComponent = DriftJSComponent;

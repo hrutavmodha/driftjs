@@ -1,29 +1,29 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { DriftJSClientVM, mountApp } from '../src/index.js';
+import { DriftJSClientVM, mount, interpret } from '../src/index.js';
 import { parseTemplate, generate } from '@driftjs/compiler';
 import { Opcodes, encodeInstruction, encodeInstruction24 } from '../src/isa.js';
 
 describe('DriftJSClientVM', () => {
   describe('constructor input data passing', () => {
-    it('should mount app when program and root element are passed in constructor', () => {
+    it('should boot app when program and root element are passed in constructor', () => {
       const ast = parseTemplate('<div>Hello VM</div>');
       const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = new DriftJSClientVM(program, root);
-      vm.mount();
+      vm.boot();
 
       expect(root.innerHTML).toBe('<div>Hello VM</div>');
       vm.unmount();
     });
 
-    it('should mount app via mountApp convenience function', () => {
+    it('should mount app via mount convenience function', () => {
       const ast = parseTemplate('<p>App VM</p>');
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
 
       expect(root.innerHTML).toBe('<p>App VM</p>');
       vm.unmount();
@@ -37,7 +37,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
       const input = root.querySelector('input') as HTMLInputElement;
 
       expect(input.value).toBe('initial');
@@ -61,7 +61,7 @@ describe('DriftJSClientVM', () => {
       };
 
       const root = document.createElement('div');
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
 
       expect(root.innerHTML).toBe('<div></div>');
       vm.unmount();
@@ -89,7 +89,7 @@ describe('DriftJSClientVM', () => {
       };
 
       const root = document.createElement('div');
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
 
       expect(root.innerHTML).toBe('<div>Subroutine</div>');
       vm.unmount();
@@ -100,7 +100,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
       expect(root.innerHTML).toBe('<button data-drift-node="1">Click</button>');
 
       vm.unmount();
@@ -115,7 +115,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
       expect(root.innerHTML).toBe('<p>Count: 0</p>');
 
       await new Promise(resolve => setTimeout(resolve, 30));
@@ -130,7 +130,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
       expect(root.innerHTML).toBe('<p>Count: 0</p>');
 
       await new Promise(resolve => setTimeout(resolve, 30));
@@ -145,7 +145,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
       expect(root.innerHTML).toBe('<p>A: 1</p><p>B: 10</p>');
 
       await new Promise(resolve => setTimeout(resolve, 30));
@@ -160,7 +160,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
       expect(root.innerHTML).toBe('<p>Status: loading</p>');
 
       await new Promise(resolve => setTimeout(resolve, 20));
@@ -175,7 +175,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
       expect(root.innerHTML).toBe('<p>Data: none</p>');
 
       await new Promise(resolve => setTimeout(resolve, 20));
@@ -190,7 +190,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = mountApp(program, root);
+      const vm = interpret(program, root);
       expect(root.innerHTML).toBe('<p>Ticks: 0</p>');
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -211,7 +211,7 @@ describe('DriftJSClientVM', () => {
         const program = generate(ast);
         const root = document.createElement('div');
 
-        const vm = mountApp(program, root);
+        const vm = interpret(program, root);
         expect(root.innerHTML).toBe('<p>User: Guest</p>');
 
         await new Promise(resolve => setTimeout(resolve, 30));

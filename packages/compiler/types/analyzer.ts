@@ -12,3 +12,9 @@ export interface AnalysisResult {
   nextRegIdx: number;
   scriptThunkCodes: string[];
 }
+
+export interface Replacement {
+  start: number;
+  end: number;
+  text: string;
+}
