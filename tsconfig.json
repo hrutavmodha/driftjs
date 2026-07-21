@@ -2,8 +2,17 @@
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     "paths": {
-      "driftjs": ["./packages/core/src/index.ts"],
-      "driftjs/*": ["./packages/core/src/*"],
+      "driftjs": ["./packages/vm/src/index.ts"],
+      "driftjs/*": ["./packages/vm/src/*"],
+      "@driftjs/compiler": ["./packages/compiler/src/index.ts"],
+      "@driftjs/compiler/lexer": ["./packages/compiler/src/lexer/index.ts"],
+      "@driftjs/compiler/parser": ["./packages/compiler/src/parser/index.ts"],
+      "@driftjs/compiler/analyzer": ["./packages/compiler/src/analyzer/index.ts"],
+      "@driftjs/compiler/generator": ["./packages/compiler/src/generator/index.ts"],
+      "@driftjs/compiler/types": ["./packages/compiler/types/index.ts"],
+      "@driftjs/compiler/*": ["./packages/compiler/*"],
+      "@driftjs/vm": ["./packages/vm/src/index.ts"],
+      "@driftjs/vm/*": ["./packages/vm/src/*"],
       "vite-plugin-drift": ["./packages/vite-plugin/src/index.ts"]
     },
 

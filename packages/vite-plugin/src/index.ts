@@ -1,15 +1,8 @@
 import type { Plugin } from 'vite';
-import { parseTemplate, compile } from 'driftjs';
+import { parseTemplate, generate } from '@driftjs/compiler';
+import type { DriftPluginOptions } from '../types/index.js';
 
-/**
- * Options for the DriftJS Vite plugin.
- */
-export interface DriftPluginOptions {
-  /**
-   * Extension for single file components. Defaults to '.drift'.
-   */
-  extension?: string;
-}
+export * from '../types/index.js';
 
 /**
  * Vite plugin for compiling .drift single-file component templates into reactive VM bytecode AOT at build time.
@@ -30,7 +23,7 @@ export function driftPlugin(options: DriftPluginOptions = {}): Plugin {
 
       // 1. Parse template AST and compile bytecode program AOT at build time
       const ast = parseTemplate(code);
-      const program = compile(ast);
+      const program = generate(ast);
 
       // 2. Serialize bytecode Uint32Array
       const bytecodeArray = Array.from(program.bytecode);
@@ -44,7 +37,7 @@ export function driftPlugin(options: DriftPluginOptions = {}): Plugin {
       });
 
       const jsCode = `
-import { mountApp } from 'driftjs';
+import { mountApp } from '@driftjs/vm';
 
 export const program = {
   bytecode: new Uint32Array([${bytecodeArray.join(', ')}]),

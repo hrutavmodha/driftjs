@@ -133,18 +133,15 @@ describe('DriftJSParser', () => {
     });
 
     it('should throw Error when tag name is missing', () => {
-      const parser = new DriftJSParser('<>');
-      expect(() => parser.parse()).toThrow('Expected tag name');
+      expect(() => parseTemplate('<>')).toThrow('Expected tag name');
     });
 
     it('should throw Error when closing tag mismatches', () => {
-      const parser = new DriftJSParser('<div></span>');
-      expect(() => parser.parse()).toThrow('Expected closing tag </div> but got </span>');
+      expect(() => parseTemplate('<div></span>')).toThrow('Expected closing tag </div> but got </span>');
     });
 
     it('should throw Error when interpolation is unclosed', () => {
-      const parser = new DriftJSParser('<p>{count</p>');
-      expect(() => parser.parse()).toThrow('Unclosed interpolation expression');
+      expect(() => parseTemplate('<p>{count</p>')).toThrow('Unclosed interpolation');
     });
   });
 });

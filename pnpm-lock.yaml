@@ -18,8 +18,11 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(jsdom@29.1.1)(vite@8.1.5(esbuild@0.28.1))
 
-  packages/core:
+  packages/compiler:
     dependencies:
+      '@driftjs/vm':
+        specifier: workspace:*
+        version: link:../vm
       acorn:
         specifier: ^8.17.0
         version: 8.17.0
@@ -29,28 +32,21 @@ importers:
 
   packages/vite-plugin:
     dependencies:
-      driftjs:
+      '@driftjs/compiler':
         specifier: workspace:*
-        version: link:../core
+        version: link:../compiler
+      '@driftjs/vm':
+        specifier: workspace:*
+        version: link:../vm
       vite:
         specifier: '>=7.0.0'
         version: 8.1.5(esbuild@0.28.1)
 
-  temp:
-    dependencies:
-      driftjs:
-        specifier: file:../packages/core
-        version: file:packages/core
+  packages/vm:
     devDependencies:
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vite:
-        specifier: ^8.1.5
-        version: 8.1.5(esbuild@0.28.1)
-      vite-plugin-drift:
-        specifier: file:../packages/vite-plugin
-        version: file:packages/vite-plugin(vite@8.1.5(esbuild@0.28.1))
+      '@driftjs/compiler':
+        specifier: workspace:*
+        version: link:../compiler
 
 packages:
 
@@ -585,9 +581,6 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
-  driftjs@file:packages/core:
-    resolution: {directory: packages/core, type: directory}
-
   entities@8.0.0:
     resolution: {integrity: sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA==}
     engines: {node: '>=20.19.0'}
@@ -817,11 +810,6 @@ packages:
   undici@7.28.0:
     resolution: {integrity: sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==}
     engines: {node: '>=20.18.1'}
-
-  vite-plugin-drift@file:packages/vite-plugin:
-    resolution: {directory: packages/vite-plugin, type: directory}
-    peerDependencies:
-      vite: ^7.0.0
 
   vite@8.1.5:
     resolution: {integrity: sha512-7ULLwsCdYx/nRyrpiEwvqb5TFHrMVZyBt+rg/OAXT7rgj/z+DtTDyKFeLAdDkubDVDKD8jOsndmy7m55XcfUsw==}
@@ -1288,11 +1276,6 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
-  driftjs@file:packages/core:
-    dependencies:
-      acorn: 8.17.0
-      estree-walker: 3.0.3
-
   entities@8.0.0: {}
 
   es-module-lexer@2.3.1: {}
@@ -1542,11 +1525,6 @@ snapshots:
       '@typescript/typescript-win32-x64': 7.0.2
 
   undici@7.28.0: {}
-
-  vite-plugin-drift@file:packages/vite-plugin(vite@8.1.5(esbuild@0.28.1)):
-    dependencies:
-      driftjs: link:packages/core
-      vite: 8.1.5(esbuild@0.28.1)
 
   vite@8.1.5(esbuild@0.28.1):
     dependencies:

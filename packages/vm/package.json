@@ -1,7 +1,7 @@
 {
-  "name": "@driftjs/vite-plugin",
+  "name": "@driftjs/vm",
   "version": "0.0.0",
-  "description": "Vite plugin for compiling .drift single-file component templates into reactive VM bytecode",
+  "description": "A bytecode-driven runtime reactivity register VM engine",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -17,12 +17,8 @@
   "scripts": {
     "build": "tsc"
   },
-  "dependencies": {
-    "@driftjs/compiler": "workspace:*",
-    "@driftjs/vm": "workspace:*"
-  },
-  "peerDependencies": {
-    "vite": ">=7.0.0"
+  "devDependencies": {
+    "@driftjs/compiler": "workspace:*"
   },
   "type": "module"
 }

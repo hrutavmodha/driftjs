@@ -1,18 +1,17 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { DriftJSVM, mountApp } from '../src/vm/index.js';
-import { parseTemplate } from '../src/parser/index.js';
-import { compile } from '../src/compiler/index.js';
-import { Opcodes, encodeInstruction, encodeInstruction24 } from '../src/vm/isa.js';
+import { DriftJSClientVM, mountApp } from '../src/index.js';
+import { parseTemplate, generate } from '@driftjs/compiler';
+import { Opcodes, encodeInstruction, encodeInstruction24 } from '../src/isa.js';
 
-describe('DriftJSVM', () => {
+describe('DriftJSClientVM', () => {
   describe('constructor input data passing', () => {
     it('should mount app when program and root element are passed in constructor', () => {
       const ast = parseTemplate('<div>Hello VM</div>');
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = new DriftJSVM(program, root);
+      const vm = new DriftJSClientVM(program, root);
       vm.mount();
 
       expect(root.innerHTML).toBe('<div>Hello VM</div>');
@@ -21,7 +20,7 @@ describe('DriftJSVM', () => {
 
     it('should mount app via mountApp convenience function', () => {
       const ast = parseTemplate('<p>App VM</p>');
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = mountApp(program, root);
@@ -35,7 +34,7 @@ describe('DriftJSVM', () => {
     it('should set DOM property directly via SET_PROPERTY', () => {
       const template = '<input type="text" value={val} /><script>let val = "initial";</script>';
       const ast = parseTemplate(template);
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = mountApp(program, root);
@@ -98,11 +97,11 @@ describe('DriftJSVM', () => {
 
     it('should clean up event listeners, node references, and innerHTML on unmount', () => {
       const ast = parseTemplate('<button onclick={handleClick}>Click</button><script>function handleClick() {}</script>');
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = mountApp(program, root);
-      expect(root.innerHTML).toBe('<button>Click</button>');
+      expect(root.innerHTML).toBe('<button data-drift-node="1">Click</button>');
 
       vm.unmount();
       expect(root.innerHTML).toBe('');
@@ -113,7 +112,7 @@ describe('DriftJSVM', () => {
     it('should update DOM asynchronously when state is mutated inside setTimeout', async () => {
       const template = '<p>Count: {count}</p><script>let count = 0; setTimeout(() => { count = 42; }, 10);</script>';
       const ast = parseTemplate(template);
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = mountApp(program, root);
@@ -128,7 +127,7 @@ describe('DriftJSVM', () => {
     it('should batch multiple synchronous mutations into a single microtask DOM update', async () => {
       const template = '<p>Count: {count}</p><script>let count = 0; setTimeout(() => { count = 1; count = 2; count = 3; }, 10);</script>';
       const ast = parseTemplate(template);
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = mountApp(program, root);
@@ -143,7 +142,7 @@ describe('DriftJSVM', () => {
     it('should retain O(1) bitmask dependency check so unchanged signals are skipped during re-render', async () => {
       const template = '<p>A: {a}</p><p>B: {b}</p><script>let a = 1; let b = 10; setTimeout(() => { a = 2; }, 10);</script>';
       const ast = parseTemplate(template);
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = mountApp(program, root);
@@ -158,7 +157,7 @@ describe('DriftJSVM', () => {
     it('should update DOM asynchronously when state is mutated inside Promise.then', async () => {
       const template = '<p>Status: {status}</p><script>let status = "loading"; Promise.resolve("done").then(val => { status = val; });</script>';
       const ast = parseTemplate(template);
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = mountApp(program, root);
@@ -173,7 +172,7 @@ describe('DriftJSVM', () => {
     it('should update DOM when state is mutated inside async function with await', async () => {
       const template = '<p>Data: {data}</p><script>let data = "none"; async function loadData() { const res = await Promise.resolve("loaded"); data = res; } loadData();</script>';
       const ast = parseTemplate(template);
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = mountApp(program, root);
@@ -188,7 +187,7 @@ describe('DriftJSVM', () => {
     it('should update DOM repeatedly on setInterval ticks', async () => {
       const template = '<p>Ticks: {ticks}</p><script>let ticks = 0; const timer = setInterval(() => { ticks++; if (ticks >= 3) clearInterval(timer); }, 15);</script>';
       const ast = parseTemplate(template);
-      const program = compile(ast);
+      const program = generate(ast);
       const root = document.createElement('div');
 
       const vm = mountApp(program, root);
@@ -209,7 +208,7 @@ describe('DriftJSVM', () => {
       try {
         const template = '<p>User: {username}</p><script>let username = "Guest"; async function fetchUser() { const res = await fetch("/api/user"); const data = await res.json(); username = data.user; } fetchUser();</script>';
         const ast = parseTemplate(template);
-        const program = compile(ast);
+        const program = generate(ast);
         const root = document.createElement('div');
 
         const vm = mountApp(program, root);

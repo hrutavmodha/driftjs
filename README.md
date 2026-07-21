@@ -72,8 +72,9 @@ mount(App, appElement);
 
 | Package                         | Version   | Description                                                             |
 | :------------------------------ | :-------- | :---------------------------------------------------------------------- |
-| **`driftjs`**           | `0.0.0` | Core reactivity engine containing Parser, AST Compiler, and Register VM |
-| **`vite-plugin-drift`** | `0.0.0` | Vite plugin for compiling`.drift` templates to VM bytecode AOT        |
+| **`@driftjs/compiler`**         | `0.0.0`   | Parser and AST bytecode generator                                       |
+| **`@driftjs/vm`**               | `0.0.0`   | Bytecode-driven Register VM runtime reactivity engine                   |
+| **`vite-plugin-drift`**         | `0.0.0`   | Vite plugin for compiling `.drift` templates to VM bytecode AOT         |
 
 ---
 

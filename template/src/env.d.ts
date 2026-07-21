@@ -1,7 +1,9 @@
 /// <reference types="vite/client" />
 
 declare module '*.drift' {
-  import type { DriftJSComponent } from 'driftjs';
-  const component: DriftJSComponent;
+  const component: {
+    program: any;
+    mount: (target: HTMLElement) => any;
+  };
   export default component;
 }

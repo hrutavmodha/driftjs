@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { driftPlugin } from '../src/index.js';
-import { mountApp } from 'driftjs';
+import { mountApp } from '@driftjs/vm';
 
 describe('vite-plugin-drift', () => {
   const plugin = driftPlugin() as any;
@@ -28,7 +28,7 @@ describe('vite-plugin-drift', () => {
 
     // Dynamically evaluate transformed plugin output code
     const cleanJsCode = transformResult.code
-      .replace("import { mountApp } from 'driftjs';", "")
+      .replace("import { mountApp } from '@driftjs/vm';", "")
       .replace("export const program =", "const program =")
       .replace("export const mount = function mount(target) {", "const mount = function mount(target) {")
       .replace("export default component;", "");

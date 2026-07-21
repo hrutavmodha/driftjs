@@ -1,3 +1,5 @@
+import type { Opcode } from '../types/index.js';
+
 export const Opcodes = {
   LOAD_CONST: 1,
   LOAD_NODE: 2,
@@ -17,7 +19,6 @@ export const Opcodes = {
   SET_PROPERTY: 16,
 } as const;
 
-export type Opcode = typeof Opcodes[keyof typeof Opcodes];
 
 /**
  * Encodes an instruction with up to three 8-bit arguments.

@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { DriftJSCompiler, compile } from '../src/compiler/index.js';
+import { DriftJSGenerator, generate } from '../src/generator/index.js';
 import { parseTemplate } from '../src/parser/index.js';
 
-describe('DriftJSCompiler', () => {
+describe('DriftJSGenerator', () => {
   describe('constructor input data passing', () => {
-    it('should compile AST passed in constructor', () => {
+    it('should generate AST passed in constructor via DriftJSGenerator', () => {
       const ast = parseTemplate('<div>Hello</div>');
-      const compiler = new DriftJSCompiler(ast);
-      const program = compiler.compile();
+      const generator = new DriftJSGenerator(ast);
+      const program = generator.generate();
 
       expect(program.bytecode).toBeInstanceOf(Uint32Array);
       expect(program.bytecode.length).toBeGreaterThan(0);
@@ -15,9 +15,9 @@ describe('DriftJSCompiler', () => {
       expect(program.constants).toContain('Hello');
     });
 
-    it('should compile AST via compile convenience function', () => {
+    it('should generate AST via generate convenience function', () => {
       const ast = parseTemplate('<p>Test</p>');
-      const program = compile(ast);
+      const program = generate(ast);
 
       expect(program.bytecode).toBeInstanceOf(Uint32Array);
       expect(program.bytecode.length).toBeGreaterThan(0);
@@ -26,8 +26,8 @@ describe('DriftJSCompiler', () => {
     });
   });
 
-  describe('script state and reactive update compilation', () => {
-    it('should compile script declarations, dynamic attribute expressions, and event handlers', () => {
+  describe('script state and reactive update generation', () => {
+    it('should generate script declarations, dynamic attribute expressions, and event handlers', () => {
       const ast = parseTemplate(`
         <script>
           let userInput = "";
@@ -39,8 +39,8 @@ describe('DriftJSCompiler', () => {
           <input type="text" value={userInput} oninput={(e) => handleInput(e);} />
         </div>
       `);
-      const compiler = new DriftJSCompiler(ast);
-      const program = compiler.compile();
+      const generator = new DriftJSGenerator(ast);
+      const program = generator.generate();
 
       expect(program.bytecode.length).toBeGreaterThan(0);
       expect(program.constants).toContain('input');

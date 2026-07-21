@@ -6,8 +6,9 @@
     "noEmit": false,
     "paths": {
       "@driftjs/vm": ["../vm/dist/index.d.ts"],
-      "@driftjs/compiler": ["../compiler/dist/index.d.ts"]
+      "@driftjs/vm/*": ["../vm/dist/*"]
     }
   },
-  "include": ["src/**/*", "types/**/*"]
+  "include": ["src/**/*", "types/**/*"],
+  "exclude": ["src/**/*.test.ts", "tests/**/*"]
 }

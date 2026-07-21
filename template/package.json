@@ -14,6 +14,7 @@
     "vite-plugin-drift": "file:../packages/vite-plugin"
   },
   "dependencies": {
-    "driftjs": "file:../packages/core"
+    "@driftjs/compiler": "file:../packages/compiler",
+    "@driftjs/vm": "file:../packages/vm"
   }
 }

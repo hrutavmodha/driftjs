@@ -1,13 +1,7 @@
-import { Opcodes, encodeInstruction } from '../vm/index.js';
-import type { ASTNode, ElementNode, TextNode, InterpolationNode, ScriptNode } from '../parser/index.js';
+import type { ASTNode, ScriptNode } from '../../types/index.js';
+import type { AnalyzedExpression, AnalysisResult } from '../../types/index.js';
 import * as acorn from 'acorn';
 import { walk } from 'estree-walker';
-
-export interface CompiledProgram {
-  bytecode: Uint32Array;
-  constants: unknown[];
-  updateBlockOffset: number;
-}
 
 const JS_GLOBALS = new Set([
   'console', 'window', 'document', 'globalThis', 'Math', 'Date', 'Array', 'Object',
@@ -25,35 +19,63 @@ interface Replacement {
 }
 
 /**
- * DriftJS Compiler for compiling AST nodes into VM bytecode programs.
+ * DriftJS Analyzer for performing AST scope resolution, reactive variable tracking,
+ * dependency mask calculation, and AST expression transformations.
  */
-export class DriftJSCompiler {
-  private bytecode: number[] = [];
-  private constants: unknown[] = [];
-  private constantMap: Map<unknown, number> = new Map();
-  private nextNodeIdx = 0;
-  private nextRegIdx = 1;
-  private varToReg: Map<string, number> = new Map();
-
-  private updates: { nodeIdx: number, reg: number, thunkIdx: number, depMask: number, attrKeyIdx?: number, isProperty?: boolean }[] = [];
-  private eventHandlers: { nodeIdx: number, eventIdx: number, handlerStr: string, bindInstIdx: number }[] = [];
+export class DriftJSAnalyzer {
+  public varToReg: Map<string, number> = new Map();
+  public nextRegIdx = 1;
 
   /**
-   * Initializes a new compiler instance.
+   * Initializes a new analyzer instance.
    *
-   * @param ast - The AST nodes array to compile.
+   * @param ast - The AST node array to analyze.
    */
   constructor(private readonly ast: ASTNode[]) {}
 
-  private getRegForVar(name: string): number {
+  /**
+   * Performs semantic analysis on the AST.
+   *
+   * @returns Complete analysis result including var-to-register map and analyzed script thunk codes.
+   */
+  public analyze(): AnalysisResult {
+    this.varToReg = new Map();
+    this.nextRegIdx = 1;
+
+    const scriptNodes = this.ast.filter((n): n is ScriptNode => n.type === 'Script');
+    const scriptThunkCodes: string[] = [];
+
+    for (const script of scriptNodes) {
+      scriptThunkCodes.push(this.analyzeScript(script));
+    }
+
+    return {
+      varToReg: this.varToReg,
+      nextRegIdx: this.nextRegIdx,
+      scriptThunkCodes
+    };
+  }
+
+  public getRegForVar(name: string): number {
     return this.varToReg.get(name)!;
   }
 
-  private createThunk(code: string): (regs: unknown[], vm: unknown) => unknown {
+  public hasVar(name: string): boolean {
+    return this.varToReg.has(name);
+  }
+
+  public createThunk(code: string): (regs: unknown[], vm: unknown) => unknown {
     return new Function('regs', 'vm', code) as (regs: unknown[], vm: unknown) => unknown;
   }
 
-  private rewriteExpression(expr: string, isEventHandler = false): { rewritten: string, depMask: number } {
+  /**
+   * Rewrites an expression, calculating dependency masks and inserting reactive dirty marks.
+   *
+   * @param expr - Expression string to rewrite.
+   * @param isEventHandler - Whether the expression is inside an event handler.
+   * @returns Analyzed expression with rewritten string and depMask.
+   */
+  public rewriteExpression(expr: string, isEventHandler = false): AnalyzedExpression {
     const jsAst = acorn.parse(expr, { ecmaVersion: 2020, allowReturnOutsideFunction: true });
     const replacements: Replacement[] = [];
     let depMask = 0;
@@ -183,10 +205,9 @@ export class DriftJSCompiler {
     return { rewritten, depMask };
   }
 
-  private compileScript(scriptNode: ScriptNode): number {
+  private analyzeScript(scriptNode: ScriptNode): string {
     const jsAst = acorn.parse(scriptNode.content, { ecmaVersion: 2020 });
-    
-    // First pass: Discover all top-level state variables, functions, and classes
+
     if (Array.isArray(jsAst.body)) {
       for (const node of jsAst.body as any[]) {
         if (node.type === 'VariableDeclaration') {
@@ -208,7 +229,6 @@ export class DriftJSCompiler {
       }
     }
 
-    // Second pass: Collect replacements for declarations, functions, and identifiers
     const replacements: Replacement[] = [];
     const localScopes: Set<string>[] = [new Set()];
 
@@ -346,210 +366,17 @@ export class DriftJSCompiler {
       }
     }
     rewritten += content.slice(lastEnd);
-
-    const thunk = this.createThunk(rewritten);
-    return this.getConstant(thunk);
-  }
-
-  /**
-   * Compiles the AST into a compiled VM program.
-   *
-   * @returns The compiled bytecode program and constants array.
-   */
-  public compile(): CompiledProgram {
-    // Reset compilation state for fresh compilation run
-    this.bytecode = [];
-    this.constants = [];
-    this.constantMap = new Map();
-    this.nextNodeIdx = 0;
-    this.nextRegIdx = 1;
-    this.varToReg = new Map();
-    this.updates = [];
-    this.eventHandlers = [];
-
-    const scriptNodes = this.ast.filter((n): n is ScriptNode => n.type === 'Script');
-    
-    // First, compile scripts to populate varToReg
-    const scriptThunkIndices: number[] = [];
-    for (const script of scriptNodes) {
-      scriptThunkIndices.push(this.compileScript(script));
-    }
-
-    const rootNodes = this.ast.filter((n): n is ElementNode | TextNode | InterpolationNode => n.type !== 'Script').map(node => this.compileNode(node));
-
-    // Emit script thunks at the beginning
-    for (const thunkIdx of scriptThunkIndices) {
-      this.emit(Opcodes.EXEC_THUNK, 0, thunkIdx);
-    }
-
-    for (const rootIdx of rootNodes) {
-      this.emit(Opcodes.MOUNT, rootIdx);
-    }
-    
-    const endOfMountJumpIdx = this.bytecode.length;
-    this.emit24(Opcodes.JUMP, 0); 
-
-    const updateBlockOffset = this.bytecode.length;
-    for (const up of this.updates) {
-      this.emit(Opcodes.EXEC_THUNK, up.reg, up.thunkIdx, up.depMask);
-      if (up.attrKeyIdx !== undefined) {
-        const op = up.isProperty ? Opcodes.SET_PROPERTY : Opcodes.SET_ATTRIBUTE;
-        this.emit(op, up.nodeIdx, up.attrKeyIdx, up.reg);
-      } else {
-        this.emit(Opcodes.SET_TEXT, up.nodeIdx, up.reg);
-      }
-    }
-    this.emit(Opcodes.RETURN); 
-
-    for (const handler of this.eventHandlers) {
-      const handlerOffset = this.bytecode.length;
-      this.bytecode[handler.bindInstIdx] = encodeInstruction(Opcodes.BIND_EVENT, handler.nodeIdx, handler.eventIdx, handlerOffset);
-
-      let handlerStr = handler.handlerStr.trim();
-      if (handlerStr.startsWith('{') && handlerStr.endsWith('}')) {
-        handlerStr = handlerStr.slice(1, -1).trim();
-      }
-      handlerStr = handlerStr.replace(/;+\s*$/, '').trim();
-
-      const { rewritten } = this.rewriteExpression(handlerStr, true);
-      const thunkCode = `
-        const e = regs[0];
-        const event = regs[0];
-        try {
-          const fn = (${rewritten});
-          if (typeof fn === 'function') {
-            fn(regs[0], vm);
-          }
-        } catch (err) {
-          console.error('[DriftJS Event Handler Error]', err);
-        }
-      `;
-      const thunk = this.createThunk(thunkCode);
-      const thunkIdx = this.getConstant(thunk);
-      
-      this.emit(Opcodes.EXEC_THUNK, 0, thunkIdx);
-      this.emit24(Opcodes.JUMP, updateBlockOffset); 
-    }
-
-    const endOfProgramOffset = this.bytecode.length;
-    this.bytecode[endOfMountJumpIdx] = this.encodeInstruction24(Opcodes.JUMP, updateBlockOffset);
-
-    return {
-      bytecode: new Uint32Array(this.bytecode),
-      constants: this.constants,
-      updateBlockOffset,
-    };
-  }
-
-  private compileNode(node: ElementNode | TextNode | InterpolationNode): number {
-    switch (node.type) {
-      case 'Element': return this.compileElement(node);
-      case 'Text': return this.compileText(node);
-      case 'Interpolation': return this.compileInterpolation(node);
-      default: throw new Error(`Unknown node type`);
-    }
-  }
-
-  private compileElement(node: ElementNode): number {
-    const nodeIdx = this.nextNodeIdx++;
-    const tagIdx = this.getConstant(node.tag);
-    
-    this.emit(Opcodes.CREATE_ELEMENT, tagIdx, nodeIdx);
-
-    for (const [key, value] of Object.entries(node.attributes)) {
-      const keyIdx = this.getConstant(key);
-      const valStr = value.trim();
-      const isProperty = key === 'value' || key === 'checked' || key === 'disabled' || key === 'selected';
-      const setOpcode = isProperty ? Opcodes.SET_PROPERTY : Opcodes.SET_ATTRIBUTE;
-
-      if (valStr.startsWith('{') && valStr.endsWith('}')) {
-        const expr = valStr.slice(1, -1).trim();
-        const { rewritten, depMask } = this.rewriteExpression(expr);
-        const thunk = this.createThunk(`return ${rewritten}`);
-        const thunkIdx = this.getConstant(thunk);
-        const reg = this.nextRegIdx++;
-        
-        this.emit(Opcodes.EXEC_THUNK, reg, thunkIdx);
-        this.emit(setOpcode, nodeIdx, keyIdx, reg);
-        this.updates.push({ nodeIdx, reg, thunkIdx, depMask, attrKeyIdx: keyIdx, isProperty });
-      } else {
-        const valIdx = this.getConstant(value);
-        const reg = this.nextRegIdx++;
-        this.emit(Opcodes.LOAD_CONST, reg, valIdx);
-        this.emit(setOpcode, nodeIdx, keyIdx, reg);
-      }
-    }
-
-    for (const child of node.children) {
-      if (child.type !== 'Script') {
-        const childIdx = this.compileNode(child);
-        this.emit(Opcodes.APPEND_CHILD, nodeIdx, childIdx);
-      }
-    }
-
-    for (const [event, handlerStr] of Object.entries(node.events)) {
-      const eventIdx = this.getConstant(event);
-      const bindInstIdx = this.bytecode.length;
-      this.emit(Opcodes.BIND_EVENT, nodeIdx, eventIdx, 0); 
-      this.eventHandlers.push({ nodeIdx, eventIdx, handlerStr, bindInstIdx });
-    }
-
-    return nodeIdx;
-  }
-
-  private compileText(node: TextNode): number {
-    const nodeIdx = this.nextNodeIdx++;
-    const textIdx = this.getConstant(node.content);
-    this.emit(Opcodes.CREATE_TEXT, textIdx, nodeIdx);
-    return nodeIdx;
-  }
-
-  private compileInterpolation(node: InterpolationNode): number {
-    const nodeIdx = this.nextNodeIdx++;
-    
-    const textIdx = this.getConstant('');
-    this.emit(Opcodes.CREATE_TEXT, textIdx, nodeIdx);
-
-    const { rewritten, depMask } = this.rewriteExpression(node.expression);
-    const thunk = this.createThunk(`return ${rewritten}`);
-    
-    const thunkIdx = this.getConstant(thunk);
-    const reg = this.nextRegIdx++;
-    
-    this.updates.push({ nodeIdx, reg, thunkIdx, depMask });
-
-    return nodeIdx;
-  }
-
-  private getConstant(value: unknown): number {
-    const existing = this.constantMap.get(value);
-    if (existing !== undefined) return existing;
-    const idx = this.constants.length;
-    this.constants.push(value);
-    this.constantMap.set(value, idx);
-    return idx;
-  }
-
-  private emit(op: import('../vm/index.js').Opcode, a = 0, b = 0, c = 0) {
-    this.bytecode.push(encodeInstruction(op, a, b, c));
-  }
-
-  private emit24(op: import('../vm/index.js').Opcode, offset: number) {
-    this.bytecode.push(this.encodeInstruction24(op, offset));
-  }
-
-  private encodeInstruction24(op: number, arg24: number): number {
-    return ((op & 0xFF) << 24) | (arg24 & 0xFFFFFF);
+    return rewritten;
   }
 }
 
 /**
- * Convenience function to compile an AST node array into a compiled VM program.
+ * Convenience function to analyze an AST node array.
  *
- * @param ast - The AST nodes array to compile.
- * @returns The compiled bytecode program and constants array.
+ * @param ast - The AST array to analyze.
+ * @returns Analysis result.
  */
-export function compile(ast: ASTNode[]): CompiledProgram {
-  const compiler = new DriftJSCompiler(ast);
-  return compiler.compile();
+export function analyzeAST(ast: ASTNode[]): AnalysisResult {
+  const analyzer = new DriftJSAnalyzer(ast);
+  return analyzer.analyze();
 }
