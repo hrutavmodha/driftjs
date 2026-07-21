@@ -47,6 +47,35 @@ describe('DriftJSServerVM (SSR)', () => {
     expect(html).toBe('<p title="&quot;hello&quot; &amp; &lt;world&gt;">&lt;b&gt;alert(1)&lt;/b&gt;</p>');
   });
 
+  it('should render boolean properties like disabled and checked in SSR', () => {
+    const template = '<button disabled={isDisabled}>Submit</button><script>let isDisabled = "true";</script>';
+    const ast = parseTemplate(template);
+    const program = generate(ast);
+
+    const html = renderToString(program);
+    expect(html).toBe('<button disabled="true">Submit</button>');
+  });
+
+  it('should render complex nested trees with multiple interpolation targets in SSR', () => {
+    const template = `
+      <script>
+        let user = "Alice";
+        let role = "Admin";
+      </script>
+      <header>
+        <div class="user-badge">
+          <span>{user}</span>
+          <span class="role">{role}</span>
+        </div>
+      </header>
+    `;
+    const ast = parseTemplate(template);
+    const program = generate(ast);
+
+    const html = renderToString(program);
+    expect(html).toBe('<header><div class="user-badge"><span>Alice</span><span class="role">Admin</span></div></header>');
+  });
+
   it('should instantiate DriftJSServerVM directly', () => {
     const ast = parseTemplate('<span>Direct VM</span>');
     const program = generate(ast);

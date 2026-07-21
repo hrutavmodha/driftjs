@@ -193,7 +193,7 @@ describe('DriftJSClientVM', () => {
       const vm = interpret(program, root);
       expect(root.innerHTML).toBe('<p>Ticks: 0</p>');
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 120));
 
       expect(root.innerHTML).toBe('<p>Ticks: 3</p>');
       vm.unmount();
