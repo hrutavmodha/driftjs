@@ -20,9 +20,9 @@ importers:
 
   packages/compiler:
     dependencies:
-      '@driftjs/vm':
+      '@driftjs/runtime':
         specifier: workspace:*
-        version: link:../vm
+        version: link:../runtime
       acorn:
         specifier: ^8.17.0
         version: 8.17.0
@@ -30,23 +30,38 @@ importers:
         specifier: ^3.0.3
         version: 3.0.3
 
+  packages/runtime: {}
+
   packages/vite-plugin:
     dependencies:
       '@driftjs/compiler':
         specifier: workspace:*
         version: link:../compiler
-      '@driftjs/vm':
+      '@driftjs/runtime':
         specifier: workspace:*
-        version: link:../vm
+        version: link:../runtime
       vite:
         specifier: '>=7.0.0'
         version: 8.1.5(esbuild@0.28.1)
 
-  packages/vm:
-    devDependencies:
+  template:
+    dependencies:
       '@driftjs/compiler':
         specifier: workspace:*
-        version: link:../compiler
+        version: link:../packages/compiler
+      '@driftjs/runtime':
+        specifier: workspace:*
+        version: link:../packages/runtime
+    devDependencies:
+      '@driftjs/vite-plugin':
+        specifier: workspace:*
+        version: link:../packages/vite-plugin
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.1.5
+        version: 8.1.5(esbuild@0.28.1)
 
 packages:
 

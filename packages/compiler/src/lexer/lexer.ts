@@ -1,9 +1,6 @@
 import { TokenType, type Token } from '../../types/index.js';
 
-const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr'
-]);
+
 
 /**
  * DriftJS Lexer for tokenizing template source strings into a token stream.

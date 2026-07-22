@@ -45,7 +45,7 @@ driftjs/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   ├── vm/                # @driftjs/vm — Register VM runtime engine
+│   ├── runtime/           # @driftjs/runtime — Register VM runtime engine
 │   │   ├── index.ts       # Package entry: re-exports src/ and types/
 │   │   ├── src/
 │   │   │   ├── index.ts   # Barrel: re-exports isa, client, server
@@ -53,7 +53,7 @@ driftjs/
 │   │   │   ├── client/
 │   │   │   │   └── index.ts  # DriftJSClientVM class + interpret() + mount()
 │   │   │   └── server/
-│   │   │       └── index.ts  # DriftJSServerVM class + renderToString() + renderToStaticMarkup()
+│   │   │       └── index.ts  # DriftJSServerVM class + renderToString()
 │   │   ├── types/
 │   │   │   └── index.ts   # Opcode type, VMProgram, DriftJSComponent, DriftComponent
 │   │   ├── tests/
@@ -119,7 +119,7 @@ pnpm lint             # Type-check workspace (tsc --noEmit)
 pnpm clean            # Remove all dist/ directories
 ```
 
-**Build order matters.** `@driftjs/vm` must build first (it has no workspace deps), then `@driftjs/compiler` (depends on `@driftjs/vm`), then `@driftjs/vite-plugin` (depends on both). `pnpm -r build` handles this automatically via topological sort.
+**Build order matters.** `@driftjs/runtime` must build first (it has no workspace deps), then `@driftjs/compiler` (depends on `@driftjs/runtime`), then `@driftjs/vite-plugin` (depends on both). `pnpm -r build` handles this automatically via topological sort.
 
 ---
 
@@ -227,7 +227,7 @@ Some instructions use a 24-bit argument variant: `[ Opcode (8-bit) | arg24 (24-b
 | 15 | `0x0F` | `REMOVE_CHILD` | `n_a`, `n_b` | `nodes[a].removeChild(nodes[b])` |
 | 16 | `0x10` | `SET_PROPERTY` | `n_a`, `c_b`, `r_c` | `nodes[a][constants[b]] = registers[c]` |
 
-### VM Runtime (`packages/vm/`)
+### VM Runtime (`packages/runtime/`)
 
 #### Client VM (`src/client/index.ts`)
 
@@ -253,7 +253,6 @@ Some instructions use a 24-bit argument variant: `[ Opcode (8-bit) | arg24 (24-b
 
 **Exported functions:**
 - `renderToString(input)` — SSR render to HTML string.
-- `renderToStaticMarkup(input)` — alias for `renderToString`.
 
 ### Vite Plugin (`packages/vite-plugin/`)
 
@@ -301,7 +300,7 @@ interface CompiledProgram {
 }
 ```
 
-### VM Types (`packages/vm/types/index.ts`)
+### VM Types (`packages/runtime/types/index.ts`)
 
 ```typescript
 type Opcode = typeof Opcodes[keyof typeof Opcodes]; // 1..16
@@ -367,8 +366,8 @@ pnpm build && pnpm test  # Build first if testing cross-package changes
 | `@driftjs/compiler` | `tests/parser.test.ts` | 10 | AST parsing: elements, attributes, events, void elements, whitespace stripping, errors |
 | `@driftjs/compiler` | `tests/analyzer.test.ts` | 5 | Scope resolution, register assignment, mutation rewriting, dep masks, error detection |
 | `@driftjs/compiler` | `tests/generator.test.ts` | 3 | Bytecode generation via class and function API, end-to-end instruction emission |
-| `@driftjs/vm` | `tests/vm.test.ts` | 13 | Client VM: mount, properties, child removal, branching, unmount, async reactivity, microtask batching, bitmask optimization |
-| `@driftjs/vm` | `tests/server.test.ts` | — | Server-side rendering |
+| `@driftjs/runtime` | `tests/vm.test.ts` | 13 | Client VM: mount, properties, child removal, branching, unmount, async reactivity, microtask batching, bitmask optimization |
+| `@driftjs/runtime` | `tests/server.test.ts` | — | Server-side rendering |
 | `@driftjs/vite-plugin` | `tests/plugin.test.ts` | 3 | Plugin instantiation, file filtering, AOT .drift → ESM compilation |
 
 ### Testing Conventions
@@ -418,13 +417,13 @@ This pattern holds for `DriftJSLexer`/`tokenize`, `DriftJSParser`/`parseTemplate
 ### Dependency Graph
 
 ```
-@driftjs/vm              (no workspace dependencies)
+@driftjs/runtime           (no workspace dependencies)
     ▲
     │
-@driftjs/compiler        (depends on @driftjs/vm for Opcodes and encodeInstruction)
+@driftjs/compiler        (depends on @driftjs/runtime for Opcodes and encodeInstruction)
     ▲
     │
-@driftjs/vite-plugin     (depends on @driftjs/compiler and @driftjs/vm)
+@driftjs/vite-plugin     (depends on @driftjs/compiler and @driftjs/runtime)
 ```
 
 ---
@@ -442,10 +441,10 @@ This pattern holds for `DriftJSLexer`/`tokenize`, `DriftJSParser`/`parseTemplate
 
 ## How to Add a New Opcode
 
-1. Add the opcode constant to `packages/vm/src/isa.ts` in the `Opcodes` object.
+1. Add the opcode constant to `packages/runtime/src/isa.ts` in the `Opcodes` object.
 2. Update the ISA documentation in `docs/ISA.md`.
-3. Add a `case` branch in `DriftJSClientVM.execute()` (`packages/vm/src/client/index.ts`).
-4. Add a corresponding `case` branch in `DriftJSServerVM.execute()` (`packages/vm/src/server/index.ts`) — or a no-op if the opcode is client-only.
+3. Add a `case` branch in `DriftJSClientVM.execute()` (`packages/runtime/src/client/index.ts`).
+4. Add a corresponding `case` branch in `DriftJSServerVM.execute()` (`packages/runtime/src/server/index.ts`) — or a no-op if the opcode is client-only.
 5. If the opcode is emitted by the compiler, add emission logic in `DriftJSGenerator` (`packages/compiler/src/generator/generator.ts`).
 6. Add tests in the appropriate test file(s).
 7. Rebuild: `pnpm build && pnpm test`.

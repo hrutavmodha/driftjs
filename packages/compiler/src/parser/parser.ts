@@ -1,11 +1,8 @@
 import type { ASTNode, ElementNode, TextNode, InterpolationNode, ScriptNode } from '../../types/index.js';
 import { TokenType, type Token } from '../../types/index.js';
 import { tokenize } from '../lexer/index.js';
+import { VOID_ELEMENTS } from '../constants.js';
 
-const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr'
-]);
 
 /**
  * DriftJS Parser for transforming token streams into AST node arrays.

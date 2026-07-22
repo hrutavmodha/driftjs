@@ -61,5 +61,25 @@ describe('DriftJSLexer', () => {
       const lexer = new DriftJSLexer('<p>{count</p>');
       expect(() => lexer.tokenize()).toThrow('Unclosed interpolation expression');
     });
+
+    it('should handle escaped quotes inside interpolation', () => {
+      const tokens = tokenize('<p>{"Hello \\"World\\""}</p>');
+      const interpToken = tokens.find(t => t.type === TokenType.Interpolation);
+      expect(interpToken).toBeDefined();
+      expect(interpToken?.value).toBe('"Hello \\"World\\""');
+    });
+
+    it('should tokenize multi-word hyphenated and namespaced attributes', () => {
+      const tokens = tokenize('<div data-test-id="app" aria-label="Main" />');
+      const attrTokens = tokens.filter(t => t.type === TokenType.AttributeName);
+      expect(attrTokens.map(t => t.value)).toEqual(['data-test-id', 'aria-label']);
+    });
+
+    it('should handle boolean attributes without values', () => {
+      const tokens = tokenize('<button disabled></button>');
+      expect(tokens[0]).toEqual({ type: TokenType.TagOpen, value: 'button', start: 0, end: 7 });
+      expect(tokens[1]).toEqual({ type: TokenType.AttributeName, value: 'disabled', start: 8, end: 16 });
+      expect(tokens[2]).toEqual({ type: TokenType.TagOpenEnd, value: '>', start: 16, end: 17 });
+    });
   });
 });

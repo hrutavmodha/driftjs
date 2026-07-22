@@ -1,10 +1,7 @@
 import { Opcodes } from '../isa.js';
+import { VOID_ELEMENTS } from '../constants.js';
 import type { Opcode, VMProgram, DriftComponent } from '../../types/index.js';
 
-const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr'
-]);
 
 export interface VirtualElementNode {
   type: 'Element';
@@ -250,9 +247,3 @@ export function renderToString(input: DriftComponent | VMProgram): string {
   return vm.renderToString();
 }
 
-/**
- * Alias for renderToString.
- */
-export function renderToStaticMarkup(input: DriftComponent | VMProgram): string {
-  return renderToString(input);
-}

@@ -49,5 +49,36 @@ describe('DriftJSAnalyzer', () => {
 
       expect(() => analyzer.rewriteExpression('unknownVar + 1')).toThrow('Variable "unknownVar" is not defined in state');
     });
+
+    it('should handle >32 state variables using bitmask wrapping', () => {
+      let script = '<script>';
+      for (let i = 1; i <= 33; i++) {
+        script += `let v${i} = ${i}; `;
+      }
+      script += '</script>';
+      const ast = parseTemplate(script);
+      const analyzer = new DriftJSAnalyzer(ast);
+      analyzer.analyze();
+
+      expect(analyzer.varToReg.get('v33')).toBe(33);
+      const exprAnalysis = analyzer.rewriteExpression('v33');
+      expect(exprAnalysis.depMask).toBe(1 << (33 % 32));
+    });
+
+    it('should exclude arrow function parameters and local block variables from dependency mask', () => {
+      const ast = parseTemplate('<script>let items = [1, 2];</script>');
+      const analyzer = new DriftJSAnalyzer(ast);
+      analyzer.analyze();
+
+      const exprAnalysis = analyzer.rewriteExpression('(items) => { const count = items.length; return count * 2; }');
+      expect(exprAnalysis.depMask).toBe(0);
+      expect(exprAnalysis.rewritten).toBe('(items) => { const count = items.length; return count * 2; }');
+    });
+
+    it('should analyze top-level destructuring declarations in script', () => {
+      const ast = parseTemplate('<script>let { count, name } = state;</script>');
+      const analyzer = new DriftJSAnalyzer(ast);
+      expect(() => analyzer.analyze()).not.toThrow();
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { Opcodes, encodeInstruction, type Opcode } from '@driftjs/vm';
+import { Opcodes, encodeInstruction, type Opcode } from '@driftjs/runtime';
 import type { ASTNode, ElementNode, TextNode, InterpolationNode, ScriptNode, CompiledProgram } from '../../types/index.js';
 import { DriftJSAnalyzer } from '../analyzer/index.js';
 

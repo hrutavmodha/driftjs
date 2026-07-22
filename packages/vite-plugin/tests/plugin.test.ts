@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { driftPlugin } from '../src/index.js';
-import { interpret } from '@driftjs/vm';
+import { interpret } from '@driftjs/runtime';
 
 describe('vite-plugin-drift', () => {
   const plugin = driftPlugin() as any;
@@ -28,7 +28,7 @@ describe('vite-plugin-drift', () => {
 
     // Dynamically evaluate transformed plugin output code
     const cleanJsCode = transformResult.code
-      .replace("import { interpret } from '@driftjs/vm';", "")
+      .replace("import { interpret } from '@driftjs/runtime';", "")
       .replace("export const program =", "const program =")
       .replace("export const render = function render(target) {", "const render = function render(target) {")
       .replace("export default component;", "");
@@ -46,5 +46,10 @@ describe('vite-plugin-drift', () => {
     await new Promise(resolve => setTimeout(resolve, 40));
 
     expect(root.innerHTML).toBe('<p>Count: 100</p>');
+  });
+
+  it('should propagate build-time template compilation error on undeclared state variable', () => {
+    const code = '<p>{count}</p>';
+    expect(() => plugin.transform(code, 'App.drift')).toThrow('Variable "count" is not defined in state');
   });
 });

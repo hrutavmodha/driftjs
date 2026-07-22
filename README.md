@@ -24,7 +24,7 @@
 ### 1. Installation
 
 ```bash
-npm install @driftjs/vm
+npm install @driftjs/runtime
 npm install -D @driftjs/vite-plugin
 ```
 
@@ -59,7 +59,7 @@ export default defineConfig({
 ### 4. Mount the Component (`main.ts`)
 
 ```typescript
-import { mount } from '@driftjs/vm';
+import { mount } from '@driftjs/runtime';
 import App from './App.drift';
 
 const appElement = document.getElementById('app')!;
@@ -73,7 +73,7 @@ mount(App, appElement);
 | Package | Description |
 | :--- | :--- |
 | **`@driftjs/compiler`** | Lexer, parser, analyzer, and AST bytecode generator |
-| **`@driftjs/vm`** | Bytecode-driven Register VM runtime reactivity engine |
+| **`@driftjs/runtime`** | Bytecode-driven Register VM runtime reactivity engine |
 | **`@driftjs/vite-plugin`** | Vite plugin for compiling `.drift` templates to VM bytecode AOT |
 
 ---

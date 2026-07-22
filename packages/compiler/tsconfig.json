@@ -7,8 +7,8 @@
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "noEmit": false,
     "paths": {
-      "@driftjs/vm": ["../vm/dist/index.d.ts"],
-      "@driftjs/vm/*": ["../vm/dist/*"]
+      "@driftjs/runtime": ["../runtime/dist/index.d.ts"],
+      "@driftjs/runtime/*": ["../runtime/dist/*"]
     }
   },
   "include": ["index.ts", "src/**/*", "types/**/*"],

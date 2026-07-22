@@ -222,5 +222,44 @@ describe('DriftJSClientVM', () => {
         globalThis.fetch = originalFetch;
       }
     });
+
+    it('should safely handle unmount while microtask re-render is pending', async () => {
+      const template = '<p>Count: {count}</p><script>let count = 0;</script>';
+      const ast = parseTemplate(template);
+      const program = generate(ast);
+      const root = document.createElement('div');
+
+      const vm = interpret(program, root);
+      vm.markDirty(1);
+      expect(() => vm.unmount()).not.toThrow();
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(root.innerHTML).toBe('');
+    });
+
+    it('should handle event delegation on targets removed during bubbling', () => {
+      const template = '<button onclick={handleClick}>Click</button><script>function handleClick() {}</script>';
+      const ast = parseTemplate(template);
+      const program = generate(ast);
+      const root = document.createElement('div');
+
+      const vm = interpret(program, root);
+      const button = root.querySelector('button')!;
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(() => vm.unmount()).not.toThrow();
+    });
+
+    it('should handle re-entrant state mutations during patch flush loop', async () => {
+      const template = '<p>Count: {count}</p><script>let count = 0; function inc() { count++; }</script>';
+      const ast = parseTemplate(template);
+      const program = generate(ast);
+      const root = document.createElement('div');
+
+      const vm = interpret(program, root);
+      vm.markDirty(1);
+      vm.markDirty(1);
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(root.innerHTML).toContain('Count:');
+      vm.unmount();
+    });
   });
 });

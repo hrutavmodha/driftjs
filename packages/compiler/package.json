@@ -14,7 +14,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@driftjs/vm": "workspace:*",
+    "@driftjs/runtime": "workspace:*",
     "acorn": "^8.17.0",
     "estree-walker": "^3.0.3"
   },

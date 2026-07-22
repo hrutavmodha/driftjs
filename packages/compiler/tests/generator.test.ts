@@ -49,5 +49,25 @@ describe('DriftJSGenerator', () => {
       const thunks = program.constants.filter((c) => typeof c === 'function');
       expect(thunks.length).toBeGreaterThan(0);
     });
+
+    it('should de-duplicate identical literal values in constants pool', () => {
+      const ast = parseTemplate('<div><p>duplicate</p><span>duplicate</span></div>');
+      const program = generate(ast);
+      const duplicateCount = program.constants.filter(c => c === 'duplicate').length;
+      expect(duplicateCount).toBe(1);
+    });
+
+    it('should emit bytecode for element with multiple dynamic bindings', () => {
+      const ast = parseTemplate(`
+        <script>
+          let val = "hello";
+          let title = "world";
+        </script>
+        <input type="text" value={val} title={title} />
+      `);
+      const program = generate(ast);
+      expect(program.updateBlockOffset).toBeGreaterThan(0);
+      expect(program.bytecode.length).toBeGreaterThan(program.updateBlockOffset!);
+    });
   });
 });

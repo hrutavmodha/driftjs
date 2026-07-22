@@ -143,5 +143,46 @@ describe('DriftJSParser', () => {
     it('should throw Error when interpolation is unclosed', () => {
       expect(() => parseTemplate('<p>{count</p>')).toThrow('Unclosed interpolation');
     });
+
+    it('should parse boolean attributes without explicit values', () => {
+      const ast = parseTemplate('<button disabled>Submit</button>');
+      expect(ast).toEqual([
+        {
+          type: 'Element',
+          tag: 'button',
+          attributes: { disabled: '' },
+          events: {},
+          children: [{ type: 'Text', content: 'Submit' }]
+        }
+      ]);
+    });
+
+    it('should parse self-closing custom elements', () => {
+      const ast = parseTemplate('<my-card title="Info" />');
+      expect(ast).toEqual([
+        {
+          type: 'Element',
+          tag: 'my-card',
+          attributes: { title: 'Info' },
+          events: {},
+          children: []
+        }
+      ]);
+    });
+
+    it('should parse deeply nested element trees', () => {
+      let template = 'Hello';
+      for (let i = 0; i < 50; i++) {
+        template = `<div>${template}</div>`;
+      }
+      const ast = parseTemplate(template);
+      let curr = ast[0];
+      for (let i = 0; i < 49; i++) {
+        expect(curr?.type).toBe('Element');
+        curr = (curr as any).children[0];
+      }
+      expect(curr?.type).toBe('Element');
+      expect((curr as any).children[0]).toEqual({ type: 'Text', content: 'Hello' });
+    });
   });
 });

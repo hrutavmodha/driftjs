@@ -9,13 +9,11 @@ import type { DriftPluginOptions } from '../types/index.js';
  * @returns Vite Plugin object.
  */
 export function driftPlugin(options: DriftPluginOptions = {}): Plugin {
-  const extension = options.extension ?? '.drift';
-
   return {
     name: 'vite-plugin-drift',
     enforce: 'pre',
     transform(code: string, id: string) {
-      if (!id.endsWith(extension)) {
+      if (!id.endsWith('.drift')) {
         return null;
       }
 
@@ -35,7 +33,7 @@ export function driftPlugin(options: DriftPluginOptions = {}): Plugin {
       });
 
       const jsCode = `
-import { interpret } from '@driftjs/vm';
+import { interpret } from '@driftjs/runtime';
 
 export const program = {
   bytecode: new Uint32Array([${bytecodeArray.join(', ')}]),

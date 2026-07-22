@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseTemplate, generate } from '@driftjs/compiler';
-import { renderToString, renderToStaticMarkup, DriftJSServerVM } from '../src/server/index.js';
+import { renderToString, DriftJSServerVM } from '../src/server/index.js';
 
 describe('DriftJSServerVM (SSR)', () => {
   it('should render simple static HTML template to string', () => {
@@ -34,7 +34,7 @@ describe('DriftJSServerVM (SSR)', () => {
     const ast = parseTemplate(template);
     const program = generate(ast);
 
-    const html = renderToStaticMarkup(program);
+    const html = renderToString(program);
     expect(html).toBe('<div><img src="avatar.png" alt="Avatar"><input type="text" value="Drift"></div>');
   });
 
@@ -84,5 +84,23 @@ describe('DriftJSServerVM (SSR)', () => {
     const html = vm.renderToString();
 
     expect(html).toBe('<span>Direct VM</span>');
+  });
+
+  it('should render null, undefined, and boolean false interpolations cleanly', () => {
+    const template = '<script>let a = null; let b = undefined; let c = false;</script><p>{a}{b}{c}</p>';
+    const ast = parseTemplate(template);
+    const program = generate(ast);
+
+    const html = renderToString(program);
+    expect(html).toBe('<p>false</p>');
+  });
+
+  it('should render top-level template fragments without a single root wrapper element', () => {
+    const template = '<h1>Header</h1><p>Paragraph</p>';
+    const ast = parseTemplate(template);
+    const program = generate(ast);
+
+    const html = renderToString(program);
+    expect(html).toBe('<h1>Header</h1><p>Paragraph</p>');
   });
 });

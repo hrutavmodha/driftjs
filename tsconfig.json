@@ -2,8 +2,8 @@
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     "paths": {
-      "driftjs": ["./packages/vm/index.ts"],
-      "driftjs/*": ["./packages/vm/*"],
+      "driftjs": ["./packages/runtime/index.ts"],
+      "driftjs/*": ["./packages/runtime/*"],
       "@driftjs/compiler": ["./packages/compiler/index.ts"],
       "@driftjs/compiler/src": ["./packages/compiler/src/index.ts"],
       "@driftjs/compiler/lexer": ["./packages/compiler/src/lexer/index.ts"],
@@ -12,10 +12,10 @@
       "@driftjs/compiler/generator": ["./packages/compiler/src/generator/index.ts"],
       "@driftjs/compiler/types": ["./packages/compiler/types/index.ts"],
       "@driftjs/compiler/*": ["./packages/compiler/*"],
-      "@driftjs/vm": ["./packages/vm/index.ts"],
-      "@driftjs/vm/src": ["./packages/vm/src/index.ts"],
-      "@driftjs/vm/types": ["./packages/vm/types/index.ts"],
-      "@driftjs/vm/*": ["./packages/vm/*"],
+      "@driftjs/runtime": ["./packages/runtime/index.ts"],
+      "@driftjs/runtime/src": ["./packages/runtime/src/index.ts"],
+      "@driftjs/runtime/types": ["./packages/runtime/types/index.ts"],
+      "@driftjs/runtime/*": ["./packages/runtime/*"],
       "@driftjs/vite-plugin": ["./packages/vite-plugin/index.ts"],
       "@driftjs/vite-plugin/src": ["./packages/vite-plugin/src/index.ts"],
       "@driftjs/vite-plugin/types": ["./packages/vite-plugin/types/index.ts"],

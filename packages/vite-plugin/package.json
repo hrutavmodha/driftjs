@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@driftjs/compiler": "workspace:*",
-    "@driftjs/vm": "workspace:*"
+    "@driftjs/runtime": "workspace:*"
   },
   "peerDependencies": {
     "vite": ">=7.0.0"
