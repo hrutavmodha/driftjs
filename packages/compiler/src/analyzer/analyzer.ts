@@ -11,6 +11,27 @@ const JS_GLOBALS = new Set([
   'setInterval', 'clearInterval'
 ]);
 
+function collectParams(params: any[], targetSet: Set<string>): void {
+  if (!params) return;
+  for (const param of params) {
+    if (param.type === 'Identifier') {
+      targetSet.add(param.name);
+    } else if (param.type === 'AssignmentPattern' && param.left && param.left.type === 'Identifier') {
+      targetSet.add(param.left.name);
+    } else if (param.type === 'RestElement' && param.argument && param.argument.type === 'Identifier') {
+      targetSet.add(param.argument.name);
+    } else if (param.type === 'ObjectPattern') {
+      for (const prop of param.properties) {
+        if (prop.value && prop.value.type === 'Identifier') targetSet.add(prop.value.name);
+      }
+    } else if (param.type === 'ArrayPattern') {
+      for (const elt of param.elements) {
+        if (elt && elt.type === 'Identifier') targetSet.add(elt.name);
+      }
+    }
+  }
+}
+
 /**
  * DriftJS Analyzer for performing AST scope resolution, reactive variable tracking,
  * dependency mask calculation, and AST expression transformations.
@@ -109,26 +130,7 @@ export class DriftJSAnalyzer {
       return false;
     };
 
-    const collectParams = (params: any[], targetSet: Set<string>) => {
-      if (!params) return;
-      for (const param of params) {
-        if (param.type === 'Identifier') {
-          targetSet.add(param.name);
-        } else if (param.type === 'AssignmentPattern' && param.left && param.left.type === 'Identifier') {
-          targetSet.add(param.left.name);
-        } else if (param.type === 'RestElement' && param.argument && param.argument.type === 'Identifier') {
-          targetSet.add(param.argument.name);
-        } else if (param.type === 'ObjectPattern') {
-          for (const prop of param.properties) {
-            if (prop.value && prop.value.type === 'Identifier') targetSet.add(prop.value.name);
-          }
-        } else if (param.type === 'ArrayPattern') {
-          for (const elt of param.elements) {
-            if (elt && elt.type === 'Identifier') targetSet.add(elt.name);
-          }
-        }
-      }
-    };
+
 
     walk(jsAst as any, {
       enter: (node: any, parent: any) => {
@@ -255,26 +257,7 @@ export class DriftJSAnalyzer {
       return false;
     };
 
-    const collectParams = (params: any[], targetSet: Set<string>) => {
-      if (!params) return;
-      for (const param of params) {
-        if (param.type === 'Identifier') {
-          targetSet.add(param.name);
-        } else if (param.type === 'AssignmentPattern' && param.left && param.left.type === 'Identifier') {
-          targetSet.add(param.left.name);
-        } else if (param.type === 'RestElement' && param.argument && param.argument.type === 'Identifier') {
-          targetSet.add(param.argument.name);
-        } else if (param.type === 'ObjectPattern') {
-          for (const prop of param.properties) {
-            if (prop.value && prop.value.type === 'Identifier') targetSet.add(prop.value.name);
-          }
-        } else if (param.type === 'ArrayPattern') {
-          for (const elt of param.elements) {
-            if (elt && elt.type === 'Identifier') targetSet.add(elt.name);
-          }
-        }
-      }
-    };
+
 
     walk(jsAst as any, {
       enter: (node: any, parent: any) => {

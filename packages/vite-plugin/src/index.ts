@@ -29,30 +29,23 @@ export function driftPlugin(options: DriftPluginOptions = {}): Plugin {
       const serializedConstants: string[] = [];
 
       program.constants.forEach((c) => {
-        if (typeof c === 'function') {
+        if (typeof c === 'function' || (typeof c === 'string' && (c.includes('regs') || c.startsWith('function')))) {
           const fnName = `_thunk${thunkFunctions.length}`;
-          const fnStr = c.toString();
-          const namedFn = fnStr.replace(
-            /^(?:function\s*\w*|\((?:regs,\s*vm,\s*nodes,\s*rootElement)?\)\s*=>|args\s*=>)/,
-            `function ${fnName}`
-          );
-          thunkFunctions.push(namedFn);
-          serializedConstants.push(fnName);
-        } else if (
-          typeof c === 'string' &&
-          (c.startsWith('(regs, vm') || c.startsWith('function'))
-        ) {
-          const fnName = `_thunk${thunkFunctions.length}`;
-          let body = c.trim();
-          if (body.startsWith('(regs, vm, nodes, rootElement) =>')) {
-            body = body.slice('(regs, vm, nodes, rootElement) =>'.length).trim();
+          const str = (typeof c === 'function' ? c.toString() : String(c)).trim();
+          let body = str;
+          if (body.includes('=>')) {
+            body = body.slice(body.indexOf('=>') + 2).trim();
             if (body.startsWith('{') && body.endsWith('}')) {
               body = body.slice(1, -1).trim();
             } else {
               body = `return ${body};`;
             }
           } else if (body.startsWith('function')) {
-            body = body.replace(/^function\s*\([^)]*\)\s*\{/, '').replace(/\}$/, '').trim();
+            const firstBrace = body.indexOf('{');
+            const lastBrace = body.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              body = body.slice(firstBrace + 1, lastBrace).trim();
+            }
           }
           thunkFunctions.push(
             `function ${fnName}(regs, vm, nodes, rootElement) {\n  ${body}\n}`

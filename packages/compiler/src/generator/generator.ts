@@ -90,7 +90,7 @@ export class DriftJSGenerator {
           }
           return __h;
         } catch (e) {
-          ${rewritten}
+          console.error('Error executing event handler:', e);
         }
       `);
       const thunkIdx = this.getConstant(thunkFn);
@@ -227,13 +227,17 @@ export class DriftJSGenerator {
       const jumpAlreadyActiveIdx = this.bytecode.length;
       this.emit(Opcodes.JUMP_IF_EQUAL, branchStateReg, stateReg, 0);
 
-      // Remove nodes from all other branches
+      // Remove nodes from all other branches (deduplicated)
+      const otherNodesToRemove = new Set<number>();
       for (let j = 0; j < branches.length; j++) {
         if (j !== i) {
           for (const otherNodeIdx of branchNodes[j]!) {
-            this.emit(Opcodes.REMOVE_CHILD, parentNodeIdx, otherNodeIdx);
+            otherNodesToRemove.add(otherNodeIdx);
           }
         }
+      }
+      for (const otherNodeIdx of otherNodesToRemove) {
+        this.emit(Opcodes.REMOVE_CHILD, parentNodeIdx, otherNodeIdx);
       }
 
       // Insert current branch nodes before anchor

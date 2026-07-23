@@ -1,6 +1,21 @@
 import { Opcodes } from '../isa.js';
 import type { Opcode, VMProgram, DriftJSComponent } from '../../types/index.js';
 
+const ALLOWED_PROPERTIES = new Set(['value', 'checked', 'disabled', 'indeterminate', 'selected', 'readOnly', 'hidden']);
+
+function compileThunkString(thunkStr: string): Function {
+  let body = thunkStr.trim();
+  if (body.startsWith('(regs, vm, nodes, rootElement) =>')) {
+    body = body.replace(/^\(regs,\s*vm,\s*nodes,\s*rootElement\)\s*=>\s*\{?/, '');
+    if (body.endsWith('}')) {
+      body = body.slice(0, -1);
+    }
+  } else if (body.startsWith('function')) {
+    body = body.replace(/^function\s*\w*\s*\([^)]*\)\s*\{/, '').replace(/\}$/, '');
+  }
+  return new Function('regs', 'vm', 'nodes', 'rootElement', body);
+}
+
 /**
  * DriftJS Virtual Machine for executing bytecode programs against a target HTML element.
  */
@@ -12,12 +27,12 @@ export class DriftJSClientVM {
   private callStack: number[];
   private pc: number;
   private dirtyMask = 0;
-  private prevRegBuffer: unknown[];
   private updateBlockOffset = 0;
   private updatePending = false;
 
   private isHydrating = false;
   private hydratedNodes = new Set<Node>();
+  private hydrationWalker: TreeWalker | null = null;
   
   private eventDelegationTable: Map<string, number>;
   private registeredEvents: Map<string, (e: Event) => void>;
@@ -39,7 +54,6 @@ export class DriftJSClientVM {
     this.registers = [null];
     this.callStack = [];
     this.pc = 0;
-    this.prevRegBuffer = [];
     this.eventDelegationTable = new Map();
     this.registeredEvents = new Map();
   }
@@ -48,9 +62,8 @@ export class DriftJSClientVM {
    * Boots the application by running the initial mount block of the bytecode.
    */
   public boot(): void {
-    this.execute(0);
-    this.dirtyMask = 0;
-    this.prevRegBuffer = [...this.registers];
+    this.pc = 0;
+    this.execute();
   }
 
   /**
@@ -58,26 +71,26 @@ export class DriftJSClientVM {
    */
   public hydrate(): void {
     this.isHydrating = true;
-    this.boot();
+    this.hydrationWalker = document.createTreeWalker(
+      this.rootElement,
+      NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT
+    );
+    this.pc = 0;
+    this.execute();
     this.isHydrating = false;
+    this.hydrationWalker = null;
   }
 
   /**
    * Unmounts the application by clearing event listeners and emptying the root element.
    */
   public unmount(): void {
-    for (const [eventName, handler] of this.registeredEvents.entries()) {
+    for (const [eventName, handler] of this.registeredEvents) {
       this.rootElement.removeEventListener(eventName, handler);
     }
     this.registeredEvents.clear();
     this.eventDelegationTable.clear();
-
     this.rootElement.innerHTML = '';
-    this.nodes = [];
-    this.registers = [];
-    this.dirtyMask = 0;
-    this.prevRegBuffer = [];
-    this.pc = 0;
   }
 
   /**
@@ -103,29 +116,31 @@ export class DriftJSClientVM {
    * Runs the update block to patch changed DOM elements.
    */
   public patch(): void {
-    if (this.dirtyMask === 0 || this.updateBlockOffset === 0) return;
-    this.execute(this.updateBlockOffset);
+    if (this.dirtyMask === 0) return;
+    this.pc = this.updateBlockOffset;
+    this.execute();
     this.dirtyMask = 0;
-    this.prevRegBuffer = [...this.registers];
   }
 
   /**
-   * Executes bytecode from a specified program counter offset.
+   * Executes bytecode from specified program counter offset or current PC.
    *
-   * @param startPc - Starting PC offset.
+   * @param startPc - Optional starting PC offset.
    */
-  public execute(startPc: number): void {
-    this.pc = startPc;
+  public execute(startPc?: number): void {
+    if (startPc !== undefined) {
+      this.pc = startPc;
+    }
 
     while (this.pc < this.bytecode.length) {
-      const inst = this.bytecode[this.pc]!;
-      const op = ((inst >> 24) & 0xFF) as Opcode;
-      const a = (inst >> 16) & 0xFF;
-      const b = (inst >> 8) & 0xFF;
-      const c = inst & 0xFF;
-      const arg24 = inst & 0xFFFFFF;
-
+      const instruction = this.bytecode[this.pc]!;
       this.pc++;
+
+      const op = (instruction >> 24) & 0xFF;
+      const a = (instruction >> 16) & 0xFF;
+      const b = (instruction >> 8) & 0xFF;
+      const c = instruction & 0xFF;
+      const arg24 = instruction & 0xFFFFFF;
 
       switch (op) {
         case Opcodes.LOAD_CONST: {
@@ -148,12 +163,14 @@ export class DriftJSClientVM {
           }
 
           let thunk = this.constants[thunkIdx];
-          if (typeof thunk === 'string' && (thunk.startsWith('(regs, vm') || thunk.startsWith('function'))) {
-            thunk = (0, eval)(thunk.startsWith('function') ? `(${thunk})` : thunk);
+          if (typeof thunk === 'string') {
+            thunk = compileThunkString(thunk);
             this.constants[thunkIdx] = thunk;
           }
           if (typeof thunk === 'function') {
             this.registers[reg] = thunk(this.registers, this, this.nodes, this.rootElement);
+          } else {
+            throw new TypeError(`Execution Error: Constant at index ${thunkIdx} is not a valid thunk function.`);
           }
           break;
         }
@@ -168,8 +185,8 @@ export class DriftJSClientVM {
               break;
             }
           }
-          const el = document.createElement(tag);
-          this.nodes[nodeIdx] = el;
+          const element = document.createElement(tag);
+          this.nodes[nodeIdx] = element;
           break;
         }
 
@@ -189,17 +206,16 @@ export class DriftJSClientVM {
         }
 
         case Opcodes.APPEND_CHILD: {
-          if (this.isHydrating) break;
-          const parentNode = (a === 0 ? this.rootElement : this.nodes[a]) as HTMLElement | null;
+          const parentNode = this.nodes[a];
           const childNode = this.nodes[b];
-          if (parentNode && childNode) {
+          if (parentNode && childNode && !this.isHydrating) {
             parentNode.appendChild(childNode);
           }
           break;
         }
 
         case Opcodes.REMOVE_CHILD: {
-          const parentNode = (a === 0 ? this.rootElement : this.nodes[a]) as HTMLElement | null;
+          const parentNode = this.nodes[a];
           const childNode = this.nodes[b];
           if (parentNode && childNode && childNode.parentNode === parentNode) {
             parentNode.removeChild(childNode);
@@ -208,11 +224,9 @@ export class DriftJSClientVM {
         }
 
         case Opcodes.MOUNT: {
-          if (this.isHydrating) break;
-          const nodeIdx = a;
-          const targetNode = this.nodes[nodeIdx];
-          if (targetNode) {
-            this.rootElement.appendChild(targetNode);
+          const node = this.nodes[a];
+          if (node && !this.isHydrating) {
+            this.rootElement.appendChild(node);
           }
           break;
         }
@@ -231,6 +245,17 @@ export class DriftJSClientVM {
           const nodeIdx = a;
           const attrKey = this.constants[b] as string;
           const regVal = String(this.registers[c] ?? '');
+          
+          if (/^on/i.test(attrKey)) {
+            throw new Error(`Security Violation: Cannot set inline event handler attribute "${attrKey}" via SET_ATTRIBUTE`);
+          }
+          if (/^(href|src|action|formaction)$/i.test(attrKey)) {
+            const sanitizedVal = regVal.trim().toLowerCase();
+            if (sanitizedVal.startsWith('javascript:') || sanitizedVal.startsWith('vbscript:') || sanitizedVal.startsWith('data:text/html')) {
+              throw new Error(`Security Violation: Unsafe URI protocol in attribute "${attrKey}": "${regVal}"`);
+            }
+          }
+
           const node = this.nodes[nodeIdx];
           if (node && node instanceof HTMLElement) {
             node.setAttribute(attrKey, regVal);
@@ -242,6 +267,11 @@ export class DriftJSClientVM {
           const nodeIdx = a;
           const propKey = this.constants[b] as string;
           const regVal = this.registers[c];
+
+          if (!ALLOWED_PROPERTIES.has(propKey)) {
+            throw new Error(`Security Violation: Property mutation disallowed for key "${propKey}"`);
+          }
+
           const node = this.nodes[nodeIdx];
           if (node && node instanceof HTMLElement) {
             (node as any)[propKey] = regVal;

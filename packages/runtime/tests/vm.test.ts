@@ -353,4 +353,32 @@ describe('DriftJSClientVM', () => {
       vm.unmount();
     });
   });
+
+  describe('Security Constraints', () => {
+    it('should throw security error when attempting SET_PROPERTY with unallowed keys like innerHTML', () => {
+      const program = {
+        bytecode: new Uint32Array([
+          (4 << 24) | (0 << 16) | (1 << 8), // CREATE_ELEMENT tag 0 -> node 1
+          (1 << 24) | (1 << 16) | (1 << 8), // LOAD_CONST reg 1 -> const 1 ("<script>alert(1)</script>")
+          (16 << 24) | (1 << 16) | (2 << 8) | (1 & 0xFF) // SET_PROPERTY node 1, prop 2 ("innerHTML"), reg 1
+        ]),
+        constants: ['div', '<script>alert(1)</script>', 'innerHTML']
+      };
+      const root = document.createElement('div');
+      expect(() => interpret(program, root)).toThrow('Security Violation: Property mutation disallowed for key "innerHTML"');
+    });
+
+    it('should throw security error when SET_ATTRIBUTE is given dangerous javascript: protocol', () => {
+      const program = {
+        bytecode: new Uint32Array([
+          (4 << 24) | (0 << 16) | (1 << 8), // CREATE_ELEMENT tag 0 -> node 1
+          (1 << 24) | (1 << 16) | (1 << 8), // LOAD_CONST reg 1 -> const 1 ("javascript:alert(1)")
+          (9 << 24) | (1 << 16) | (2 << 8) | (1 & 0xFF) // SET_ATTRIBUTE node 1, attr 2 ("href"), reg 1
+        ]),
+        constants: ['a', 'javascript:alert(1)', 'href']
+      };
+      const root = document.createElement('div');
+      expect(() => interpret(program, root)).toThrow('Security Violation: Unsafe URI protocol in attribute "href"');
+    });
+  });
 });

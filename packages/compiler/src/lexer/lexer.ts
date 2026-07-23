@@ -27,15 +27,19 @@ export class DriftJSLexer {
     const tokens: Token[] = [];
 
     while (!this.isEOF()) {
-      if (this.tryScanIfControlFlow(tokens)) {
-        continue;
-      } else if (this.tryScanForControlFlow(tokens)) {
-        continue;
-      } else if (this.tryScanElseControlFlow(tokens)) {
-        continue;
-      } else if (this.tryScanBlockClose(tokens)) {
-        continue;
-      } else if (this.startsWith('{')) {
+      let peekCursor = this.cursor;
+      while (peekCursor < this.source.length && /\s/.test(this.source[peekCursor]!)) {
+        peekCursor++;
+      }
+      const char = this.source[peekCursor];
+      if (char === 'i' || char === 'f' || char === 'e' || char === '}') {
+        if (this.tryScanIfControlFlow(tokens)) continue;
+        if (this.tryScanForControlFlow(tokens)) continue;
+        if (this.tryScanElseControlFlow(tokens)) continue;
+        if (this.tryScanBlockClose(tokens)) continue;
+      }
+
+      if (this.startsWith('{')) {
         tokens.push(this.scanInterpolation());
       } else if (this.startsWith('<')) {
         if (this.source.charCodeAt(this.cursor + 1) === 47 /* '/' */) {

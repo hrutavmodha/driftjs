@@ -72,16 +72,31 @@ export class DriftJSServerVM {
           break;
         }
 
+function compileThunkString(thunkStr: string): Function {
+  let body = thunkStr.trim();
+  if (body.startsWith('(regs, vm, nodes, rootElement) =>')) {
+    body = body.replace(/^\(regs,\s*vm,\s*nodes,\s*rootElement\)\s*=>\s*\{?/, '');
+    if (body.endsWith('}')) {
+      body = body.slice(0, -1);
+    }
+  } else if (body.startsWith('function')) {
+    body = body.replace(/^function\s*\w*\s*\([^)]*\)\s*\{/, '').replace(/\}$/, '');
+  }
+  return new Function('regs', 'vm', 'nodes', 'rootElement', body);
+}
+
         case Opcodes.EXEC_THUNK: {
           const reg = a;
           const thunkIdx = b;
           let thunk = this.constants[thunkIdx];
-          if (typeof thunk === 'string' && (thunk.startsWith('(regs, vm') || thunk.startsWith('function'))) {
-            thunk = (0, eval)(thunk.startsWith('function') ? `(${thunk})` : thunk);
+          if (typeof thunk === 'string') {
+            thunk = compileThunkString(thunk);
             this.constants[thunkIdx] = thunk;
           }
           if (typeof thunk === 'function') {
             this.registers[reg] = thunk(this.registers, this, this.nodes, (this as any).rootElement || (this as any).root);
+          } else {
+            throw new TypeError(`Execution Error: Constant at index ${thunkIdx} is not a valid thunk function.`);
           }
           break;
         }
@@ -245,36 +260,49 @@ export class DriftJSServerVM {
    */
   public renderToString(): string {
     this.execute();
-    return this.rootChildren.map(node => serializeVirtualNode(node)).join('');
+    const parts: string[] = [];
+    for (const node of this.rootChildren) {
+      serializeInto(node, parts);
+    }
+    return parts.join('');
   }
 }
 
-function serializeVirtualNode(node: VirtualNode): string {
+function serializeInto(node: VirtualNode, parts: string[]): void {
   if (node.type === 'Text') {
-    return escapeHtml(node.content);
+    parts.push(escapeHtml(node.content));
+    return;
   }
 
   const tag = node.tag.toLowerCase();
-  let attrStr = '';
+  parts.push('<', tag);
   for (const [key, value] of node.attributes.entries()) {
-    attrStr += ` ${escapeHtml(key)}="${escapeHtml(value)}"`;
+    parts.push(' ', escapeHtml(key), '="', escapeHtml(value), '"');
   }
+  parts.push('>');
 
   if (VOID_ELEMENTS.has(tag)) {
-    return `<${tag}${attrStr}>`;
+    return;
   }
 
-  const childrenHtml = node.children.map(child => serializeVirtualNode(child)).join('');
-  return `<${tag}${attrStr}>${childrenHtml}</${tag}>`;
+  for (const child of node.children) {
+    serializeInto(child, parts);
+  }
+
+  parts.push('</', tag, '>');
 }
 
+const ESCAPE_MAP: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+  '\x00': ''
+};
+
 function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  return str.replace(/[&<>"'\x00]/g, ch => ESCAPE_MAP[ch] || '');
 }
 
 /**
