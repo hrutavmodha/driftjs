@@ -101,26 +101,23 @@ export class DriftJSAnalyzer {
     return `(regs, vm, nodes, rootElement) => {\n  ${code.trim()}\n}`;
   }
 
-  /**
-   * Rewrites an expression, calculating dependency masks and inserting reactive dirty marks.
-   *
-   * @param expr - Expression string to rewrite.
-   * @param isEventHandler - Whether the expression is inside an event handler.
-   * @param localScopeVars - Optional array of additional local variable names in scope.
-   * @returns Analyzed expression with rewritten string and depMask.
-   */
-  public rewriteExpression(expr: string, isEventHandler = false, localScopeVars: string[] = []): AnalyzedExpression {
-    const jsAst = acorn.parse(expr, { ecmaVersion: 2020, allowReturnOutsideFunction: true });
+  private walkAndRewriteScope(
+    jsAst: any,
+    code: string,
+    options: { isScript?: boolean; isEventHandler?: boolean; localScopeVars?: string[] } = {}
+  ): { rewritten: string; depMask: number } {
     const replacements: Replacement[] = [];
     let depMask = 0;
-
     const localScopes: Set<string>[] = [new Set()];
-    if (isEventHandler) {
+
+    if (options.isEventHandler) {
       localScopes[0]!.add('e');
       localScopes[0]!.add('event');
     }
-    for (const v of localScopeVars) {
-      if (v) localScopes[0]!.add(v);
+    if (options.localScopeVars) {
+      for (const v of options.localScopeVars) {
+        if (v) localScopes[0]!.add(v);
+      }
     }
 
     const isLocal = (name: string): boolean => {
@@ -130,138 +127,9 @@ export class DriftJSAnalyzer {
       return false;
     };
 
-
-
     walk(jsAst as any, {
       enter: (node: any, parent: any) => {
-        if (
-          node.type === 'ArrowFunctionExpression' ||
-          node.type === 'FunctionExpression' ||
-          node.type === 'FunctionDeclaration'
-        ) {
-          const scope = new Set<string>();
-          collectParams(node.params, scope);
-          localScopes.push(scope);
-        } else if (
-          node.type === 'BlockStatement' ||
-          node.type === 'ForStatement' ||
-          node.type === 'ForInStatement' ||
-          node.type === 'ForOfStatement' ||
-          node.type === 'CatchClause'
-        ) {
-          localScopes.push(new Set());
-        }
-
-        if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'Identifier') {
-          localScopes[localScopes.length - 1]!.add(node.id.name);
-        }
-
-        if (node.type === 'UpdateExpression') {
-          if (node.argument && node.argument.type === 'Identifier' && !isLocal(node.argument.name)) {
-            if (this.varToReg.has(node.argument.name)) {
-              const reg = this.getRegForVar(node.argument.name);
-              replacements.push({ start: node.start, end: node.start, text: `(vm?.markDirty(${reg}), ` });
-              replacements.push({ start: node.end, end: node.end, text: `)` });
-            }
-          }
-        }
-
-        if (node.type === 'AssignmentExpression') {
-          if (node.left && node.left.type === 'Identifier' && !isLocal(node.left.name)) {
-            if (this.varToReg.has(node.left.name)) {
-              const reg = this.getRegForVar(node.left.name);
-              replacements.push({ start: node.start, end: node.start, text: `(vm?.markDirty(${reg}), ` });
-              replacements.push({ start: node.end, end: node.end, text: `)` });
-            }
-          }
-        }
-
-        if (node.type === 'Identifier') {
-          if (parent && parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return;
-          if (parent && parent.type === 'Property' && parent.key === node && !parent.computed) return;
-          if (parent && (parent.type === 'FunctionDeclaration' || parent.type === 'FunctionExpression' || parent.type === 'ArrowFunctionExpression') && parent.id === node) return;
-
-          if (isLocal(node.name)) {
-            return;
-          }
-
-          if (this.varToReg.has(node.name)) {
-            const reg = this.getRegForVar(node.name);
-            depMask |= (1 << (reg % 32));
-            replacements.push({ start: node.start, end: node.end, text: `regs[${reg}]` });
-          } else if (!JS_GLOBALS.has(node.name)) {
-            throw new Error(`Variable "${node.name}" is not defined in state`);
-          }
-        }
-      },
-      leave: (node: any) => {
-        if (
-          node.type === 'ArrowFunctionExpression' ||
-          node.type === 'FunctionExpression' ||
-          node.type === 'FunctionDeclaration' ||
-          node.type === 'BlockStatement' ||
-          node.type === 'ForStatement' ||
-          node.type === 'ForInStatement' ||
-          node.type === 'ForOfStatement' ||
-          node.type === 'CatchClause'
-        ) {
-          localScopes.pop();
-        }
-      }
-    });
-
-    replacements.sort((a, b) => a.start - b.start || a.end - b.end);
-    let rewritten = '';
-    let lastEnd = 0;
-    for (const rep of replacements) {
-      if (rep.start >= lastEnd) {
-        rewritten += expr.slice(lastEnd, rep.start) + rep.text;
-        lastEnd = Math.max(lastEnd, rep.end);
-      }
-    }
-    rewritten += expr.slice(lastEnd);
-    return { rewritten, depMask };
-  }
-
-  private analyzeScript(scriptNode: ScriptNode): string {
-    const jsAst = acorn.parse(scriptNode.content, { ecmaVersion: 2020 });
-
-    if (Array.isArray(jsAst.body)) {
-      for (const node of jsAst.body as any[]) {
-        if (node.type === 'VariableDeclaration') {
-          for (const decl of node.declarations) {
-            if (decl.id && decl.id.type === 'Identifier') {
-              if (!this.varToReg.has(decl.id.name)) {
-                this.varToReg.set(decl.id.name, this.nextRegIdx++);
-              }
-            }
-          }
-        } else if (
-          (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') &&
-          node.id && node.id.type === 'Identifier'
-        ) {
-          if (!this.varToReg.has(node.id.name)) {
-            this.varToReg.set(node.id.name, this.nextRegIdx++);
-          }
-        }
-      }
-    }
-
-    const replacements: Replacement[] = [];
-    const localScopes: Set<string>[] = [new Set()];
-
-    const isLocal = (name: string): boolean => {
-      for (let i = localScopes.length - 1; i >= 0; i--) {
-        if (localScopes[i]!.has(name)) return true;
-      }
-      return false;
-    };
-
-
-
-    walk(jsAst as any, {
-      enter: (node: any, parent: any) => {
-        if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id && node.id.type === 'Identifier') {
+        if (options.isScript && (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id && node.id.type === 'Identifier') {
           if (localScopes.length === 1 && this.varToReg.has(node.id.name)) {
             const reg = this.getRegForVar(node.id.name);
             replacements.push({ start: node.start, end: node.start, text: `regs[${reg}] = (` });
@@ -269,8 +137,8 @@ export class DriftJSAnalyzer {
           }
         }
 
-        if (node.type === 'VariableDeclaration') {
-          if (localScopes.length === 1) {
+        if (options.isScript && node.type === 'VariableDeclaration') {
+          if (localScopes.length === 1 && node.declarations[0]) {
             replacements.push({
               start: node.start,
               end: node.declarations[0].start,
@@ -279,8 +147,8 @@ export class DriftJSAnalyzer {
           }
         }
 
-        if (node.type === 'VariableDeclarator') {
-          if (localScopes.length > 1 && node.id && node.id.type === 'Identifier') {
+        if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'Identifier') {
+          if (localScopes.length > 1) {
             localScopes[localScopes.length - 1]!.add(node.id.name);
           }
         }
@@ -328,13 +196,14 @@ export class DriftJSAnalyzer {
           if (parent && parent.type === 'Property' && parent.key === node && !parent.computed) return;
           if (parent && (parent.type === 'FunctionDeclaration' || parent.type === 'FunctionExpression' || parent.type === 'ArrowFunctionExpression') && parent.id === node) return;
 
-          if (isLocal(node.name)) {
-            return;
-          }
+          if (isLocal(node.name)) return;
 
           if (this.varToReg.has(node.name)) {
             const reg = this.getRegForVar(node.name);
+            depMask |= (1 << (reg % 32));
             replacements.push({ start: node.start, end: node.end, text: `regs[${reg}]` });
+          } else if (!options.isScript && !JS_GLOBALS.has(node.name)) {
+            throw new Error(`Variable "${node.name}" is not defined in state`);
           }
         }
       },
@@ -357,15 +226,54 @@ export class DriftJSAnalyzer {
     replacements.sort((a, b) => a.start - b.start || a.end - b.end);
     let rewritten = '';
     let lastEnd = 0;
-    const content = scriptNode.content;
     for (const rep of replacements) {
       if (rep.start >= lastEnd) {
-        rewritten += content.slice(lastEnd, rep.start) + rep.text;
+        rewritten += code.slice(lastEnd, rep.start) + rep.text;
         lastEnd = Math.max(lastEnd, rep.end);
       }
     }
-    rewritten += content.slice(lastEnd);
-    return rewritten;
+    rewritten += code.slice(lastEnd);
+    return { rewritten, depMask };
+  }
+
+  /**
+   * Rewrites an expression, calculating dependency masks and inserting reactive dirty marks.
+   *
+   * @param expr - Expression string to rewrite.
+   * @param isEventHandler - Whether the expression is inside an event handler.
+   * @param localScopeVars - Optional array of additional local variable names in scope.
+   * @returns Analyzed expression with rewritten string and depMask.
+   */
+  public rewriteExpression(expr: string, isEventHandler = false, localScopeVars: string[] = []): AnalyzedExpression {
+    const jsAst = acorn.parse(expr, { ecmaVersion: 2020, allowReturnOutsideFunction: true });
+    return this.walkAndRewriteScope(jsAst, expr, { isEventHandler, localScopeVars });
+  }
+
+  private analyzeScript(scriptNode: ScriptNode): string {
+    const jsAst = acorn.parse(scriptNode.content, { ecmaVersion: 2020 });
+
+    if (Array.isArray(jsAst.body)) {
+      for (const node of jsAst.body as any[]) {
+        if (node.type === 'VariableDeclaration') {
+          for (const decl of node.declarations) {
+            if (decl.id && decl.id.type === 'Identifier') {
+              if (!this.varToReg.has(decl.id.name)) {
+                this.varToReg.set(decl.id.name, this.nextRegIdx++);
+              }
+            }
+          }
+        } else if (
+          (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') &&
+          node.id && node.id.type === 'Identifier'
+        ) {
+          if (!this.varToReg.has(node.id.name)) {
+            this.varToReg.set(node.id.name, this.nextRegIdx++);
+          }
+        }
+      }
+    }
+
+    return this.walkAndRewriteScope(jsAst, scriptNode.content, { isScript: true }).rewritten;
   }
 }
 

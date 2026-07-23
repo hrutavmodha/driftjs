@@ -18,12 +18,12 @@ describe('DriftJSClientVM', () => {
       vm.unmount();
     });
 
-    it('should mount app via mount convenience function', () => {
+    it('should mount app via mount convenience function', async () => {
       const ast = parseTemplate('<p>App VM</p>');
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = interpret(program, root);
+      const vm = await interpret(program, root);
 
       expect(root.innerHTML).toBe('<p>App VM</p>');
       vm.unmount();
@@ -31,13 +31,13 @@ describe('DriftJSClientVM', () => {
   });
 
   describe('ISA opcodes: SET_PROPERTY, REMOVE_CHILD, JUMP_IF_TRUE, CALL', () => {
-    it('should set DOM property directly via SET_PROPERTY', () => {
+    it('should set DOM property directly via SET_PROPERTY', async () => {
       const template = '<input type="text" value={val} /><script>let val = "initial";</script>';
       const ast = parseTemplate(template);
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = interpret(program, root);
+      const vm = await interpret(program, root);
       const input = root.querySelector('input') as HTMLInputElement;
 
       expect(input.value).toBe('initial');
@@ -211,7 +211,7 @@ describe('DriftJSClientVM', () => {
         const program = generate(ast);
         const root = document.createElement('div');
 
-        const vm = interpret(program, root);
+        const vm = await interpret(program, root);
         expect(root.innerHTML).toBe('<p>User: Guest</p>');
 
         await new Promise(resolve => setTimeout(resolve, 30));
@@ -229,20 +229,20 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = interpret(program, root);
+      const vm = await interpret(program, root);
       vm.markDirty(1);
       expect(() => vm.unmount()).not.toThrow();
       await new Promise(resolve => setTimeout(resolve, 20));
       expect(root.innerHTML).toBe('');
     });
 
-    it('should handle event delegation on targets removed during bubbling', () => {
+    it('should handle event delegation on targets removed during bubbling', async () => {
       const template = '<button onclick={handleClick}>Click</button><script>function handleClick() {}</script>';
       const ast = parseTemplate(template);
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = interpret(program, root);
+      const vm = await interpret(program, root);
       const button = root.querySelector('button')!;
       button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       expect(() => vm.unmount()).not.toThrow();
@@ -254,7 +254,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = interpret(program, root);
+      const vm = await interpret(program, root);
       vm.markDirty(1);
       vm.markDirty(1);
       await new Promise(resolve => setTimeout(resolve, 20));
@@ -262,13 +262,13 @@ describe('DriftJSClientVM', () => {
       vm.unmount();
     });
 
-    it('should render conditional control flow if/else blocks', () => {
+    it('should render conditional control flow if/else blocks', async () => {
       const template = '<script>let count = 6;</script><div>if count > 5 { <p>High</p> } else { <p>Low</p> }</div>';
       const ast = parseTemplate(template);
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = interpret(program, root);
+      const vm = await interpret(program, root);
       expect(root.innerHTML).toContain('<p>High</p>');
       vm.unmount();
     });
@@ -279,7 +279,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = interpret(program, root);
+      const vm = await interpret(program, root);
       expect(root.innerHTML).toContain('<p>Low</p>');
       expect(root.innerHTML).not.toContain('<p>High</p>');
 
@@ -299,7 +299,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = interpret(program, root);
+      const vm = await interpret(program, root);
       expect(root.innerHTML).toContain('<span>0</span>');
 
       const btn = root.querySelector('button')!;
@@ -317,7 +317,7 @@ describe('DriftJSClientVM', () => {
       const program = generate(ast);
       const root = document.createElement('div');
 
-      const vm = interpret(program, root);
+      const vm = await interpret(program, root);
       expect(root.innerHTML).toContain('<li>0: Apple</li>');
       expect(root.innerHTML).toContain('<li>1: Banana</li>');
 
@@ -335,13 +335,13 @@ describe('DriftJSClientVM', () => {
       const ast = parseTemplate(template);
       const program = generate(ast);
 
-      const ssrHtml = renderToString(program);
+      const ssrHtml = await renderToString(program);
       const root = document.createElement('div');
       root.innerHTML = ssrHtml;
 
       const initialChildCount = root.childNodes.length;
 
-      const vm = hydrate(program, root);
+      const vm = await hydrate(program, root);
       expect(root.childNodes.length).toBe(initialChildCount);
 
       const btn = root.querySelector('button')!;

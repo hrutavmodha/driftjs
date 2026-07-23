@@ -27,23 +27,15 @@ describe('vite-plugin-drift', () => {
     const driftCode = '<p>Count: {count}</p><script>let count = 0; setTimeout(() => { count = 100; }, 15);</script>';
     const transformResult = plugin.transform(driftCode, 'App.drift');
 
-    // Dynamically evaluate transformed plugin output code
     const cleanJsCode = transformResult.code
       .replace("import { interpret } from '@driftjs/runtime';", "")
       .replace("export const program =", "const program =")
       .replace("export const render = function render(target) {", "const render = function render(target) {")
-      .replace("export default component;", "");
-
-    const evaluator = (interpretFn: typeof interpret, targetEl: HTMLElement) => {
-      const fn = (0, eval)(`((interpret, target) => {
-        ${cleanJsCode}
-        return render(target);
-      })`);
-      return fn(interpretFn, targetEl);
-    };
+      .replace("export default component;", "return render(target);");
 
     const root = document.createElement('div');
-    evaluator(interpret, root);
+    const runner = new Function('interpret', 'target', cleanJsCode);
+    runner(interpret, root);
 
     expect(root.innerHTML).toBe('<p>Count: 0</p>');
 

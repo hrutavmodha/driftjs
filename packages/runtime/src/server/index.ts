@@ -16,6 +16,19 @@ export interface VirtualTextNode {
 
 export type VirtualNode = VirtualElementNode | VirtualTextNode;
 
+export function compileThunkString(thunkStr: string): Function {
+  let body = thunkStr.trim();
+  if (body.startsWith('(regs, vm, nodes, rootElement) =>')) {
+    body = body.replace(/^\(regs,\s*vm,\s*nodes,\s*rootElement\)\s*=>\s*\{?/, '');
+    if (body.endsWith('}')) {
+      body = body.slice(0, -1);
+    }
+  } else if (body.startsWith('function')) {
+    body = body.replace(/^function\s*\w*\s*\([^)]*\)\s*\{/, '').replace(/\}$/, '');
+  }
+  return new Function('regs', 'vm', 'nodes', 'rootElement', body);
+}
+
 /**
  * Headless Server-Side VM for executing DriftJS bytecode and rendering HTML strings.
  */
@@ -71,19 +84,6 @@ export class DriftJSServerVM {
           this.registers[a] = this.nodes[b] ?? null;
           break;
         }
-
-function compileThunkString(thunkStr: string): Function {
-  let body = thunkStr.trim();
-  if (body.startsWith('(regs, vm, nodes, rootElement) =>')) {
-    body = body.replace(/^\(regs,\s*vm,\s*nodes,\s*rootElement\)\s*=>\s*\{?/, '');
-    if (body.endsWith('}')) {
-      body = body.slice(0, -1);
-    }
-  } else if (body.startsWith('function')) {
-    body = body.replace(/^function\s*\w*\s*\([^)]*\)\s*\{/, '').replace(/\}$/, '');
-  }
-  return new Function('regs', 'vm', 'nodes', 'rootElement', body);
-}
 
         case Opcodes.EXEC_THUNK: {
           const reg = a;

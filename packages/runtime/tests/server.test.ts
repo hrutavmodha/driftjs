@@ -3,15 +3,15 @@ import { parseTemplate, generate } from '@driftjs/compiler';
 import { renderToString, DriftJSServerVM } from '../src/server/index.js';
 
 describe('DriftJSServerVM (SSR)', () => {
-  it('should render simple static HTML template to string', () => {
+  it('should render simple static HTML template to string', async () => {
     const ast = parseTemplate('<div id="container"><h1>Hello SSR</h1></div>');
     const program = generate(ast);
 
-    const html = renderToString(program);
+    const html = await renderToString(program);
     expect(html).toBe('<div id="container"><h1>Hello SSR</h1></div>');
   });
 
-  it('should render reactive state and interpolations evaluated on server', () => {
+  it('should render reactive state and interpolations evaluated on server', async () => {
     const template = `
       <script>
         let title = "DriftJS Engine";
@@ -25,38 +25,38 @@ describe('DriftJSServerVM (SSR)', () => {
     const ast = parseTemplate(template);
     const program = generate(ast);
 
-    const html = renderToString(program);
+    const html = await renderToString(program);
     expect(html).toBe('<div class="card"><h2>DriftJS Engine</h2><p>Count: 42</p></div>');
   });
 
-  it('should correctly handle void elements without closing tags', () => {
+  it('should correctly handle void elements without closing tags', async () => {
     const template = '<div><script>let val = "Drift";</script><img src="avatar.png" alt="Avatar"><input type="text" value={val} /></div>';
     const ast = parseTemplate(template);
     const program = generate(ast);
 
-    const html = renderToString(program);
+    const html = await renderToString(program);
     expect(html).toBe('<div><img src="avatar.png" alt="Avatar"><input type="text" value="Drift"></div>');
   });
 
-  it('should escape HTML special characters in text and attributes to prevent XSS', () => {
+  it('should escape HTML special characters in text and attributes to prevent XSS', async () => {
     const template = '<p title={badAttr}>{badText}</p><script>let badAttr = \'"hello" & <world>\'; let badText = "<b>alert(1)</b>";</script>';
     const ast = parseTemplate(template);
     const program = generate(ast);
 
-    const html = renderToString(program);
+    const html = await renderToString(program);
     expect(html).toBe('<p title="&quot;hello&quot; &amp; &lt;world&gt;">&lt;b&gt;alert(1)&lt;/b&gt;</p>');
   });
 
-  it('should render boolean properties like disabled and checked in SSR', () => {
+  it('should render boolean properties like disabled and checked in SSR', async () => {
     const template = '<button disabled={isDisabled}>Submit</button><script>let isDisabled = "true";</script>';
     const ast = parseTemplate(template);
     const program = generate(ast);
 
-    const html = renderToString(program);
+    const html = await renderToString(program);
     expect(html).toBe('<button disabled="true">Submit</button>');
   });
 
-  it('should render complex nested trees with multiple interpolation targets in SSR', () => {
+  it('should render complex nested trees with multiple interpolation targets in SSR', async () => {
     const template = `
       <script>
         let user = "Alice";
@@ -72,7 +72,7 @@ describe('DriftJSServerVM (SSR)', () => {
     const ast = parseTemplate(template);
     const program = generate(ast);
 
-    const html = renderToString(program);
+    const html = await renderToString(program);
     expect(html).toBe('<header><div class="user-badge"><span>Alice</span><span class="role">Admin</span></div></header>');
   });
 
@@ -86,21 +86,21 @@ describe('DriftJSServerVM (SSR)', () => {
     expect(html).toBe('<span>Direct VM</span>');
   });
 
-  it('should render null, undefined, and boolean false interpolations cleanly', () => {
+  it('should render null, undefined, and boolean false interpolations cleanly', async () => {
     const template = '<script>let a = null; let b = undefined; let c = false;</script><p>{a}{b}{c}</p>';
     const ast = parseTemplate(template);
     const program = generate(ast);
 
-    const html = renderToString(program);
+    const html = await renderToString(program);
     expect(html).toBe('<p>false</p>');
   });
 
-  it('should render top-level template fragments without a single root wrapper element', () => {
+  it('should render top-level template fragments without a single root wrapper element', async () => {
     const template = '<h1>Header</h1><p>Paragraph</p>';
     const ast = parseTemplate(template);
     const program = generate(ast);
 
-    const html = renderToString(program);
+    const html = await renderToString(program);
     expect(html).toBe('<h1>Header</h1><p>Paragraph</p>');
   });
 });

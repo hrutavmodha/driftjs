@@ -167,6 +167,7 @@ export class DriftJSClientVM {
             thunk = compileThunkString(thunk);
             this.constants[thunkIdx] = thunk;
           }
+
           if (typeof thunk === 'function') {
             this.registers[reg] = thunk(this.registers, this, this.nodes, this.rootElement);
           } else {
@@ -181,11 +182,13 @@ export class DriftJSClientVM {
           if (this.isHydrating) {
             const existing = this.findMatchingHydrationNode(1, tag);
             if (existing) {
+              (existing as any).__driftNodeIdx = nodeIdx;
               this.nodes[nodeIdx] = existing;
               break;
             }
           }
           const element = document.createElement(tag);
+          (element as any).__driftNodeIdx = nodeIdx;
           this.nodes[nodeIdx] = element;
           break;
         }
@@ -196,11 +199,13 @@ export class DriftJSClientVM {
           if (this.isHydrating) {
             const existing = this.findMatchingHydrationNode(3);
             if (existing) {
+              (existing as any).__driftNodeIdx = nodeIdx;
               this.nodes[nodeIdx] = existing;
               break;
             }
           }
           const textNode = document.createTextNode(textContent);
+          (textNode as any).__driftNodeIdx = nodeIdx;
           this.nodes[nodeIdx] = textNode;
           break;
         }
@@ -286,6 +291,7 @@ export class DriftJSClientVM {
 
           const targetNode = (nodeIdx === 0 ? this.rootElement : this.nodes[nodeIdx]) as HTMLElement | null;
           if (targetNode) {
+            (targetNode as any).__driftNodeIdx = nodeIdx;
             targetNode.setAttribute(`data-drift-node`, String(nodeIdx));
           }
 
@@ -297,7 +303,8 @@ export class DriftJSClientVM {
               while (curr) {
                 if (curr.nodeType === 1) {
                   const elem = curr as HTMLElement;
-                  const nIdxStr = elem.getAttribute('data-drift-node');
+                  const privIdx = (elem as any).__driftNodeIdx;
+                  const nIdxStr = privIdx !== undefined ? String(privIdx) : elem.getAttribute('data-drift-node');
                   if (nIdxStr !== null) {
                     const nIdx = parseInt(nIdxStr, 10);
                     const key = `${nIdx}:${eventName}`;
@@ -399,22 +406,20 @@ export class DriftJSClientVM {
   }
 
   private findMatchingHydrationNode(nodeType: number, tag?: string): Node | null {
-    const filter = nodeType === 1 ? NodeFilter.SHOW_ELEMENT : (nodeType === 3 ? NodeFilter.SHOW_TEXT : NodeFilter.SHOW_COMMENT);
-    const walker = document.createTreeWalker(this.rootElement, filter);
-    let curr: Node | null = walker.nextNode();
+    if (!this.hydrationWalker) {
+      this.hydrationWalker = document.createTreeWalker(this.rootElement, NodeFilter.SHOW_ALL);
+    }
+    let curr: Node | null = this.hydrationWalker.currentNode;
     while (curr) {
-      if (!this.hydratedNodes.has(curr)) {
-        if (nodeType === 1 && tag) {
-          if ((curr as HTMLElement).tagName.toLowerCase() === tag.toLowerCase()) {
+      if (!this.hydratedNodes.has(curr) && curr !== this.rootElement) {
+        if (curr.nodeType === nodeType) {
+          if (nodeType !== 1 || !tag || (curr as HTMLElement).tagName.toLowerCase() === tag.toLowerCase()) {
             this.hydratedNodes.add(curr);
             return curr;
           }
-        } else {
-          this.hydratedNodes.add(curr);
-          return curr;
         }
       }
-      curr = walker.nextNode();
+      curr = this.hydrationWalker.nextNode();
     }
     return null;
   }

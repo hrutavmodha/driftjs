@@ -32,10 +32,13 @@ export class DriftJSLexer {
         peekCursor++;
       }
       const char = this.source[peekCursor];
-      if (char === 'i' || char === 'f' || char === 'e' || char === '}') {
+      if (char === 'i') {
         if (this.tryScanIfControlFlow(tokens)) continue;
+      } else if (char === 'f') {
         if (this.tryScanForControlFlow(tokens)) continue;
+      } else if (char === 'e') {
         if (this.tryScanElseControlFlow(tokens)) continue;
+      } else if (char === '}') {
         if (this.tryScanBlockClose(tokens)) continue;
       }
 
