@@ -1,6 +1,6 @@
 # DriftJS Test Suite Specification & Matrix
 
-This document provides a formal test specification matrix covering all 65 test cases across the DriftJS monorepo (`@driftjs/compiler`, `@driftjs/runtime`, and `vite-plugin-drift`).
+This document provides a formal test specification matrix covering all 76 test cases across the DriftJS monorepo (`@driftjs/compiler`, `@driftjs/runtime`, and `vite-plugin-drift`).
 
 ---
 
@@ -8,14 +8,14 @@ This document provides a formal test specification matrix covering all 65 test c
 
 | Package                                     | Test Module File                              | Active Tests | Proposed Edge Cases | Total Specified |            Status            |
 | :------------------------------------------ | :-------------------------------------------- | :----------: | :-----------------: | :-------------: | :---------------------------: |
-| **`@driftjs/compiler` (Lexer)**     | `packages/compiler/tests/lexer.test.ts`     |      10      |          0          |       10       |         ✅ 10 PASSED          |
-| **`@driftjs/compiler` (Parser)**    | `packages/compiler/tests/parser.test.ts`    |      13      |          0          |       13       |         ✅ 13 PASSED          |
+| **`@driftjs/compiler` (Lexer)**     | `packages/compiler/tests/lexer.test.ts`     |      12      |          0          |       12       |         ✅ 12 PASSED          |
+| **`@driftjs/compiler` (Parser)**    | `packages/compiler/tests/parser.test.ts`    |      15      |          0          |       15       |         ✅ 15 PASSED          |
 | **`@driftjs/compiler` (Analyzer)**  | `packages/compiler/tests/analyzer.test.ts`  |      8       |          0          |        8        |          ✅ 8 PASSED          |
 | **`@driftjs/compiler` (Generator)** | `packages/compiler/tests/generator.test.ts` |      5       |          0          |        5        |          ✅ 5 PASSED          |
-| **`@driftjs/runtime` (Client)**     | `packages/runtime/tests/vm.test.ts`         |      16      |          0          |       16       |         ✅ 16 PASSED          |
+| **`@driftjs/runtime` (Client)**     | `packages/runtime/tests/vm.test.ts`         |      23      |          0          |       23       |         ✅ 23 PASSED          |
 | **`@driftjs/runtime` (Server)**     | `packages/runtime/tests/server.test.ts`     |      9       |          0          |        9        |          ✅ 9 PASSED          |
 | **`@driftjs/vite-plugin`**          | `packages/vite-plugin/tests/plugin.test.ts` |      4       |          0          |        4        |          ✅ 4 PASSED          |
-| **Total Workspace**                   | **7 Test Suites**                       |    **65**    |        **0**        |     **65**     |   **65/65 PASSED (100%)**     |
+| **Total Workspace**                   | **7 Test Suites**                       |    **76**    |        **0**        |     **76**     |   **76/76 PASSED (100%)**     |
 
 ---
 
@@ -35,6 +35,8 @@ This document provides a formal test specification matrix covering all 65 test c
 | `TC-LEX-008` | Edge Case  | Handle escaped quotes inside interpolation               | `<p>{"Hello \"World\""}</p>`                   | Emits `Interpolation` token containing `"Hello \"World\""`, correctly skipping escaped quote characters                                                      |  ✅ PASSED  |
 | `TC-LEX-009` | Edge Case  | Tokenize multi-word hyphenated and namespaced attributes | `<div data-test-id="app" aria-label="Main" />` | Emits `AttributeName("data-test-id")` and `AttributeName("aria-label")` tokens preserving hyphens                                                            |  ✅ PASSED  |
 | `TC-LEX-010` | Edge Case  | Handle boolean attributes without values                 | `<button disabled></button>`                   | Emits `AttributeName("disabled")` followed immediately by `TagOpenEnd` token                                                                                 |  ✅ PASSED  |
+| `TC-LEX-011` | Happy Path | Tokenize if and else control flow statements             | `if count > 5 { ... } else { ... }`            | Emits `TokenType.If` and `TokenType.Else` tokens                                                                                                               |  ✅ PASSED  |
+| `TC-LEX-012` | Happy Path | Tokenize for loop control flow blocks                    | `for item, index in items { ... }`             | Emits `TokenType.For` token with loop header expression                                                                                                        |  ✅ PASSED  |
 
 ---
 
@@ -55,6 +57,8 @@ This document provides a formal test specification matrix covering all 65 test c
 | `TC-PAR-011` | Edge Case  | Parse boolean attributes without explicit values     | `<button disabled>Submit</button>`             | Returns `ElementNode(button)` with `attributes: { disabled: "" }`                                |  ✅ PASSED  |
 | `TC-PAR-012` | Edge Case  | Parse self-closing custom elements                   | `<my-card title="Info" />`                     | Returns self-closing `ElementNode("my-card")` with attributes without scanning for closing tag   |  ✅ PASSED  |
 | `TC-PAR-013` | Edge Case  | Parse deeply nested element trees                    | 50 levels of nested `<div>` elements           | Returns deeply nested AST structure without encountering stack overflow                           |  ✅ PASSED  |
+| `TC-PAR-014` | Happy Path | Parse control flow if/else statements into `IfBlock` | `if count > 5 { <p>High</p> } else { ... }`    | Returns `IfBlock` AST node with `condition`, `consequent`, and `alternate` branches               |  ✅ PASSED  |
+| `TC-PAR-015` | Happy Path | Parse for loop control flow blocks into `ForBlock`   | `for item, idx in items { <p>{item}</p> }`     | Returns `ForBlock` AST node with `item`, `index`, `iterable`, and `body` nodes                    |  ✅ PASSED  |
 
 ---
 
@@ -105,6 +109,13 @@ This document provides a formal test specification matrix covering all 65 test c
 | `TC-VM-014` | Edge Case          | Safely handle `unmount()` while microtask re-render is pending          | Invoke `vm.unmount()` immediately after `markDirty()`  | Cancels pending re-render patch without throwing errors or operating on detached DOM nodes |  ✅ PASSED  |
 | `TC-VM-015` | Edge Case          | Handle event delegation on targets removed during bubbling               | Trigger event on node that detaches during bubbling       | Delegation listener safely walks parent chain without null dereference error               |  ✅ PASSED  |
 | `TC-VM-016` | Edge Case          | Handle re-entrant state mutations during patch flush loop                | Mutate state variable inside thunk execution              | Re-entrant mutation triggers secondary dirty patch cleanly                                 |  ✅ PASSED  |
+| `TC-VM-017` | Control Flow       | Render conditional control flow if/else blocks                           | `if count > 5 { <p>High</p> } else { <p>Low</p> }`        | Correctly renders active branch based on initial state                                     |  ✅ PASSED  |
+| `TC-VM-018` | Control Flow       | Dynamically switch branches on reactive state mutation                   | Mutate `count` from 10 to 0                               | Toggles branches in DOM, removing inactive branch nodes and mounting active branch         |  ✅ PASSED  |
+| `TC-VM-019` | Event Delegation   | Trigger state mutation and DOM re-render on button click                 | Dispatch click event to delegated button                  | Executes handler thunk, marks register dirty, and updates DOM asynchronously               |  ✅ PASSED  |
+| `TC-VM-020` | Control Flow       | Render and reactively update for loop blocks                             | `for item, idx in items { <li>{idx}: {item}</li> }`       | Renders list items and reactively updates array modifications in DOM                       |  ✅ PASSED  |
+| `TC-VM-021` | SSR Hydration      | Hydrate server-rendered HTML and preserve reactivity without wiping DOM | `hydrate(program, root)`                                  | Attaches reactivity to pre-rendered HTML without wiping DOM elements                       |  ✅ PASSED  |
+| `TC-VM-022` | Security           | Reject unallowed property keys in `SET_PROPERTY`                         | `SET_PROPERTY` with `innerHTML`                           | Throws `Security Violation` error for unallowed property mutations                         |  ✅ PASSED  |
+| `TC-VM-023` | Security           | Block `javascript:` URIs and `on*` attributes in `SET_ATTRIBUTE`          | `SET_ATTRIBUTE` with `javascript:alert(1)`                | Throws `Security Violation` error for dangerous attribute values                           |  ✅ PASSED  |
 
 ---
 
