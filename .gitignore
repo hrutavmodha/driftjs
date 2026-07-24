@@ -2,3 +2,4 @@ temp/
 node_modules/
 dist/
 *.env
+js-framework-benchmark/

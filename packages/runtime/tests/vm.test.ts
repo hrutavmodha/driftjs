@@ -397,6 +397,46 @@ describe('DriftJSClientVM', () => {
       vm.unmount();
     });
 
+    it('should correctly delete a single item from a keyed for-loop list on button click', async () => {
+      const template = `
+        <script>
+          let items = [{id: 1, text: "A"}, {id: 2, text: "B"}, {id: 3, text: "C"}];
+          function deleteItem(id) {
+            items = items.filter(item => item.id !== id);
+          }
+        </script>
+        <ul>
+          for item in items by item.id {
+            <li>
+              <span>{item.text}</span>
+              <button onclick={deleteItem(item.id)}>Delete {item.id}</button>
+            </li>
+          }
+        </ul>
+      `;
+      const ast = parseTemplate(template);
+      const program = generate(ast);
+      const root = document.createElement('div');
+
+      const vm = await interpret(program, root);
+      let lis = root.querySelectorAll('li');
+      expect(lis.length).toBe(3);
+      expect(lis[0]!.querySelector('span')!.textContent).toBe('A');
+      expect(lis[1]!.querySelector('span')!.textContent).toBe('B');
+
+      const deleteBtn2 = lis[1]!.querySelector('button')!;
+      deleteBtn2.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      lis = root.querySelectorAll('li');
+      expect(lis.length).toBe(2);
+      expect(lis[0]!.querySelector('span')!.textContent).toBe('A');
+      expect(lis[1]!.querySelector('span')!.textContent).toBe('C');
+
+      vm.unmount();
+    });
+
     it('should support explicit key expression syntax "for item in items by keyExpr"', async () => {
       const template = '<script>let items = [{uid: "x1", val: 10}, {uid: "x2", val: 20}];</script><ul>for item in items by item.uid { <li>{item.val}</li> }</ul>';
       const ast = parseTemplate(template);

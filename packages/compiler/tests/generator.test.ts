@@ -69,5 +69,40 @@ describe('DriftJSGenerator', () => {
       expect(program.updateBlockOffset).toBeGreaterThan(0);
       expect(program.bytecode.length).toBeGreaterThan(program.updateBlockOffset!);
     });
+
+    it('should generate valid thunk code and bytecode for keyed for-loops with LIS reconciliation', () => {
+      const ast = parseTemplate(`
+        <script>
+          let items = [{ id: 1, label: "Item 1" }, { id: 2, label: "Item 2" }];
+        </script>
+        <table>
+          <tbody>
+            for item in items by item.id {
+              <tr>
+                <td>{item.id}</td>
+                <td>{item.label}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      `);
+      const program = generate(ast);
+      expect(program.bytecode.length).toBeGreaterThan(0);
+
+      // Parent elements outside the for-loop are compiled via bytecode
+      expect(program.constants).toContain('table');
+      expect(program.constants).toContain('tbody');
+
+      // For-loop body elements are compiled into JS thunk strings,
+      // so 'tr' and 'td' appear inside the thunk function source, not
+      // as separate constants pool entries.
+      const forThunk = program.constants.find(
+        c => typeof c === 'string' && c.includes('getSequence')
+      );
+      expect(forThunk).toBeDefined();
+      const thunkSrc = forThunk as string;
+      expect(thunkSrc).toContain('createElement("tr")');
+      expect(thunkSrc).toContain('createElement("td")');
+    });
   });
 });

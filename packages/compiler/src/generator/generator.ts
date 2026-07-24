@@ -14,7 +14,7 @@ export class DriftJSGenerator {
   private nextRegIdx = 1;
   private analyzer: DriftJSAnalyzer;
 
-  private updates: { nodeIdx: number; reg: number; thunkIdx: number; depMask: number; attrKeyIdx?: number; isProperty?: boolean }[] = [];
+  private updates: { nodeIdx: number; reg: number; thunkIdx: number; depMask: number; attrKeyIdx?: number; isProperty?: boolean; isForBlock?: boolean }[] = [];
   private ifSubroutineOffsets: number[] = [];
   private eventHandlers: { nodeIdx: number; eventIdx: number; handlerStr: string; bindInstIdx: number }[] = [];
 
@@ -64,6 +64,9 @@ export class DriftJSGenerator {
     const updateBlockOffset = this.bytecode.length;
     for (const up of this.updates) {
       this.emit(Opcodes.EXEC_THUNK, up.reg, up.thunkIdx, up.depMask);
+      if (up.isForBlock) {
+        continue;
+      }
       if (up.attrKeyIdx !== undefined) {
         const setOpcode = up.isProperty ? Opcodes.SET_PROPERTY : Opcodes.SET_ATTRIBUTE;
         this.emit(setOpcode, up.nodeIdx, up.attrKeyIdx, up.reg);
@@ -326,43 +329,79 @@ export class DriftJSGenerator {
     let createJS = '';
     let updateJS = '';
 
+    const compileElementJS = (elNode: import('../../types/index.js').ElementNode, varName: string): { createStr: string; updateStr: string } => {
+      let createStr = `${varName} = document.createElement(${JSON.stringify(elNode.tag)});\n`;
+      let updateStr = ``;
+
+      for (const [k, v] of Object.entries(elNode.attributes)) {
+        let valExpr = JSON.stringify(v);
+        if (v.startsWith('{') && v.endsWith('}')) {
+          valExpr = evalExpr(v.slice(1, -1));
+        }
+        const isProp = k === 'value' || k === 'checked' || k === 'disabled';
+        if (isProp) {
+          createStr += `${varName}[${JSON.stringify(k)}] = ${valExpr};\n`;
+        } else {
+          createStr += `${varName}.setAttribute(${JSON.stringify(k)}, String(${valExpr} ?? ''));\n`;
+        }
+        createStr += `itemRecord.elementMap[${JSON.stringify(varName)}] = ${varName};\n`;
+        if (v.startsWith('{') && v.endsWith('}')) {
+          if (isProp) {
+            updateStr += `if (itemRecord.elementMap[${JSON.stringify(varName)}]) itemRecord.elementMap[${JSON.stringify(varName)}][${JSON.stringify(k)}] = ${valExpr};\n`;
+          } else {
+            updateStr += `if (itemRecord.elementMap[${JSON.stringify(varName)}]) itemRecord.elementMap[${JSON.stringify(varName)}].setAttribute(${JSON.stringify(k)}, String(${valExpr} ?? ''));\n`;
+          }
+        }
+      }
+
+      for (const [evtName, handlerStr] of Object.entries(elNode.events)) {
+        const handlerExpr = evalExpr(handlerStr);
+        createStr += `${varName}.addEventListener(${JSON.stringify(evtName)}, (e) => {\n`;
+        createStr += `  regs[0] = e;\n`;
+        createStr += `  const scope = (typeof itemRecord !== 'undefined' && itemRecord) ? itemRecord.scope : (typeof scope !== 'undefined' ? scope : {});\n`;
+        createStr += `  const __h = (${handlerExpr});\n`;
+        createStr += `  if (typeof __h === 'function') __h.call(vm, e);\n`;
+        createStr += `});\n`;
+      }
+
+      for (let childIdx = 0; childIdx < elNode.children.length; childIdx++) {
+        const child = elNode.children[childIdx]!;
+        if (child.type === 'Element') {
+          const childVar = `${varName}_c${childIdx}`;
+          createStr += `let ${childVar};\n`;
+          const sub = compileElementJS(child, childVar);
+          createStr += sub.createStr;
+          createStr += `${varName}.appendChild(${childVar});\n`;
+          updateStr += sub.updateStr;
+        } else if (child.type === 'Text') {
+          createStr += `${varName}.appendChild(document.createTextNode(${JSON.stringify(child.content)}));\n`;
+        } else if (child.type === 'Interpolation') {
+          const valExpr = evalExpr(child.expression);
+          const tVar = `${varName}_t${childIdx}`;
+          createStr += `const ${tVar} = document.createTextNode(String(${valExpr} ?? ''));\n`;
+          createStr += `${varName}.appendChild(${tVar});\n`;
+          createStr += `itemRecord.textBindings['${varName}_${childIdx}'] = ${tVar};\n`;
+          updateStr += `if (itemRecord.textBindings['${varName}_${childIdx}']) itemRecord.textBindings['${varName}_${childIdx}'].textContent = String(${valExpr} ?? '');\n`;
+        }
+      }
+
+      return { createStr, updateStr };
+    };
+
     for (let nodeIdx = 0; nodeIdx < nodes.length; nodeIdx++) {
       const node = nodes[nodeIdx]!;
       if (node.type === 'Element') {
-        createJS += `const el_${nodeIdx} = document.createElement(${JSON.stringify(node.tag)});\n`;
-        updateJS += `const el_${nodeIdx} = itemRecord.nodes[${nodeIdx}];\n`;
-
-        for (const [k, v] of Object.entries(node.attributes)) {
-          let valExpr = JSON.stringify(v);
-          if (v.startsWith('{') && v.endsWith('}')) {
-            valExpr = evalExpr(v.slice(1, -1));
-          }
-          createJS += `el_${nodeIdx}.setAttribute(${JSON.stringify(k)}, String(${valExpr} ?? ''));\n`;
-          if (v.startsWith('{') && v.endsWith('}')) {
-            updateJS += `if (el_${nodeIdx}) el_${nodeIdx}.setAttribute(${JSON.stringify(k)}, String(${valExpr} ?? ''));\n`;
-          }
-        }
-
-        for (let childIdx = 0; childIdx < node.children.length; childIdx++) {
-          const child = node.children[childIdx]!;
-          if (child.type === 'Text') {
-            createJS += `el_${nodeIdx}.appendChild(document.createTextNode(${JSON.stringify(child.content)}));\n`;
-          } else if (child.type === 'Interpolation') {
-            const valExpr = evalExpr(child.expression);
-            createJS += `const childText_${nodeIdx}_${childIdx} = document.createTextNode(String(${valExpr} ?? ''));\n`;
-            createJS += `el_${nodeIdx}.appendChild(childText_${nodeIdx}_${childIdx});\n`;
-            createJS += `itemRecord.textBindings['${nodeIdx}_${childIdx}'] = childText_${nodeIdx}_${childIdx};\n`;
-
-            updateJS += `if (itemRecord.textBindings['${nodeIdx}_${childIdx}']) itemRecord.textBindings['${nodeIdx}_${childIdx}'].textContent = String(${valExpr} ?? '');\n`;
-          }
-        }
-
-        createJS += `parent.insertBefore(el_${nodeIdx}, anchor);\nitemRecord.nodes.push(el_${nodeIdx});\n`;
+        const varName = `el_${nodeIdx}`;
+        createJS += `let ${varName};\n`;
+        const res = compileElementJS(node, varName);
+        createJS += res.createStr;
+        updateJS += res.updateStr;
+        createJS += `parent.insertBefore(${varName}, refNode);\nitemRecord.nodes.push(${varName});\n`;
       } else if (node.type === 'Text') {
-        createJS += `const t_${nodeIdx} = document.createTextNode(${JSON.stringify(node.content)});\nparent.insertBefore(t_${nodeIdx}, anchor);\nitemRecord.nodes.push(t_${nodeIdx});\n`;
+        createJS += `const t_${nodeIdx} = document.createTextNode(${JSON.stringify(node.content)});\nparent.insertBefore(t_${nodeIdx}, refNode);\nitemRecord.nodes.push(t_${nodeIdx});\n`;
       } else if (node.type === 'Interpolation') {
         const valExpr = evalExpr(node.expression);
-        createJS += `const t_${nodeIdx} = document.createTextNode(String(${valExpr} ?? ''));\nparent.insertBefore(t_${nodeIdx}, anchor);\nitemRecord.nodes.push(t_${nodeIdx});\nitemRecord.textBindings['root_${nodeIdx}'] = t_${nodeIdx};\n`;
+        createJS += `const t_${nodeIdx} = document.createTextNode(String(${valExpr} ?? ''));\nparent.insertBefore(t_${nodeIdx}, refNode);\nitemRecord.nodes.push(t_${nodeIdx});\nitemRecord.textBindings['root_${nodeIdx}'] = t_${nodeIdx};\n`;
         updateJS += `if (itemRecord.textBindings['root_${nodeIdx}']) itemRecord.textBindings['root_${nodeIdx}'].textContent = String(${valExpr} ?? '');\n`;
       }
     }
@@ -371,129 +410,311 @@ export class DriftJSGenerator {
   }
 
   private compileForBlock(node: import('../../types/index.js').ForBlockNode, parentNodeIdx = 0): number {
-    const anchorNodeIdx = this.nextNodeIdx++;
-    const commentTextIdx = this.getConstant('drift-for-anchor');
-    this.emit(Opcodes.CREATE_COMMENT, commentTextIdx, anchorNodeIdx);
-    if (parentNodeIdx === 0) {
-      this.emit(Opcodes.MOUNT, anchorNodeIdx);
-    } else {
-      this.emit(Opcodes.APPEND_CHILD, parentNodeIdx, anchorNodeIdx);
-    }
-
-    const { rewritten: iterableRewritten, depMask } = this.analyzer.rewriteExpression(node.iterable, false);
-    const extraLocals: string[] = [node.item];
-    if (node.index) extraLocals.push(node.index);
-    const keyRewritten = node.key ? this.analyzer.rewriteExpression(node.key, false, extraLocals).rewritten : null;
-    const { createJS, updateJS } = this.compileForBodyToJS(node.body, node.item, node.index);
-
-    const thunkCode = `
-      const list = (${iterableRewritten}) || [];
-      const parent = (nodes && nodes[${parentNodeIdx}]) || (vm && vm.rootElement) || (rootElement) || (typeof document !== 'undefined' ? document.body : null);
-      const anchor = nodes && nodes[${anchorNodeIdx}];
-      if (!parent || !anchor) return;
-      if (anchor.parentNode !== parent) {
-        parent.appendChild(anchor);
-      }
-
-      if (!vm) vm = {};
-      if (!vm._forCache) vm._forCache = new Map();
-      const oldKeyMap = vm._forCache.get(${anchorNodeIdx}) || new Map();
-      const newKeyMap = new Map();
-      const newCache = [];
-
-      const itemVar = ${JSON.stringify(node.item)};
-      const indexVar = ${JSON.stringify(node.index || null)};
-
-      for (let i = 0; i < list.length; i++) {
-        const itemVal = list[i];
-        const indexVal = i;
-        const ${node.item} = itemVal;
-        ${node.index ? `const ${node.index} = indexVal;` : ''}
-        const scope = { [itemVar]: itemVal };
-        if (indexVar) scope[indexVar] = indexVal;
-
-        let rawKeyVal;
-        if (${keyRewritten ? 'true' : 'false'}) {
-          rawKeyVal = (${keyRewritten});
-        } else if (itemVal !== null && typeof itemVal === 'object') {
-          rawKeyVal = itemVal.id !== undefined ? itemVal.id : (itemVal.key !== undefined ? itemVal.key : (itemVal._id !== undefined ? itemVal._id : i));
-        } else {
-          rawKeyVal = itemVal !== undefined ? itemVal : i;
-        }
-
-        let keyVal = rawKeyVal;
-        let dupIdx = 0;
-        while (newKeyMap.has(keyVal)) {
-          dupIdx++;
-          keyVal = String(rawKeyVal) + '__dup_' + dupIdx;
-        }
-
-        let existingRecords = oldKeyMap.get(rawKeyVal) || oldKeyMap.get(keyVal);
-        let itemRecord = existingRecords && existingRecords.length > 0 ? existingRecords.shift() : null;
-        if (existingRecords && existingRecords.length === 0) {
-          oldKeyMap.delete(rawKeyVal);
-          oldKeyMap.delete(keyVal);
-        }
-
-        if (itemRecord && itemRecord.nodes && itemRecord.nodes.length > 0) {
-          ${updateJS}
-        } else {
-          itemRecord = { key: keyVal, nodes: [], textBindings: {} };
-          ${createJS}
-        }
-
-        itemRecord.key = keyVal;
-        newKeyMap.set(keyVal, [itemRecord]);
-        newCache.push(itemRecord);
-      }
-
-      let nextRefNode = anchor;
-      for (let i = newCache.length - 1; i >= 0; i--) {
-        const itemRecord = newCache[i];
-        for (let j = itemRecord.nodes.length - 1; j >= 0; j--) {
-          const n = itemRecord.nodes[j];
-          if (n && n.nextSibling !== nextRefNode) {
-            parent.insertBefore(n, nextRefNode);
-          }
-          if (n) {
-            nextRefNode = n;
-          }
-        }
-      }
-
-      for (const recordsList of oldKeyMap.values()) {
-        if (Array.isArray(recordsList)) {
-          for (const oldRec of recordsList) {
-            if (oldRec && oldRec.nodes) {
-              for (const n of oldRec.nodes) {
-                if (n && n.parentNode === parent) {
-                  parent.removeChild(n);
-                }
-              }
-            }
-          }
-        }
-      }
-
-      vm._forCache.set(${anchorNodeIdx}, newKeyMap);
-    `;
-
-    const thunkFn = this.analyzer.createThunk(thunkCode);
-    const thunkIdx = this.getConstant(thunkFn);
-
-    const arrReg = this.nextRegIdx++;
-    this.emit(Opcodes.EXEC_THUNK, arrReg, thunkIdx, 0);
-
-    this.updates.push({
-      nodeIdx: anchorNodeIdx,
-      reg: arrReg,
-      thunkIdx,
-      depMask
-    });
-
-    return anchorNodeIdx;
+  const anchorNodeIdx = this.nextNodeIdx++;
+  const commentTextIdx = this.getConstant('drift-for-anchor');
+  this.emit(Opcodes.CREATE_COMMENT, commentTextIdx, anchorNodeIdx);
+  if (parentNodeIdx === 0) {
+    this.emit(Opcodes.MOUNT, anchorNodeIdx);
+  } else {
+    this.emit(Opcodes.APPEND_CHILD, parentNodeIdx, anchorNodeIdx);
   }
 
+  // 1. Extract dependency mask from iterable (e.g., `data`)
+  const { rewritten: iterableRewritten, depMask: iterableMask } = this.analyzer.rewriteExpression(node.iterable, false);
+
+  const extraLocals: string[] = [node.item];
+  if (node.index) extraLocals.push(node.index);
+
+  // 2. Scan loop body for additional external state dependencies (e.g., `selected`)
+  let bodyMask = 0;
+  const scanBodyDeps = (nodes: ASTNode[]) => {
+    for (const n of nodes) {
+      if (n.type === 'Element') {
+        for (const v of Object.values(n.attributes)) {
+          if (v.startsWith('{') && v.endsWith('}')) {
+            const { depMask } = this.analyzer.rewriteExpression(v.slice(1, -1), false, extraLocals);
+            bodyMask |= depMask;
+          }
+        }
+        scanBodyDeps(n.children);
+      } else if (n.type === 'Interpolation') {
+        const { depMask } = this.analyzer.rewriteExpression(n.expression, false, extraLocals);
+        bodyMask |= depMask;
+      } else if (n.type === 'IfBlock') {
+        const { depMask } = this.analyzer.rewriteExpression(n.condition, false, extraLocals);
+        bodyMask |= depMask;
+        scanBodyDeps(n.consequent);
+        if (n.alternate) scanBodyDeps(n.alternate);
+      }
+    }
+  };
+  scanBodyDeps(node.body);
+
+  const combinedDepMask = iterableMask | bodyMask;
+
+  const keyRewritten = node.key ? this.analyzer.rewriteExpression(node.key, false, extraLocals).rewritten : null;
+  const { createJS, updateJS } = this.compileForBodyToJS(node.body, node.item, node.index);
+
+  const thunkCode = `
+    function getSequence(arr) {
+      const p = new Int32Array(arr.length);
+      const result = [];
+      let u, v, c;
+      const len = arr.length;
+      for (let i = 0; i < len; i++) {
+        const arrI = arr[i];
+        if (arrI !== -1) {
+          const lastIdx = result[result.length - 1];
+          if (result.length === 0 || arr[lastIdx] < arrI) {
+            p[i] = result.length > 0 ? lastIdx : -1;
+            result.push(i);
+            continue;
+          }
+          u = 0;
+          v = result.length - 1;
+          while (u < v) {
+            c = (u + v) >> 1;
+            if (arr[result[c]] < arrI) {
+              u = c + 1;
+            } else {
+              v = c;
+            }
+          }
+          if (arrI < arr[result[u]]) {
+            if (u > 0) {
+              p[i] = result[u - 1];
+            }
+            result[u] = i;
+          }
+        }
+      }
+      let uLen = result.length;
+      if (uLen === 0) return [];
+      let vIdx = result[uLen - 1];
+      while (uLen-- > 0) {
+        result[uLen] = vIdx;
+        vIdx = p[vIdx];
+      }
+      return result;
+    }
+
+    const _nodes = (vm && vm.nodes) || (typeof nodes !== 'undefined' ? nodes : null);
+    const list = (${iterableRewritten}) || [];
+    const parent = (_nodes && _nodes[${parentNodeIdx}]) || (vm && vm.rootElement) || (typeof document !== 'undefined' ? document.body : null);
+    const anchor = _nodes && _nodes[${anchorNodeIdx}];
+    if (!parent || !anchor) return;
+    if (anchor.parentNode !== parent) {
+      parent.appendChild(anchor);
+    }
+
+    if (!vm) vm = {};
+    if (!vm._forCache) vm._forCache = new Map();
+    const oldCache = vm._forCache.get(${anchorNodeIdx}) || [];
+    const newCache = [];
+    const newKeySet = new Set();
+
+    const itemVar = ${JSON.stringify(node.item)};
+    const indexVar = ${JSON.stringify(node.index || null)};
+
+    for (let i = 0; i < list.length; i++) {
+      const itemVal = list[i];
+      const indexVal = i;
+      const ${node.item} = itemVal;
+      ${node.index ? `const ${node.index} = indexVal;` : ''}
+      const scope = { [itemVar]: itemVal };
+      if (indexVar) scope[indexVar] = indexVal;
+
+      let rawKeyVal;
+      if (${keyRewritten ? 'true' : 'false'}) {
+        rawKeyVal = (${keyRewritten});
+      } else if (itemVal !== null && typeof itemVal === 'object') {
+        rawKeyVal = itemVal.id !== undefined ? itemVal.id : (itemVal.key !== undefined ? itemVal.key : (itemVal._id !== undefined ? itemVal._id : i));
+      } else {
+        rawKeyVal = itemVal !== undefined ? itemVal : i;
+      }
+
+      let keyVal = rawKeyVal;
+      let dupIdx = 0;
+      while (newKeySet.has(keyVal)) {
+        dupIdx++;
+        keyVal = String(rawKeyVal) + '__dup_' + dupIdx;
+      }
+      newKeySet.add(keyVal);
+
+      newCache.push({ key: keyVal, itemVal, indexVal, scope });
+    }
+
+    const oldLen = oldCache.length;
+    const newLen = newCache.length;
+    let i = 0;
+    let oldEnd = oldLen - 1;
+    let newEnd = newLen - 1;
+
+    // 1. Sync prefix
+    while (i <= oldEnd && i <= newEnd && oldCache[i].key === newCache[i].key) {
+      const oldRec = oldCache[i];
+      const newItem = newCache[i];
+      const itemVal = newItem.itemVal;
+      const indexVal = newItem.indexVal;
+      const scope = newItem.scope;
+      const ${node.item} = itemVal;
+      ${node.index ? `const ${node.index} = indexVal;` : ''}
+      const itemRecord = oldRec;
+      itemRecord.scope = scope;
+      ${updateJS}
+      newCache[i] = itemRecord;
+      i++;
+    }
+
+    // 2. Sync suffix
+    while (i <= oldEnd && i <= newEnd && oldCache[oldEnd].key === newCache[newEnd].key) {
+      const oldRec = oldCache[oldEnd];
+      const newItem = newCache[newEnd];
+      const itemVal = newItem.itemVal;
+      const indexVal = newItem.indexVal;
+      const scope = newItem.scope;
+      const ${node.item} = itemVal;
+      ${node.index ? `const ${node.index} = indexVal;` : ''}
+      const itemRecord = oldRec;
+      itemRecord.scope = scope;
+      ${updateJS}
+      newCache[newEnd] = itemRecord;
+      oldEnd--;
+      newEnd--;
+    }
+
+    // 3. Pure additions
+    if (i > oldEnd) {
+      if (i <= newEnd) {
+        const refNode = (newEnd + 1 < newLen) ? newCache[newEnd + 1].nodes[0] : anchor;
+        for (let k = i; k <= newEnd; k++) {
+          const newItem = newCache[k];
+          const itemVal = newItem.itemVal;
+          const indexVal = newItem.indexVal;
+          const scope = newItem.scope;
+          const ${node.item} = itemVal;
+          ${node.index ? `const ${node.index} = indexVal;` : ''}
+          const itemRecord = { key: newItem.key, nodes: [], textBindings: {}, elementMap: {}, scope: scope, itemVal: itemVal };
+          ${createJS}
+          newCache[k] = itemRecord;
+        }
+      }
+    }
+    // 4. Pure deletions
+    else if (i > newEnd) {
+      for (let k = i; k <= oldEnd; k++) {
+        const oldRec = oldCache[k];
+        for (let nIdx = 0; nIdx < oldRec.nodes.length; nIdx++) {
+          const n = oldRec.nodes[nIdx];
+          if (n && n.parentNode) {
+            n.parentNode.removeChild(n);
+          }
+        }
+      }
+    }
+    // 5. Complex keyed reconciliation with LIS
+    else {
+      const s1 = i;
+      const e1 = newEnd;
+      const s2 = i;
+      const e2 = oldEnd;
+
+      const keyToNewIndexMap = new Map();
+      for (let k = s1; k <= e1; k++) {
+        keyToNewIndexMap.set(newCache[k].key, k);
+      }
+
+      const unhandledNewCount = e1 - s1 + 1;
+      const sources = new Int32Array(unhandledNewCount);
+      for (let k = 0; k < unhandledNewCount; k++) sources[k] = -1;
+
+      let patched = 0;
+      let moved = false;
+      let maxIndexSoFar = 0;
+
+      for (let k = s2; k <= e2; k++) {
+        const oldRec = oldCache[k];
+        const newIndex = keyToNewIndexMap.get(oldRec.key);
+        if (newIndex === undefined) {
+          for (let nIdx = 0; nIdx < oldRec.nodes.length; nIdx++) {
+            const n = oldRec.nodes[nIdx];
+            if (n && n.parentNode) {
+              n.parentNode.removeChild(n);
+            }
+          }
+        } else {
+          const newIndexInSources = newIndex - s1;
+          sources[newIndexInSources] = k;
+          if (newIndex >= maxIndexSoFar) {
+            maxIndexSoFar = newIndex;
+          } else {
+            moved = true;
+          }
+          const newItem = newCache[newIndex];
+          const itemVal = newItem.itemVal;
+          const indexVal = newItem.indexVal;
+          const scope = newItem.scope;
+          const ${node.item} = itemVal;
+          ${node.index ? `const ${node.index} = indexVal;` : ''}
+          const itemRecord = oldRec;
+          ${updateJS}
+          newCache[newIndex] = itemRecord;
+          patched++;
+        }
+      }
+
+      const lis = moved ? getSequence(sources) : [];
+      let lisIdx = lis.length - 1;
+
+      for (let j = unhandledNewCount - 1; j >= 0; j--) {
+        const newIndex = s1 + j;
+        const newItem = newCache[newIndex];
+        const refNode = (newIndex + 1 < newLen) ? newCache[newIndex + 1].nodes[0] : anchor;
+
+        if (sources[j] === -1) {
+          const itemVal = newItem.itemVal;
+          const indexVal = newItem.indexVal;
+          const scope = newItem.scope;
+          const ${node.item} = itemVal;
+          ${node.index ? `const ${node.index} = indexVal;` : ''}
+          const itemRecord = { key: newItem.key, nodes: [], textBindings: {}, elementMap: {} };
+          ${createJS}
+          newCache[newIndex] = itemRecord;
+        } else if (moved) {
+          if (lisIdx < 0 || j !== lis[lisIdx]) {
+            const itemRecord = newCache[newIndex];
+            for (let nIdx = 0; nIdx < itemRecord.nodes.length; nIdx++) {
+              const n = itemRecord.nodes[nIdx];
+              if (n) parent.insertBefore(n, refNode);
+            }
+          } else {
+            lisIdx--;
+          }
+        }
+      }
+    }
+
+    vm._forCache.set(${anchorNodeIdx}, newCache);
+  `;
+
+  const thunkFn = this.analyzer.createThunk(thunkCode);
+  const thunkIdx = this.getConstant(thunkFn);
+
+  const arrReg = this.nextRegIdx++;
+  this.emit(Opcodes.EXEC_THUNK, arrReg, thunkIdx, 0);
+
+  // 3. Register update with combined dependency bitmask (iterable + body dependencies)
+  this.updates.push({
+    nodeIdx: anchorNodeIdx,
+    reg: arrReg,
+    thunkIdx,
+    depMask: combinedDepMask,
+    isForBlock: true
+  });
+
+  return anchorNodeIdx;
+}
+  
   private compileElement(node: ElementNode): number {
     const tagIdx = this.getConstant(node.tag);
     const nodeIdx = this.nextNodeIdx++;
