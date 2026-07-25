@@ -1,0 +1,17 @@
+{
+  "name": "@driftjs/compiler",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "acorn": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/acorn": "^6.0.4"
+  }
+}
