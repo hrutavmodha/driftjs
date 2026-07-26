@@ -1,4 +1,4 @@
-import * as acorn from 'acorn';
+import { DriftLexer } from './lexer.js';
 import {
   Token,
   TokenType,
@@ -11,35 +11,48 @@ import {
   DriftParserError,
 } from '../types/index.js';
 
-/**
- * Parser for Drift template tokens producing a structured AST.
- * Time Complexity: O(T) where T is the number of tokens.
- * Space Complexity: O(N) where N is the number of AST nodes.
- */
-export class DriftParser {
+interface TokenSource {
+  nextToken(): Token;
+}
+
+class ArrayTokenSource implements TokenSource {
   private readonly tokens: readonly Token[];
   private current = 0;
 
-  /**
-   * Initializes DriftParser strictly with a Token array.
-   * @param tokens Array of tokens produced by DriftLexer.
-   */
   constructor(tokens: readonly Token[]) {
     this.tokens = tokens;
   }
 
-  /**
-   * Parses token stream into a Program AST node.
-   * @returns Root ProgramNode AST.
-   */
+  public nextToken(): Token {
+    if (this.current >= this.tokens.length) {
+      return this.tokens[this.tokens.length - 1]!;
+    }
+
+    const token = this.tokens[this.current]!;
+    this.current++;
+    return token;
+  }
+}
+
+/**
+ * Parser for Drift template tokens producing a structured AST.
+ *
+ * The parser lazily pulls tokens from the lexer on demand and keeps a small
+ * lookahead buffer for local decisions.
+ */
+export class DriftParser {
+  private readonly tokenSource: TokenSource;
+  private readonly lookahead: Token[] = [];
+
+  constructor(input: DriftLexer | readonly Token[]) {
+    this.tokenSource = Array.isArray(input) ? new ArrayTokenSource(input) : (input as DriftLexer);
+  }
+
   public parse(): ProgramNode {
-    this.current = 0;
+    this.lookahead.length = 0;
     return this.parseProgram();
   }
 
-  /**
-   * Parses token stream into ProgramNode.
-   */
   private parseProgram(): ProgramNode {
     const startLoc = this.peek().loc.start;
     const body: TemplateChildNode[] = [];
@@ -48,7 +61,7 @@ export class DriftParser {
       body.push(this.parseChild());
     }
 
-    const endLoc = this.tokens[this.tokens.length - 1]?.loc.end ?? startLoc;
+    const endLoc = this.peek().loc.end;
 
     return {
       type: ASTNodeType.Program,
@@ -57,9 +70,6 @@ export class DriftParser {
     };
   }
 
-  /**
-   * Parses a single child node inside program or element body.
-   */
   private parseChild(): TemplateChildNode {
     const token = this.peek();
 
@@ -74,7 +84,11 @@ export class DriftParser {
 
     if (token.type === TokenType.Interpolation) {
       this.advance();
-      return this.parseInterpolation(token);
+      return {
+        type: ASTNodeType.Interpolation,
+        expression: token.value,
+        loc: token.loc,
+      };
     }
 
     if (token.type === TokenType.TagOpen) {
@@ -92,7 +106,7 @@ export class DriftParser {
 
     if (token.type === TokenType.TagOpenSlash) {
       throw new DriftParserError(
-        `Unexpected closing tag '</${this.peek(1)?.value ?? ''}>' without opening tag`,
+        `Unexpected closing tag '</${this.peek(1).value}>' without opening tag`,
         token.loc.start.line,
         token.loc.start.column,
         token.loc.start.offset
@@ -107,9 +121,6 @@ export class DriftParser {
     );
   }
 
-  /**
-   * Parses an element node `<tag attr="val">children</tag>` or `<tag />`.
-   */
   private parseElement(): ElementNode {
     const openToken = this.consume(TokenType.TagOpen, 'Expected opening tag bracket');
     const startLoc = openToken.loc.start;
@@ -184,9 +195,6 @@ export class DriftParser {
     };
   }
 
-  /**
-   * Parses an attribute node `name="value"`, `name={value}`, or boolean `name`.
-   */
   private parseAttribute(): AttributeNode {
     const nameToken = this.consume(TokenType.Identifier, 'Expected attribute name');
     const startLoc = nameToken.loc.start;
@@ -207,7 +215,11 @@ export class DriftParser {
 
       if (valueToken.type === TokenType.Interpolation) {
         this.advance();
-        const interpNode = this.parseInterpolation(valueToken);
+        const interpNode: InterpolationNode = {
+          type: ASTNodeType.Interpolation,
+          expression: valueToken.value,
+          loc: valueToken.loc,
+        };
         return {
           type: ASTNodeType.Attribute,
           name,
@@ -237,66 +249,36 @@ export class DriftParser {
   }
 
   private peek(relativeOffset = 0): Token {
-    const target = this.current + relativeOffset;
-    if (target >= this.tokens.length) {
-      return this.tokens[this.tokens.length - 1]!;
-    }
-    return this.tokens[target]!;
+    this.ensureLookahead(relativeOffset);
+    return this.lookahead[Math.min(relativeOffset, this.lookahead.length - 1)]!;
   }
 
   private advance(): Token {
-    if (!this.isAtEnd()) {
-      this.current++;
+    const token = this.peek();
+    if (token.type !== TokenType.EOF) {
+      this.lookahead.shift();
     }
-    return this.peek(-1);
+    return token;
   }
 
   private check(type: TokenType): boolean {
-    if (this.isAtEnd()) {
-      return false;
-    }
     return this.peek().type === type;
   }
 
   private matchToken(type: TokenType): boolean {
-    if (this.check(type)) {
-      this.advance();
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Parses an interpolation expression token value using Acorn parseExpressionAt.
-   */
-  private parseInterpolation(token: Token): InterpolationNode {
-    let expressionAst: acorn.Node;
-    try {
-      expressionAst = acorn.parseExpressionAt(token.value, 0, {
-        ecmaVersion: 'latest',
-        allowAwaitOutsideFunction: true,
-      });
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      throw new DriftParserError(
-        `Failed to parse JS expression in interpolation: ${errorMsg}`,
-        token.loc.start.line,
-        token.loc.start.column,
-        token.loc.start.offset
-      );
+    if (!this.check(type)) {
+      return false;
     }
 
-    return {
-      type: ASTNodeType.Interpolation,
-      expression: expressionAst,
-      loc: token.loc,
-    };
+    this.advance();
+    return true;
   }
 
   private consume(type: TokenType, errorMessage: string): Token {
     if (this.check(type)) {
       return this.advance();
     }
+
     const token = this.peek();
     throw new DriftParserError(
       errorMessage,
@@ -304,5 +286,16 @@ export class DriftParser {
       token.loc.start.column,
       token.loc.start.offset
     );
+  }
+
+  private ensureLookahead(relativeOffset: number): void {
+    while (this.lookahead.length <= relativeOffset) {
+      const nextToken = this.tokenSource.nextToken();
+      this.lookahead.push(nextToken);
+
+      if (nextToken.type === TokenType.EOF) {
+        break;
+      }
+    }
   }
 }

@@ -1,22 +1,41 @@
 import { describe, it, expect } from 'vitest';
 import { DriftLexer } from '../src/lexer.js';
 import { DriftParser } from '../src/parser.js';
-import { ASTNodeType, ElementNode, DriftParserError, TokenType } from '../types/index.js';
+import {
+  ASTNodeType,
+  ElementNode,
+  DriftParserError,
+  DriftLexerError,
+  TokenType,
+  Token,
+  TextNode,
+} from '../types/index.js';
 
-describe('DriftParser Edge Cases', () => {
-  it('should parse empty template or whitespace-only token stream', () => {
-    const lexer = new DriftLexer('');
-    const parser = new DriftParser(lexer.tokenize());
+describe('DriftParser', () => {
+  it('parses empty templates', () => {
+    const parser = new DriftParser(new DriftLexer(''));
     const ast = parser.parse();
 
     expect(ast.type).toBe(ASTNodeType.Program);
     expect(ast.body).toEqual([]);
   });
 
-  it('should parse deeply nested element structures', () => {
-    const input = '<div><main><article><section><p>{text}</p></section></article></main></div>';
-    const lexer = new DriftLexer(input);
-    const parser = new DriftParser(lexer.tokenize());
+  it('lets the parser drive token consumption lazily', () => {
+    const lexer = new DriftLexer('<div><span>Hello</span></div>');
+    const parser = new DriftParser(lexer);
+
+    expect(lexer.getEmittedTokenCount()).toBe(0);
+
+    const ast = parser.parse();
+
+    expect(ast.body).toHaveLength(1);
+    expect(lexer.getEmittedTokenCount()).toBeGreaterThan(0);
+  });
+
+  it('parses deeply nested element structures', () => {
+    const parser = new DriftParser(
+      new DriftLexer('<div><main><article><section><p>{text}</p></section></article></main></div>')
+    );
     const ast = parser.parse();
 
     expect(ast.body.length).toBe(1);
@@ -34,14 +53,13 @@ describe('DriftParser Edge Cases', () => {
 
     current = current.children[0] as ElementNode;
     expect(current.tagName).toBe('p');
-
     expect(current.children[0]?.type).toBe(ASTNodeType.Interpolation);
   });
 
-  it('should parse multiple root-level elements, text, and comments', () => {
-    const input = '<!-- Root 1 --><div>One</div><!-- Root 2 --><span>Two</span>';
-    const lexer = new DriftLexer(input);
-    const parser = new DriftParser(lexer.tokenize());
+  it('parses multiple root-level elements, text, and comments', () => {
+    const parser = new DriftParser(
+      new DriftLexer('<!-- Root 1 --><div>One</div><!-- Root 2 --><span>Two</span>')
+    );
     const ast = parser.parse();
 
     expect(ast.body.length).toBe(4);
@@ -51,16 +69,15 @@ describe('DriftParser Edge Cases', () => {
     expect(ast.body[3]?.type).toBe(ASTNodeType.Element);
   });
 
-  it('should parse multiple attributes of mixed types (string, boolean, interpolated)', () => {
-    const input = '<input type="checkbox" checked id="terms" data-bind={isBound} />';
-    const lexer = new DriftLexer(input);
-    const parser = new DriftParser(lexer.tokenize());
+  it('parses attributes of mixed kinds', () => {
+    const parser = new DriftParser(
+      new DriftLexer('<input type="checkbox" checked id="terms" data-bind={isBound} />')
+    );
     const ast = parser.parse();
 
     const inputNode = ast.body[0] as ElementNode;
     expect(inputNode.isSelfClosing).toBe(true);
     expect(inputNode.attributes.length).toBe(4);
-
     expect(inputNode.attributes[0]).toMatchObject({ name: 'type', value: 'checkbox' });
     expect(inputNode.attributes[1]).toMatchObject({ name: 'checked', value: null });
     expect(inputNode.attributes[2]).toMatchObject({ name: 'id', value: 'terms' });
@@ -68,31 +85,67 @@ describe('DriftParser Edge Cases', () => {
     expect(typeof inputNode.attributes[3]?.value).toBe('object');
   });
 
-  it('should throw DriftParserError when unexpected closing tag is encountered at top-level', () => {
-    const input = '</div>';
-    const lexer = new DriftLexer(input);
-    const parser = new DriftParser(lexer.tokenize());
+  it('parses script tag content as a raw text child', () => {
+    const parser = new DriftParser(
+      new DriftLexer('<script>if (a < b) { console.log("ok"); }</script>')
+    );
+    const ast = parser.parse();
 
-    expect(() => parser.parse()).toThrowError(DriftParserError);
+    const scriptElement = ast.body[0] as ElementNode;
+    expect(scriptElement.tagName).toBe('script');
+    expect(scriptElement.children.length).toBe(1);
+    const scriptText = scriptElement.children[0] as TextNode;
+    expect(scriptText.type).toBe(ASTNodeType.Text);
+    expect(scriptText.content).toBe('if (a < b) { console.log("ok"); }');
   });
 
-  it('should throw DriftParserError when attribute value is missing after =', () => {
-    const input = '<div class=></div>';
-    const lexer = new DriftLexer(input);
-    const parser = new DriftParser(lexer.tokenize());
+  it('parses complex JS interpolations into raw expression strings', () => {
+    const parser = new DriftParser(
+      new DriftLexer('<div>{ isTrue ? "yes" : "no" }</div><span>{ (x) => x * 2 }</span><p>{ user?.name ?? "Guest" }</p>')
+    );
+    const ast = parser.parse();
 
-    expect(() => parser.parse()).toThrowError(DriftParserError);
+    const div = ast.body[0] as ElementNode;
+    const divInterpolation = div.children[0] as any;
+    expect(divInterpolation.type).toBe(ASTNodeType.Interpolation);
+    expect(divInterpolation.expression).toBe(' isTrue ? "yes" : "no" ');
+
+    const span = ast.body[1] as ElementNode;
+    const spanInterpolation = span.children[0] as any;
+    expect(spanInterpolation.expression).toBe(' (x) => x * 2 ');
   });
 
-  it('should throw DriftParserError on mismatched closing tag in nested elements', () => {
-    const input = '<div><span>Content</div></span>';
-    const lexer = new DriftLexer(input);
-    const parser = new DriftParser(lexer.tokenize());
+  it('parses interpolated attribute values as raw expression strings', () => {
+    const parser = new DriftParser(
+      new DriftLexer('<button onclick={ (e) => handleClick(e) } />')
+    );
+    const ast = parser.parse();
 
-    expect(() => parser.parse()).toThrowError(DriftParserError);
+    const button = ast.body[0] as ElementNode;
+    const attr = button.attributes[0];
+    expect(attr?.name).toBe('onclick');
+
+    const interpolationValue = attr?.value as any;
+    expect(interpolationValue.type).toBe(ASTNodeType.Interpolation);
+    expect(interpolationValue.expression).toBe(' (e) => handleClick(e) ');
   });
 
-  it('should throw DriftParserError when closing bracket is missing before content in token stream', () => {
+  it('throws when an unexpected closing tag appears at the top level', () => {
+    const parser = new DriftParser(new DriftLexer('</div>'));
+    expect(() => parser.parse()).toThrow(DriftParserError);
+  });
+
+  it('throws when an attribute value is missing after =', () => {
+    const parser = new DriftParser(new DriftLexer('<div class=></div>'));
+    expect(() => parser.parse()).toThrow(DriftLexerError);
+  });
+
+  it('throws on mismatched nested closing tags', () => {
+    const parser = new DriftParser(new DriftLexer('<div><span>Content</div></span>'));
+    expect(() => parser.parse()).toThrow(DriftParserError);
+  });
+
+  it('throws when the closing bracket is missing in a manual token stream', () => {
     const dummyLoc = { line: 1, column: 1, offset: 0 };
     const tokens: Token[] = [
       { type: TokenType.TagOpen, value: '<', loc: { start: dummyLoc, end: dummyLoc } },
@@ -100,16 +153,8 @@ describe('DriftParser Edge Cases', () => {
       { type: TokenType.Text, value: 'Hello', loc: { start: dummyLoc, end: dummyLoc } },
       { type: TokenType.EOF, value: '', loc: { start: dummyLoc, end: dummyLoc } },
     ];
+
     const parser = new DriftParser(tokens);
-
-    expect(() => parser.parse()).toThrowError(DriftParserError);
-  });
-
-  it('should throw DriftParserError when interpolation JS expression fails to parse with Acorn', () => {
-    const input = '<div>{ count + * invalid }</div>';
-    const lexer = new DriftLexer(input);
-    const parser = new DriftParser(lexer.tokenize());
-
-    expect(() => parser.parse()).toThrowError(DriftParserError);
+    expect(() => parser.parse()).toThrow(DriftParserError);
   });
 });

@@ -28,12 +28,12 @@ export interface AttributeNode extends BaseASTNode {
 
 export interface InterpolationNode extends BaseASTNode {
   readonly type: typeof ASTNodeType.Interpolation;
-  readonly expression: AcornNode;
+  readonly expression: string | AcornNode;
 }
 
 export interface TextNode extends BaseASTNode {
   readonly type: typeof ASTNodeType.Text;
-  readonly content: string;
+  readonly content: string | AcornNode | readonly AcornNode[];
 }
 
 export interface CommentNode extends BaseASTNode {
