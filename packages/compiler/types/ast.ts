@@ -11,6 +11,9 @@ export const ASTNodeType = {
   Interpolation: 'Interpolation',
   Attribute: 'Attribute',
   Comment: 'Comment',
+  If: 'If',
+  For: 'For',
+  Switch: 'Switch',
 } as const;
 
 export type ASTNodeType = typeof ASTNodeType[keyof typeof ASTNodeType];
@@ -41,6 +44,33 @@ export interface CommentNode extends BaseASTNode {
   readonly content: string;
 }
 
+export interface IfNode extends BaseASTNode {
+  readonly type: typeof ASTNodeType.If;
+  readonly test: string | AcornNode;
+  readonly consequent: readonly TemplateChildNode[];
+  readonly alternate: readonly TemplateChildNode[] | IfNode | null;
+}
+
+export interface ForNode extends BaseASTNode {
+  readonly type: typeof ASTNodeType.For;
+  readonly item: string;
+  readonly index: string | null;
+  readonly iterable: string | AcornNode;
+  readonly body: readonly TemplateChildNode[];
+}
+
+export interface CaseBranch {
+  readonly expression: string | AcornNode | null; // null for default
+  readonly body: readonly TemplateChildNode[];
+  readonly loc: SourceRange;
+}
+
+export interface SwitchNode extends BaseASTNode {
+  readonly type: typeof ASTNodeType.Switch;
+  readonly discriminant: string | AcornNode;
+  readonly cases: readonly CaseBranch[];
+}
+
 export interface ElementNode extends BaseASTNode {
   readonly type: typeof ASTNodeType.Element;
   readonly tagName: string;
@@ -49,7 +79,7 @@ export interface ElementNode extends BaseASTNode {
   readonly isSelfClosing: boolean;
 }
 
-export type TemplateChildNode = ElementNode | TextNode | InterpolationNode | CommentNode;
+export type TemplateChildNode = ElementNode | TextNode | InterpolationNode | CommentNode | IfNode | ForNode | SwitchNode;
 
 export interface ProgramNode extends BaseASTNode {
   readonly type: typeof ASTNodeType.Program;

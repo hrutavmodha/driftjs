@@ -1,11 +1,11 @@
-import { interprete } from "./packages/compiler/dist/src/index.js";
+import { interprete } from "./packages/compiler/dist/drift.mjs";
 
 const template = `
-    <script src="index.js" type="module"> 
-        let x = 10;
-        let y = 20;
-    </script>
-    <h1>Hello, {name}</h1>
+    <ul>
+        @for (item, index) in list {
+            <li key={index}>{item}</li>
+        }
+    </ul>
 `
 
 interprete(template, true);

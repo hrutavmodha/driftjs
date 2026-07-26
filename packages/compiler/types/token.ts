@@ -29,6 +29,15 @@ export const TokenType = {
   Text: 'Text',
   Interpolation: 'Interpolation',
   Comment: 'Comment',
+  DirectiveIf: 'DirectiveIf',
+  DirectiveElseIf: 'DirectiveElseIf',
+  DirectiveElse: 'DirectiveElse',
+  DirectiveFor: 'DirectiveFor',
+  DirectiveSwitch: 'DirectiveSwitch',
+  DirectiveCase: 'DirectiveCase',
+  DirectiveDefault: 'DirectiveDefault',
+  BlockOpen: 'BlockOpen',
+  BlockClose: 'BlockClose',
   EOF: 'EOF',
 } as const;
 

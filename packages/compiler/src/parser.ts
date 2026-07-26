@@ -95,6 +95,18 @@ export class DriftParser {
       return this.parseElement();
     }
 
+    if (token.type === TokenType.DirectiveIf) {
+      return this.parseIfDirective();
+    }
+
+    if (token.type === TokenType.DirectiveFor) {
+      return this.parseForDirective();
+    }
+
+    if (token.type === TokenType.DirectiveSwitch) {
+      return this.parseSwitchDirective();
+    }
+
     if (token.type === TokenType.Text) {
       this.advance();
       return {
@@ -242,6 +254,181 @@ export class DriftParser {
       value: null,
       loc: { start: startLoc, end: nameToken.loc.end },
     };
+  }
+
+  private parseIfDirective(): IfNode {
+    const ifToken = this.consume(TokenType.DirectiveIf, 'Expected @if directive');
+    const startLoc = ifToken.loc.start;
+    const test = ifToken.value;
+
+    const consequent: TemplateChildNode[] = [];
+    while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+      consequent.push(this.parseChild());
+    }
+    const endBlockToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @if block');
+
+    let alternate: TemplateChildNode[] | IfNode | null = null;
+    let endLoc = endBlockToken.loc.end;
+
+    this.skipWhitespaceTokens();
+
+    if (this.check(TokenType.DirectiveElseIf)) {
+      const elseIfToken = this.advance();
+      const elseIfStartLoc = elseIfToken.loc.start;
+      const elseIfTest = elseIfToken.value;
+
+      const elseIfConsequent: TemplateChildNode[] = [];
+      while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+        elseIfConsequent.push(this.parseChild());
+      }
+      const elseIfCloseToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @else if block');
+
+      let nestedAlt: TemplateChildNode[] | IfNode | null = null;
+      let nestedEndLoc = elseIfCloseToken.loc.end;
+
+      this.skipWhitespaceTokens();
+      if (this.check(TokenType.DirectiveElseIf)) {
+        nestedAlt = this.parseElseIfChain();
+        nestedEndLoc = (nestedAlt as IfNode).loc.end;
+      } else if (this.check(TokenType.DirectiveElse)) {
+        this.advance();
+        const elseBody: TemplateChildNode[] = [];
+        while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+          elseBody.push(this.parseChild());
+        }
+        const elseCloseToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @else block');
+        nestedAlt = elseBody;
+        nestedEndLoc = elseCloseToken.loc.end;
+      }
+
+      alternate = {
+        type: ASTNodeType.If,
+        test: elseIfTest,
+        consequent: elseIfConsequent,
+        alternate: nestedAlt,
+        loc: { start: elseIfStartLoc, end: nestedEndLoc },
+      };
+      endLoc = nestedEndLoc;
+    } else if (this.check(TokenType.DirectiveElse)) {
+      this.advance(); // consume @else
+      const elseBody: TemplateChildNode[] = [];
+      while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+        elseBody.push(this.parseChild());
+      }
+      const elseCloseToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @else block');
+      alternate = elseBody;
+      endLoc = elseCloseToken.loc.end;
+    }
+
+    return {
+      type: ASTNodeType.If,
+      test,
+      consequent,
+      alternate,
+      loc: { start: startLoc, end: endLoc },
+    };
+  }
+
+  private parseForDirective(): any {
+    const forToken = this.consume(TokenType.DirectiveFor, 'Expected @for directive');
+    const startLoc = forToken.loc.start;
+    const header = forToken.value; // e.g. "item in items" or "(item, index) in items"
+
+    const inIndex = header.indexOf(' in ');
+    if (inIndex === -1) {
+      throw new DriftParserError(
+        `Invalid @for header syntax '${header}'. Expected format: 'item in list' or '(item, index) in list'`,
+        forToken.loc.start.line,
+        forToken.loc.start.column,
+        forToken.loc.start.offset
+      );
+    }
+
+    const lhs = header.slice(0, inIndex).trim();
+    const iterable = header.slice(inIndex + 4).trim();
+
+    let item = lhs;
+    let index: string | null = null;
+
+    if (lhs.startsWith('(') && lhs.endsWith(')')) {
+      const parts = lhs.slice(1, -1).split(',').map(s => s.trim());
+      item = parts[0] || '';
+      index = parts[1] || null;
+    }
+
+    const body: TemplateChildNode[] = [];
+    while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+      body.push(this.parseChild());
+    }
+    const endBlockToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @for block');
+
+    return {
+      type: ASTNodeType.For,
+      item,
+      index,
+      iterable,
+      body,
+      loc: { start: startLoc, end: endBlockToken.loc.end },
+    };
+  }
+
+  private parseSwitchDirective(): any {
+    const switchToken = this.consume(TokenType.DirectiveSwitch, 'Expected @switch directive');
+    const startLoc = switchToken.loc.start;
+    const discriminant = switchToken.value;
+    const cases: any[] = [];
+
+    this.skipWhitespaceTokens();
+    while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+      if (this.check(TokenType.DirectiveCase)) {
+        const caseToken = this.advance();
+        const caseBody: TemplateChildNode[] = [];
+        while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+          caseBody.push(this.parseChild());
+        }
+        const closeToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @case block');
+        cases.push({
+          expression: caseToken.value,
+          body: caseBody,
+          loc: { start: caseToken.loc.start, end: closeToken.loc.end },
+        });
+      } else if (this.check(TokenType.DirectiveDefault)) {
+        const defaultToken = this.advance();
+        const defaultBody: TemplateChildNode[] = [];
+        while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+          defaultBody.push(this.parseChild());
+        }
+        const closeToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @default block');
+        cases.push({
+          expression: null,
+          body: defaultBody,
+          loc: { start: defaultToken.loc.start, end: closeToken.loc.end },
+        });
+      } else {
+        throw new DriftParserError(
+          `Unexpected token '${this.peek().value}' inside @switch block. Expected @case or @default.`,
+          this.peek().loc.start.line,
+          this.peek().loc.start.column,
+          this.peek().loc.start.offset
+        );
+      }
+      this.skipWhitespaceTokens();
+    }
+
+    const endBlockToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @switch block');
+
+    return {
+      type: ASTNodeType.Switch,
+      discriminant,
+      cases,
+      loc: { start: startLoc, end: endBlockToken.loc.end },
+    };
+  }
+
+  private skipWhitespaceTokens(): void {
+    while (this.check(TokenType.Text) && this.peek().value.trim().length === 0) {
+      this.advance();
+    }
   }
 
   private isAtEnd(): boolean {

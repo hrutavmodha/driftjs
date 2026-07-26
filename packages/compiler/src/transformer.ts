@@ -68,6 +68,52 @@ export class DriftTransformer {
       return this.transformInterpolation(node);
     }
 
+    if (node.type === ASTNodeType.If) {
+      const parsedTest = typeof node.test === 'string' && node.test.trim().length > 0
+        ? acorn.parseExpressionAt(node.test, 0, { ecmaVersion: 'latest' })
+        : node.test;
+
+      let transformedAlt: TemplateChildNode[] | IfNode | null = null;
+      if (Array.isArray(node.alternate)) {
+        transformedAlt = this.transformChildren(node.alternate);
+      } else if (node.alternate !== null) {
+        transformedAlt = this.transformNode(node.alternate) as IfNode;
+      }
+
+      return {
+        ...node,
+        test: parsedTest,
+        consequent: this.transformChildren(node.consequent),
+        alternate: transformedAlt,
+      };
+    }
+
+    if (node.type === ASTNodeType.For) {
+      return {
+        ...node,
+        iterable: typeof node.iterable === 'string'
+          ? acorn.parseExpressionAt(node.iterable, 0, { ecmaVersion: 'latest' })
+          : node.iterable,
+        body: this.transformChildren(node.body),
+      };
+    }
+
+    if (node.type === ASTNodeType.Switch) {
+      return {
+        ...node,
+        discriminant: typeof node.discriminant === 'string'
+          ? acorn.parseExpressionAt(node.discriminant, 0, { ecmaVersion: 'latest' })
+          : node.discriminant,
+        cases: node.cases.map((c) => ({
+          ...c,
+          expression: typeof c.expression === 'string' && c.expression.trim().length > 0
+            ? acorn.parseExpressionAt(c.expression, 0, { ecmaVersion: 'latest' })
+            : c.expression,
+          body: this.transformChildren(c.body),
+        })),
+      };
+    }
+
     return node;
   }
 

@@ -152,4 +152,54 @@ describe('DriftLexer', () => {
     const lexer = new DriftLexer('<div %invalid>');
     expect(() => collectTokens(lexer)).toThrow(DriftLexerError);
   });
+
+  it('lexes directive headers containing braces inside quotes cleanly', () => {
+    const lexer = new DriftLexer('@if name === "{admin}" { <span>Admin</span> }');
+    const tokens = collectTokens(lexer);
+
+    expect(tokens[0]?.type).toBe(TokenType.DirectiveIf);
+    expect(tokens[0]?.value).toBe('name === "{admin}"');
+  });
+
+  it('throws on unknown directive names', () => {
+    const lexer = new DriftLexer('@unknownDirective { content }');
+    expect(() => collectTokens(lexer)).toThrow(DriftLexerError);
+  });
+
+  it('throws on unterminated directive header', () => {
+    const lexer = new DriftLexer('@if (a > b) <div>No block open</div>');
+    expect(() => collectTokens(lexer)).toThrow(DriftLexerError);
+  });
+
+  it('lexes escaped quotes inside string literals within interpolations', () => {
+    const lexer = new DriftLexer('<span>{ "Hello \\"World\\"" }</span>');
+    const tokens = collectTokens(lexer);
+
+    const interpToken = tokens.find((t) => t.type === TokenType.Interpolation);
+    expect(interpToken?.value).toBe(' "Hello \\"World\\"" ');
+  });
+
+  it('lexes JS comments with braces inside interpolations without breaking brace depth', () => {
+    const lexer = new DriftLexer('<div>{ /* comment with } brace */ value + // line comment with } brace \n 10 }</div>');
+    const tokens = collectTokens(lexer);
+
+    const interpToken = tokens.find((t) => t.type === TokenType.Interpolation);
+    expect(interpToken?.value).toBe(' /* comment with } brace */ value + // line comment with } brace \n 10 ');
+  });
+
+  it('lexes template literal nested expressions inside interpolations without breaking brace depth', () => {
+    const lexer = new DriftLexer('<div>{ `hello ${ { key: "val" }.key }` }</div>');
+    const tokens = collectTokens(lexer);
+
+    const interpToken = tokens.find((t) => t.type === TokenType.Interpolation);
+    expect(interpToken?.value).toBe(' `hello ${ { key: "val" }.key }` ');
+  });
+
+  it('lexes escaped quotes inside directive headers cleanly', () => {
+    const lexer = new DriftLexer('@if name === "foo{\\"bar" { <span>Escaped</span> }');
+    const tokens = collectTokens(lexer);
+
+    expect(tokens[0]?.type).toBe(TokenType.DirectiveIf);
+    expect(tokens[0]?.value).toBe('name === "foo{\\"bar"');
+  });
 });

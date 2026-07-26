@@ -94,6 +94,7 @@ export class DriftLexer {
   private emittedTokenCount = 0;
   private eofToken: Token | null = null;
   private state: DriftLexerState = { kind: LexerStateKind.Data };
+  private blockDepth = 0;
 
   constructor(source: string) {
     this.source = source;
@@ -180,7 +181,122 @@ export class DriftLexer {
       return this.readInterpolationToken(startLoc, 'content', null);
     }
 
+    if (this.peek() === '}' && this.blockDepth > 0) {
+      this.advance();
+      this.blockDepth--;
+      return this.createToken(TokenType.BlockClose, '}', startLoc);
+    }
+
+    if (this.peek() === '@') {
+      return this.readDirectiveToken(startLoc);
+    }
+
     return this.readTextToken();
+  }
+
+  private readDirectiveToken(startLoc: SourceLocation): Token {
+    this.advance(); // consume '@'
+    let name = '';
+    while (!this.isAtEnd() && /[a-zA-Z]/.test(this.peek())) {
+      name += this.advance();
+    }
+
+    const KNOWN_DIRECTIVES = new Set(['if', 'else', 'for', 'switch', 'case', 'default']);
+    if (!KNOWN_DIRECTIVES.has(name)) {
+      throw new DriftLexerError(
+        `Unknown directive '@${name}'`,
+        startLoc.line,
+        startLoc.column,
+        startLoc.offset
+      );
+    }
+
+    if (name === 'if') {
+      return this.readDirectiveHeader(startLoc, TokenType.DirectiveIf);
+    } else if (name === 'else') {
+      this.skipWhitespace();
+      if (this.startsWith('if') && !/[a-zA-Z0-9_]/.test(this.peek(2))) {
+        this.consumePattern('if');
+        return this.readDirectiveHeader(startLoc, TokenType.DirectiveElseIf);
+      }
+      this.skipWhitespace();
+      if (this.peek() === '{') {
+        this.advance();
+        this.blockDepth++;
+        return this.createToken(TokenType.DirectiveElse, '', startLoc);
+      }
+      return this.createToken(TokenType.DirectiveElse, '', startLoc);
+    } else if (name === 'for') {
+      return this.readDirectiveHeader(startLoc, TokenType.DirectiveFor);
+    } else if (name === 'switch') {
+      return this.readDirectiveHeader(startLoc, TokenType.DirectiveSwitch);
+    } else if (name === 'case') {
+      return this.readDirectiveHeader(startLoc, TokenType.DirectiveCase);
+    } else {
+      this.skipWhitespace();
+      if (this.peek() === '{') {
+        this.advance();
+        this.blockDepth++;
+      }
+      return this.createToken(TokenType.DirectiveDefault, '', startLoc);
+    }
+  }
+
+  private readDirectiveHeader(startLoc: SourceLocation, type: TokenType): Token {
+    this.skipWhitespace();
+    let headerContent = '';
+    let parenDepth = 0;
+    let inQuote: string | null = null;
+    let isEscaped = false;
+
+    while (!this.isAtEnd()) {
+      const ch = this.peek();
+
+      if (inQuote !== null) {
+        headerContent += this.advance();
+        if (isEscaped) {
+          isEscaped = false;
+        } else if (ch === '\\') {
+          isEscaped = true;
+        } else if (ch === inQuote) {
+          inQuote = null;
+        }
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === '`') {
+        inQuote = ch;
+        headerContent += this.advance();
+        continue;
+      }
+
+      if (ch === '(') {
+        parenDepth++;
+        headerContent += this.advance();
+        continue;
+      }
+
+      if (ch === ')') {
+        parenDepth--;
+        headerContent += this.advance();
+        continue;
+      }
+
+      if (ch === '{' && parenDepth === 0) {
+        this.advance(); // consume '{'
+        this.blockDepth++;
+        return this.createToken(type, headerContent.trim(), startLoc);
+      }
+
+      headerContent += this.advance();
+    }
+
+    throw new DriftLexerError(
+      `Unterminated directive header, expected '{'`,
+      startLoc.line,
+      startLoc.column,
+      startLoc.offset
+    );
   }
 
   private readTagNameToken(isClosingTag: boolean): Token {
@@ -427,10 +543,29 @@ export class DriftLexer {
     let braceDepth = 1;
     let inStringQuote: string | null = null;
     let isEscaped = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+    let templateStack: number[] = [];
     let expression = '';
 
     while (!this.isAtEnd()) {
       const ch = this.advance();
+
+      if (inLineComment) {
+        expression += ch;
+        if (ch === '\n') {
+          inLineComment = false;
+        }
+        continue;
+      }
+
+      if (inBlockComment) {
+        expression += ch;
+        if (ch === '/' && expression.endsWith('*/')) {
+          inBlockComment = false;
+        }
+        continue;
+      }
 
       if (inStringQuote !== null) {
         expression += ch;
@@ -440,8 +575,25 @@ export class DriftLexer {
           isEscaped = true;
         } else if (ch === inStringQuote) {
           inStringQuote = null;
+        } else if (inStringQuote === '`' && ch === '{' && expression.endsWith('${')) {
+          templateStack.push(braceDepth);
+          inStringQuote = null;
+          braceDepth++;
         }
         continue;
+      }
+
+      if (ch === '/' && !isEscaped) {
+        const next = this.peek();
+        if (next === '/') {
+          inLineComment = true;
+          expression += ch;
+          continue;
+        } else if (next === '*') {
+          inBlockComment = true;
+          expression += ch;
+          continue;
+        }
       }
 
       if (ch === '"' || ch === "'" || ch === '`') {
@@ -458,6 +610,11 @@ export class DriftLexer {
 
       if (ch === '}') {
         braceDepth--;
+        if (templateStack.length > 0 && braceDepth === templateStack[templateStack.length - 1]) {
+          templateStack.pop();
+          inStringQuote = '`';
+        }
+
         if (braceDepth === 0) {
           if (context === 'attribute' && tagName !== null) {
             this.transitionTo({
@@ -530,7 +687,8 @@ export class DriftLexer {
     let text = '';
 
     while (!this.isAtEnd()) {
-      if (this.peek() === '<' || this.peek() === '{') {
+      const ch = this.peek();
+      if (ch === '<' || ch === '{' || ch === '@' || (ch === '}' && this.blockDepth > 0)) {
         break;
       }
       text += this.advance();

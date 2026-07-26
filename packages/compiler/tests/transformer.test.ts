@@ -67,4 +67,47 @@ describe('DriftTransformer', () => {
     expect(jsContent.kind).toBe('let');
     expect(jsContent.declarations[0].id.name).toBe('count');
   });
+
+  it('should enrich nested directive expressions (If, For, Switch) into Acorn JS AST nodes', () => {
+    const input = `
+      @switch user.getRole() {
+        @case "admin" {
+          @for item in store.getItems(10) {
+            @if item.price > 100 {
+              <span>{ item.name }</span>
+            }
+          }
+        }
+      }
+    `;
+    const lexer = new DriftLexer(input);
+    const parser = new DriftParser(lexer);
+    const rawAst = parser.parse();
+
+    const transformer = new DriftTransformer(rawAst);
+    const transformedAst = transformer.transform();
+
+    const switchNode = transformedAst.body[0] as any;
+    expect(switchNode.type).toBe(ASTNodeType.Switch);
+    expect(switchNode.discriminant.type).toBe('CallExpression');
+
+    const caseNode = switchNode.cases[0];
+    expect(caseNode.expression.type).toBe('Literal');
+
+    const forNode = caseNode.body.find((n: any) => n.type === ASTNodeType.For);
+    expect(forNode.iterable.type).toBe('CallExpression');
+
+    const ifNode = forNode.body.find((n: any) => n.type === ASTNodeType.If);
+    expect(ifNode.test.type).toBe('BinaryExpression');
+  });
+
+  it('should throw DriftParserError when an invalid JS syntax expression is encountered in an interpolation', () => {
+    const input = '<div>{ 1 + * 2 }</div>';
+    const lexer = new DriftLexer(input);
+    const parser = new DriftParser(lexer);
+    const rawAst = parser.parse();
+
+    const transformer = new DriftTransformer(rawAst);
+    expect(() => transformer.transform()).toThrow();
+  });
 });

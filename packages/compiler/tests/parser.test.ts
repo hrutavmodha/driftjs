@@ -157,4 +157,118 @@ describe('DriftParser', () => {
     const parser = new DriftParser(tokens);
     expect(() => parser.parse()).toThrow(DriftParserError);
   });
+
+  it('parses @if, @else if, and @else directives cleanly', () => {
+    const parser = new DriftParser(
+      new DriftLexer('@if isLoggedIn { <span>Welcome back</span> } @else if isGuest { <span>Welcome guest</span> } @else { <span>Please log in</span> }')
+    );
+    const ast = parser.parse();
+
+    expect(ast.body).toHaveLength(1);
+    const ifNode = ast.body[0] as any;
+    expect(ifNode.type).toBe(ASTNodeType.If);
+    expect(ifNode.test).toBe('isLoggedIn');
+    const firstSpan = ifNode.consequent.find((n: any) => n.type === ASTNodeType.Element);
+    expect(firstSpan.tagName).toBe('span');
+
+    // Alternate is nested IfNode for @else if
+    const elseIfNode = ifNode.alternate as any;
+    expect(elseIfNode.type).toBe(ASTNodeType.If);
+    expect(elseIfNode.test).toBe('isGuest');
+
+    // Else branch is array of nodes in alternate of nested IfNode
+    expect(Array.isArray(elseIfNode.alternate)).toBe(true);
+    const elseSpan = elseIfNode.alternate.find((n: any) => n.type === ASTNodeType.Element);
+    expect(elseSpan.tagName).toBe('span');
+  });
+
+  it('parses @for directives cleanly', () => {
+    const parser = new DriftParser(
+      new DriftLexer('@for (item, index) in items { <li>{item}</li> }')
+    );
+    const ast = parser.parse();
+
+    expect(ast.body).toHaveLength(1);
+    const forNode = ast.body[0] as any;
+    expect(forNode.type).toBe(ASTNodeType.For);
+    expect(forNode.item).toBe('item');
+    expect(forNode.index).toBe('index');
+    expect(forNode.iterable).toBe('items');
+    const forLi = forNode.body.find((n: any) => n.type === ASTNodeType.Element);
+    expect(forLi.tagName).toBe('li');
+  });
+
+  it('parses @for directive without index with index set to null', () => {
+    const parser = new DriftParser(
+      new DriftLexer('@for item in items { <li>{item}</li> }')
+    );
+    const ast = parser.parse();
+
+    const forNode = ast.body[0] as any;
+    expect(forNode.item).toBe('item');
+    expect(forNode.index).toBeNull();
+  });
+
+  it('parses @switch, @case, and @default directives cleanly', () => {
+    const parser = new DriftParser(
+      new DriftLexer('@switch userRole { @case "admin" { <p>Admin</p> } @case "user" { <p>User</p> } @default { <p>Unknown</p> } }')
+    );
+    const ast = parser.parse();
+
+    expect(ast.body).toHaveLength(1);
+    const switchNode = ast.body[0] as any;
+    expect(switchNode.type).toBe(ASTNodeType.Switch);
+    expect(switchNode.discriminant).toBe('userRole');
+    expect(switchNode.cases).toHaveLength(3);
+    expect(switchNode.cases[0].expression).toBe('"admin"');
+    expect(switchNode.cases[1].expression).toBe('"user"');
+    expect(switchNode.cases[2].expression).toBeNull();
+  });
+
+  it('parses deeply nested mixed control flows (nested @if inside @for inside @switch)', () => {
+    const input = `
+      @switch status {
+        @case "active" {
+          @for (item, idx) in list {
+            @if item.isVisible {
+              <div>{idx}: {item.title}</div>
+            }
+          }
+        }
+        @default {
+          <p>No active items</p>
+        }
+      }
+    `;
+    const parser = new DriftParser(new DriftLexer(input));
+    const ast = parser.parse();
+
+    const switchNode = ast.body.find((n: any) => n.type === ASTNodeType.Switch) as any;
+    expect(switchNode).toBeDefined();
+    expect(switchNode.type).toBe(ASTNodeType.Switch);
+    expect(switchNode.discriminant).toBe('status');
+
+    const activeCase = switchNode.cases[0];
+    const forNode = activeCase.body.find((n: any) => n.type === ASTNodeType.For);
+    expect(forNode.item).toBe('item');
+    expect(forNode.index).toBe('idx');
+
+    const ifNode = forNode.body.find((n: any) => n.type === ASTNodeType.If);
+    expect(ifNode.test).toBe('item.isVisible');
+  });
+
+  it('throws on unclosed directive blocks', () => {
+    const parser = new DriftParser(new DriftLexer('@if isLoggedIn { <div>Hello</div>'));
+    expect(() => parser.parse()).toThrow(DriftParserError);
+  });
+
+  it('throws on invalid @for header syntax missing in keyword', () => {
+    const parser = new DriftParser(new DriftLexer('@for item items { <li>{item}</li> }'));
+    expect(() => parser.parse()).toThrow(DriftParserError);
+  });
+
+  it('throws on invalid content inside @switch blocks that is not @case or @default', () => {
+    const parser = new DriftParser(new DriftLexer('@switch mode { <div>invalid direct child</div> }'));
+    expect(() => parser.parse()).toThrow(DriftParserError);
+  });
 });

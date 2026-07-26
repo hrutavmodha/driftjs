@@ -1,5 +1,5 @@
 {
-  "name": "@driftjs/compiler",
+  "name": "@driftjs/runtime",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -9,13 +9,7 @@
     "test": "vitest run"
   },
   "exports": {
-    ".": "./dist/drift-es.js"
+    ".": "./dist/drift-runtime-es.js"
   },
-  "license": "MIT",
-  "dependencies": {
-    "acorn": "^8.17.0"
-  },
-  "devDependencies": {
-    "@types/acorn": "^6.0.4"
-  }
+  "license": "MIT"
 }
