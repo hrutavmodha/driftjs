@@ -4,6 +4,7 @@ import {
   TemplateChildNode,
   ElementNode,
   InterpolationNode,
+  IfNode,
   ASTNodeType,
   DriftParserError,
 } from '../types/index.js';
@@ -77,7 +78,7 @@ export class DriftTransformer {
       if (Array.isArray(node.alternate)) {
         transformedAlt = this.transformChildren(node.alternate);
       } else if (node.alternate !== null) {
-        transformedAlt = this.transformNode(node.alternate) as IfNode;
+        transformedAlt = this.transformNode(node.alternate as IfNode) as IfNode;
       }
 
       return {
@@ -195,6 +196,7 @@ export class DriftTransformer {
    * Checks if string consists only of whitespace characters (space, tab, newline, carriage return) using ASCII codes.
    */
   private isWhitespaceOnly(text: string): boolean {
+    if (text.length === 0) return false;
     for (let i = 0; i < text.length; i++) {
       const code = text.charCodeAt(i);
       if (code !== 32 && code !== 9 && code !== 10 && code !== 13) {

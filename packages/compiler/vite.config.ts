@@ -1,11 +1,9 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = resolve(__filename);
-
-
+const __dirname = dirname(__filename);
 
 export default defineConfig({
     build: {
@@ -14,9 +12,9 @@ export default defineConfig({
         emptyOutDir: true,
         lib: {
             formats: ['es', 'cjs'],
-            entry: resolve(__dirname, '../src/index.ts'),
+            entry: resolve(__dirname, 'src/index.ts'),
             name: 'DriftCompiler',
-            fileName: (format: string) => format === 'cjs' ? 'drift.cjs' : `drift.mjs`
+            fileName: (format: string) => `index-${format}.js`
         }
     }
 })

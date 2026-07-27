@@ -1,17 +1,35 @@
 export * from '../types/index.js';
+export { DriftLexer } from './lexer.js';
+export { DriftParser } from './parser.js';
+export { DriftTransformer } from './transformer.js';
+export { DriftGenerator } from './generator.js';
+
 import { DriftLexer } from './lexer.js';
 import { DriftParser } from './parser.js';
 import { DriftTransformer } from './transformer.js';
+import { DriftGenerator } from './generator.js';
 
-export function interprete(src: string, debug: boolean = false): void {
+/**
+ * Compiles Drift template source code into a register-based virtual machine module.
+ *
+ * @param src - The template source string to compile.
+ * @param debug - If true, logs intermediate AST and final compiled module.
+ */
+export function interpret(src: string, debug: boolean = false) {
     const lexer = new DriftLexer(src);
     const parser = new DriftParser(lexer);
     const ast = parser.parse();
     const transformer = new DriftTransformer(ast);
     const transformedAst = transformer.transform();
+    const generator = new DriftGenerator(transformedAst);
+    const compiledModule = generator.generate();
 
     if (debug) {
+        console.log('--- Transformed AST ---');
         console.log(JSON.stringify(transformedAst, null, 2));
+        console.log('--- Compiled Module ---');
+        console.log(JSON.stringify(compiledModule, null, 2));
     }
-    // TODO: Generator and VM coming soon!
+
+    return compiledModule;
 }

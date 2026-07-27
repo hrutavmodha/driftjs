@@ -77,6 +77,8 @@ export function isRawTextTagName(tagName: string): tagName is RawTextTagName {
   return tagName === 'script' || tagName === 'style';
 }
 
+const KNOWN_DIRECTIVES = new Set(['if', 'else', 'for', 'switch', 'case', 'default']);
+
 
 /**
  * Stateful on-demand lexer for Drift templates.
@@ -200,8 +202,6 @@ export class DriftLexer {
     while (!this.isAtEnd() && /[a-zA-Z]/.test(this.peek())) {
       name += this.advance();
     }
-
-    const KNOWN_DIRECTIVES = new Set(['if', 'else', 'for', 'switch', 'case', 'default']);
     if (!KNOWN_DIRECTIVES.has(name)) {
       throw new DriftLexerError(
         `Unknown directive '@${name}'`,
@@ -225,7 +225,12 @@ export class DriftLexer {
         this.blockDepth++;
         return this.createToken(TokenType.DirectiveElse, '', startLoc);
       }
-      return this.createToken(TokenType.DirectiveElse, '', startLoc);
+      throw new DriftLexerError(
+        `Expected '{' after @else directive`,
+        startLoc.line,
+        startLoc.column,
+        startLoc.offset
+      );
     } else if (name === 'for') {
       return this.readDirectiveHeader(startLoc, TokenType.DirectiveFor);
     } else if (name === 'switch') {

@@ -2,14 +2,13 @@
   "name": "@driftjs/runtime",
   "version": "0.0.0",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index-es.js",
   "scripts": {
     "build": "vite build",
     "test": "vitest run"
   },
   "exports": {
-    ".": "./dist/drift-runtime-es.js"
+    ".": "./dist/index-es.js"
   },
   "license": "MIT"
 }

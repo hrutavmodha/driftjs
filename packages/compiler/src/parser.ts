@@ -7,6 +7,10 @@ import {
   ElementNode,
   AttributeNode,
   InterpolationNode,
+  IfNode,
+  ForNode,
+  SwitchNode,
+  CaseBranch,
   ASTNodeType,
   DriftParserError,
 } from '../types/index.js';
@@ -273,42 +277,8 @@ export class DriftParser {
     this.skipWhitespaceTokens();
 
     if (this.check(TokenType.DirectiveElseIf)) {
-      const elseIfToken = this.advance();
-      const elseIfStartLoc = elseIfToken.loc.start;
-      const elseIfTest = elseIfToken.value;
-
-      const elseIfConsequent: TemplateChildNode[] = [];
-      while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
-        elseIfConsequent.push(this.parseChild());
-      }
-      const elseIfCloseToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @else if block');
-
-      let nestedAlt: TemplateChildNode[] | IfNode | null = null;
-      let nestedEndLoc = elseIfCloseToken.loc.end;
-
-      this.skipWhitespaceTokens();
-      if (this.check(TokenType.DirectiveElseIf)) {
-        nestedAlt = this.parseElseIfChain();
-        nestedEndLoc = (nestedAlt as IfNode).loc.end;
-      } else if (this.check(TokenType.DirectiveElse)) {
-        this.advance();
-        const elseBody: TemplateChildNode[] = [];
-        while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
-          elseBody.push(this.parseChild());
-        }
-        const elseCloseToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @else block');
-        nestedAlt = elseBody;
-        nestedEndLoc = elseCloseToken.loc.end;
-      }
-
-      alternate = {
-        type: ASTNodeType.If,
-        test: elseIfTest,
-        consequent: elseIfConsequent,
-        alternate: nestedAlt,
-        loc: { start: elseIfStartLoc, end: nestedEndLoc },
-      };
-      endLoc = nestedEndLoc;
+      alternate = this.parseElseIfChain();
+      endLoc = alternate.loc.end;
     } else if (this.check(TokenType.DirectiveElse)) {
       this.advance(); // consume @else
       const elseBody: TemplateChildNode[] = [];
@@ -329,12 +299,62 @@ export class DriftParser {
     };
   }
 
-  private parseForDirective(): any {
+  private parseElseIfChain(): IfNode {
+    const elseIfToken = this.consume(TokenType.DirectiveElseIf, 'Expected @else if directive');
+    const startLoc = elseIfToken.loc.start;
+    const test = elseIfToken.value;
+
+    const consequent: TemplateChildNode[] = [];
+    while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+      consequent.push(this.parseChild());
+    }
+    const endBlockToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @else if block');
+
+    let alternate: TemplateChildNode[] | IfNode | null = null;
+    let endLoc = endBlockToken.loc.end;
+
+    this.skipWhitespaceTokens();
+
+    if (this.check(TokenType.DirectiveElseIf)) {
+      alternate = this.parseElseIfChain();
+      endLoc = alternate.loc.end;
+    } else if (this.check(TokenType.DirectiveElse)) {
+      this.advance(); // consume @else
+      const elseBody: TemplateChildNode[] = [];
+      while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+        elseBody.push(this.parseChild());
+      }
+      const elseCloseToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @else block');
+      alternate = elseBody;
+      endLoc = elseCloseToken.loc.end;
+    }
+
+    return {
+      type: ASTNodeType.If,
+      test,
+      consequent,
+      alternate,
+      loc: { start: startLoc, end: endLoc },
+    };
+  }
+
+  private parseForDirective(): ForNode {
     const forToken = this.consume(TokenType.DirectiveFor, 'Expected @for directive');
     const startLoc = forToken.loc.start;
     const header = forToken.value; // e.g. "item in items" or "(item, index) in items"
 
-    const inIndex = header.indexOf(' in ');
+    const inIndex = (() => {
+      let parenDepth = 0;
+      for (let i = 0; i <= header.length - 4; i++) {
+        const ch = header[i];
+        if (ch === '(') parenDepth++;
+        else if (ch === ')') parenDepth--;
+        else if (parenDepth === 0 && header.slice(i, i + 4) === ' in ') {
+          return i;
+        }
+      }
+      return -1;
+    })();
     if (inIndex === -1) {
       throw new DriftParserError(
         `Invalid @for header syntax '${header}'. Expected format: 'item in list' or '(item, index) in list'`,
@@ -372,11 +392,11 @@ export class DriftParser {
     };
   }
 
-  private parseSwitchDirective(): any {
+  private parseSwitchDirective(): SwitchNode {
     const switchToken = this.consume(TokenType.DirectiveSwitch, 'Expected @switch directive');
     const startLoc = switchToken.loc.start;
     const discriminant = switchToken.value;
-    const cases: any[] = [];
+    const cases: CaseBranch[] = [];
 
     this.skipWhitespaceTokens();
     while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
