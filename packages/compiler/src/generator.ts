@@ -12,6 +12,7 @@ import {
   ASTNodeType,
   Opcode,
   CompiledModule,
+  ReactiveBinding,
 } from '../types/index.js';
 
 /**
@@ -24,6 +25,8 @@ export class DriftGenerator {
   private bytecode: number[] = [];
   private constants: any[] = [];
   private nextRegisterId = 0;
+  private declaredVars: Set<string> = new Set();
+  private bindingPositions: Map<string, { pc: number; opcode: Opcode }[]> = new Map();
 
   constructor(ast: ProgramNode) {
     this.ast = ast;
@@ -37,6 +40,10 @@ export class DriftGenerator {
     this.bytecode = [];
     this.constants = [];
     this.nextRegisterId = 0;
+    this.declaredVars = new Set();
+    this.bindingPositions = new Map();
+
+    this.collectDeclaredVars(this.ast.body);
 
     if (this.ast.body.length === 0) {
       const rootReg = this.allocRegister();
@@ -45,6 +52,7 @@ export class DriftGenerator {
       return {
         bytecode: this.bytecode,
         constants: this.constants,
+        reactiveBindings: this.buildReactiveBindings(),
       };
     }
 
@@ -64,6 +72,7 @@ export class DriftGenerator {
     return {
       bytecode: this.bytecode,
       constants: this.constants,
+      reactiveBindings: this.buildReactiveBindings(),
     };
   }
 
@@ -126,7 +135,9 @@ export class DriftGenerator {
       this.emit(Opcode.SET_ATTR, elemReg, nameIdx, valIdx, 0);
     } else if (attr.value.type === ASTNodeType.Interpolation) {
       const exprIdx = this.addConstant(attr.value.expression);
+      const pc = this.bytecode.length;
       this.emit(Opcode.SET_ATTR, elemReg, nameIdx, exprIdx, 1);
+      this.recordBindingPositions(attr.value.expression, pc, Opcode.SET_ATTR);
     }
   }
 
@@ -140,8 +151,10 @@ export class DriftGenerator {
   private compileInterpolationNode(node: InterpolationNode, parentReg: number): void {
     const textReg = this.allocRegister();
     const exprConstIdx = this.addConstant(node.expression);
+    const pc = this.bytecode.length;
     this.emit(Opcode.INTERPOLATE_TEXT, textReg, exprConstIdx);
     this.emit(Opcode.APPEND_CHILD, parentReg, textReg);
+    this.recordBindingPositions(node.expression, pc, Opcode.INTERPOLATE_TEXT);
   }
 
   private compileCommentNode(node: CommentNode, parentReg: number): void {
@@ -257,6 +270,113 @@ export class DriftGenerator {
     for (const exitPos of exitJumpPatches) {
       this.patchJump(exitPos, switchEndTarget);
     }
+  }
+
+  private collectDeclaredVars(nodes: readonly TemplateChildNode[]): void {
+    for (const node of nodes) {
+      if (node.type === ASTNodeType.Element && node.tagName === 'script') {
+        for (const child of node.children) {
+          if (child.type === ASTNodeType.Text && typeof child.content === 'object' && child.content !== null) {
+            const astNode = child.content as any;
+            if (Array.isArray(astNode)) {
+              for (const stmt of astNode) {
+                this.extractVarNames(stmt);
+              }
+            } else {
+              this.extractVarNames(astNode);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private extractVarNames(node: any): void {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'VariableDeclaration') {
+      for (const decl of node.declarations) {
+        if (decl.id?.type === 'Identifier') {
+          this.declaredVars.add(decl.id.name);
+        }
+      }
+    }
+  }
+
+  private extractIdentifiers(node: any): Set<string> {
+    const ids = new Set<string>();
+    if (!node || typeof node !== 'object' || !node.type) return ids;
+
+    switch (node.type) {
+      case 'Identifier':
+        ids.add(node.name);
+        break;
+      case 'BinaryExpression':
+      case 'LogicalExpression':
+        for (const id of this.extractIdentifiers(node.left)) ids.add(id);
+        for (const id of this.extractIdentifiers(node.right)) ids.add(id);
+        break;
+      case 'UnaryExpression':
+      case 'UpdateExpression':
+        for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
+        break;
+      case 'MemberExpression':
+        for (const id of this.extractIdentifiers(node.object)) ids.add(id);
+        break;
+      case 'CallExpression':
+        for (const id of this.extractIdentifiers(node.callee)) ids.add(id);
+        for (const arg of node.arguments) {
+          for (const id of this.extractIdentifiers(arg)) ids.add(id);
+        }
+        break;
+      case 'ConditionalExpression':
+        for (const id of this.extractIdentifiers(node.test)) ids.add(id);
+        for (const id of this.extractIdentifiers(node.consequent)) ids.add(id);
+        for (const id of this.extractIdentifiers(node.alternate)) ids.add(id);
+        break;
+      case 'AssignmentExpression':
+        for (const id of this.extractIdentifiers(node.left)) ids.add(id);
+        for (const id of this.extractIdentifiers(node.right)) ids.add(id);
+        break;
+      case 'ArrowFunctionExpression':
+      case 'FunctionExpression':
+        for (const id of this.extractIdentifiers(node.body)) ids.add(id);
+        break;
+      case 'BlockStatement':
+        for (const stmt of node.body) {
+          for (const id of this.extractIdentifiers(stmt)) ids.add(id);
+        }
+        break;
+      case 'ExpressionStatement':
+        for (const id of this.extractIdentifiers(node.expression)) ids.add(id);
+        break;
+      case 'ReturnStatement':
+        if (node.argument) {
+          for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
+        }
+        break;
+    }
+    return ids;
+  }
+
+  private recordBindingPositions(expr: any, pc: number, opcode: Opcode): void {
+    if (this.declaredVars.size === 0) return;
+    const ids = this.extractIdentifiers(expr);
+    for (const name of ids) {
+      if (this.declaredVars.has(name)) {
+        if (!this.bindingPositions.has(name)) {
+          this.bindingPositions.set(name, []);
+        }
+        this.bindingPositions.get(name)!.push({ pc, opcode });
+      }
+    }
+  }
+
+  private buildReactiveBindings(): ReactiveBinding[] {
+    const bindings: ReactiveBinding[] = [];
+    for (const [variable, positions] of this.bindingPositions) {
+      bindings.push({ variable, positions });
+    }
+    return bindings;
   }
 
   private allocRegister(): number {

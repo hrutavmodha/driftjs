@@ -1,0 +1,26 @@
+{
+  "name": "@driftjs/vite-plugin",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index-es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index-es.js",
+      "require": "./dist/index-cjs.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@driftjs/compiler": "workspace:*"
+  },
+  "peerDependencies": {
+    "vite": "8.1.5"
+  },
+  "devDependencies": {
+    "@driftjs/runtime": "workspace:*"
+  }
+}

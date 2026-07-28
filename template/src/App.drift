@@ -1,0 +1,6 @@
+<script>
+    let count = 0;
+</script>
+
+<p>Count: {count}</p>
+<button onclick={() => { count++ }}>Increment</button>

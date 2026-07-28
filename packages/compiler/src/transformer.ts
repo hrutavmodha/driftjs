@@ -61,6 +61,17 @@ export class DriftTransformer {
       }
       return {
         ...node,
+        attributes: node.attributes.map((attr) => {
+          if (
+            attr.type === ASTNodeType.Attribute &&
+            attr.value !== null &&
+            typeof attr.value !== 'string' &&
+            attr.value.type === ASTNodeType.Interpolation
+          ) {
+            return { ...attr, value: this.transformInterpolation(attr.value) };
+          }
+          return attr;
+        }),
         children: this.transformChildren(node.children),
       };
     }

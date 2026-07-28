@@ -19,9 +19,19 @@ export const Opcode = {
 export type Opcode = typeof Opcode[keyof typeof Opcode];
 
 /**
+ * Describes which bytecode PC positions reference a declared variable,
+ * enabling the runtime to re-evaluate bindings when state changes.
+ */
+export interface ReactiveBinding {
+  readonly variable: string;
+  readonly positions: readonly { readonly pc: number; readonly opcode: Opcode }[];
+}
+
+/**
  * Output module emitted by DriftGenerator.
  */
 export interface CompiledModule {
   readonly bytecode: readonly number[];
   readonly constants: readonly any[];
+  readonly reactiveBindings?: readonly ReactiveBinding[];
 }
