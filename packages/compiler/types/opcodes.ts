@@ -14,6 +14,12 @@ export const Opcode = {
   JUMP_IF_FALSE: 0x09,
   EVAL_EXPR: 0x0A,
   LOOP_ITER: 0x0B,
+  /** Execute a script-block AST stored in the constant pool to initialise the component scope. */
+  EXEC_SCRIPT: 0x0C,
+  /** Reactive conditional block: re-renders its subtree when deps change. */
+  REACTIVE_IF: 0x0D,
+  /** Reactive loop block: re-renders its subtree when deps change. */
+  REACTIVE_FOR: 0x0E,
 } as const;
 
 export type Opcode = typeof Opcode[keyof typeof Opcode];
@@ -34,4 +40,6 @@ export interface CompiledModule {
   readonly bytecode: readonly number[];
   readonly constants: readonly any[];
   readonly reactiveBindings?: readonly ReactiveBinding[];
+  /** All variable names declared in the component's <script> block. Used by the runtime for change-detection. */
+  readonly declaredVars?: readonly string[];
 }

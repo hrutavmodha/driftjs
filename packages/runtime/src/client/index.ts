@@ -11,6 +11,12 @@ interface LoopFrame {
   readonly items: any[];
 }
 
+/** A self-contained reactive region that re-renders its DOM subtree when deps change. */
+interface ReactiveRegion {
+  readonly deps: ReadonlySet<string>;
+  readonly reRender: () => void;
+}
+
 /**
  * Evaluates an Acorn AST node against the given scope without eval/new Function (100% CSP compliant).
  */
@@ -148,7 +154,16 @@ function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?
     }
 
     case 'ArrayExpression': {
-      return node.elements.map((el: any) => evaluateExpression(el, scope, declaredVars));
+      const result: any[] = [];
+      for (const el of node.elements) {
+        if (el && el.type === 'SpreadElement') {
+          const spread = evaluateExpression(el.argument, scope, declaredVars);
+          if (Array.isArray(spread)) result.push(...spread);
+        } else {
+          result.push(evaluateExpression(el, scope, declaredVars));
+        }
+      }
+      return result;
     }
 
     case 'ObjectExpression': {
@@ -246,6 +261,34 @@ function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?
       return undefined;
     }
 
+    case 'FunctionDeclaration': {
+      // Register the function in scope so it can be referenced by name (e.g. onclick={increment}).
+      if (node.id?.type === 'Identifier') {
+        const capturedScope = scope;
+        const capturedDeclaredVars = declaredVars;
+        const fn = (...args: any[]) => {
+          const childScope = { ...capturedScope };
+          node.params.forEach((param: any, i: number) => {
+            if (param.type === 'Identifier') {
+              childScope[param.name] = args[i];
+            }
+          });
+          const result = evaluateExpression(node.body, childScope, capturedDeclaredVars);
+          // Write back any mutations to declared vars into the parent scope.
+          if (capturedDeclaredVars && capturedDeclaredVars.size > 0) {
+            for (const name of capturedDeclaredVars) {
+              if (name in childScope && childScope[name] !== capturedScope[name]) {
+                capturedScope[name] = childScope[name];
+              }
+            }
+          }
+          return result;
+        };
+        scope[node.id.name] = fn;
+      }
+      return undefined;
+    }
+
     default:
       return undefined;
   }
@@ -262,6 +305,18 @@ function resolveValue(val: any, scope: Record<string, any>, declaredVars?: Set<s
 }
 
 /**
+ * Removes all DOM nodes between two comment anchor nodes (exclusive of the anchors themselves).
+ */
+function clearBetweenAnchors(start: Comment, end: Comment): void {
+  let node = start.nextSibling;
+  while (node && node !== end) {
+    const next = node.nextSibling;
+    node.parentNode!.removeChild(node);
+    node = next;
+  }
+}
+
+/**
  * Register-based Virtual Machine for executing compiled DriftJS templates.
  * Clean, lightweight, and 100% CSP compliant.
  */
@@ -271,6 +326,8 @@ export class DriftClientVirtualMachine {
   private scope: Record<string, any> = {};
   private module: CompiledModule | null = null;
   private declaredVars: Set<string> = new Set();
+  private doc: Document | null = null;
+  private reactiveRegions: ReactiveRegion[] = [];
 
   private checkRegister(index: number): void {
     if (index < 0 || index >= DriftClientVirtualMachine.MAX_REGISTERS) {
@@ -288,21 +345,36 @@ export class DriftClientVirtualMachine {
     return this.registers[index];
   }
 
-  public execute(module: CompiledModule, options: VMExecutionOptions = {}): Node | null {
-    const doc = options.document || (typeof document !== 'undefined' ? document : null);
-    if (!doc) {
-      throw new Error('DriftClientVirtualMachine requires a DOM Document context to execute.');
-    }
-
-    const scope: Record<string, any> = { ...options.scope };
-    this.scope = scope;
-    this.module = module;
-    this.declaredVars = new Set(
-      (module.reactiveBindings ?? []).map((b) => b.variable)
-    );
+  /**
+   * Runs the bytecode of a sub-module using fresh registers but the VM's shared scope,
+   * declaredVars, doc, and reactiveRegions. Used by REACTIVE_IF / REACTIVE_FOR handlers.
+   */
+  private runSubModule(
+    subMod: { bytecode: readonly number[]; constants: readonly any[] },
+    scope: Record<string, any>
+  ): Node | null {
+    const savedRegisters = [...this.registers];
+    const savedModule = this.module;
     this.registers.fill(undefined);
+    this.module = subMod as CompiledModule;
 
-    const { bytecode, constants } = module;
+    const result = this.executeLoop(subMod.bytecode, subMod.constants, scope);
+
+    this.registers.fill(undefined);
+    for (let i = 0; i < savedRegisters.length; i++) this.registers[i] = savedRegisters[i];
+    this.module = savedModule;
+    return result;
+  }
+
+  /**
+   * Core execution loop — shared between the top-level execute() and runSubModule().
+   */
+  private executeLoop(
+    bytecode: readonly number[],
+    constants: readonly any[],
+    scope: Record<string, any>
+  ): Node | null {
+    const doc = this.doc!;
     let pc = 0;
     const loopStack: LoopFrame[] = [];
 
@@ -368,8 +440,13 @@ export class DriftClientVirtualMachine {
               const eventName = attrName.slice(2).toLowerCase();
               const vm = this;
               const wrappedHandler = function (this: any, ...args: any[]) {
+                const scopeSnapshot: Record<string, any> = { ...vm.scope };
                 const result = val.apply(this, args);
-                vm.triggerUpdates();
+                const changedVars = new Set<string>();
+                for (const key of vm.declaredVars) {
+                  if (vm.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
+                }
+                if (changedVars.size > 0) vm.triggerUpdates(changedVars);
                 return result;
               };
               elem.addEventListener(eventName, wrappedHandler);
@@ -377,8 +454,13 @@ export class DriftClientVirtualMachine {
               const eventName = attrName.slice(1).toLowerCase();
               const vm = this;
               const wrappedHandler = function (this: any, ...args: any[]) {
+                const scopeSnapshot: Record<string, any> = { ...vm.scope };
                 const result = val.apply(this, args);
-                vm.triggerUpdates();
+                const changedVars = new Set<string>();
+                for (const key of vm.declaredVars) {
+                  if (vm.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
+                }
+                if (changedVars.size > 0) vm.triggerUpdates(changedVars);
                 return result;
               };
               elem.addEventListener(eventName, wrappedHandler);
@@ -466,12 +548,161 @@ export class DriftClientVirtualMachine {
           break;
         }
 
+        case Opcode.EXEC_SCRIPT: {
+          const scriptBody = constants[bytecode[pc + 1]!];
+          // scriptBody is either a single AST statement or an array of statements.
+          if (Array.isArray(scriptBody)) {
+            for (const stmt of scriptBody) {
+              evaluateExpression(stmt, scope, this.declaredVars);
+            }
+          } else if (scriptBody) {
+            evaluateExpression(scriptBody, scope, this.declaredVars);
+          }
+          pc += 2;
+          break;
+        }
+
+        case Opcode.REACTIVE_IF: {
+          const parentReg  = bytecode[pc + 1]!;
+          const condIdx    = bytecode[pc + 2]!;
+          const consIdx    = bytecode[pc + 3]!;
+          const altIdx     = bytecode[pc + 4]!;
+          const depsIdx    = bytecode[pc + 5]!;
+
+          const parentElem = this.getRegister(parentReg);
+          const condExpr   = constants[condIdx];
+          const consMod    = constants[consIdx];
+          const altMod     = altIdx !== 0xFF ? constants[altIdx] : null;
+          const deps       = new Set<string>(constants[depsIdx] ?? []);
+
+          // Create comment anchor nodes and append to parent
+          const startAnchor = doc.createComment('if');
+          const endAnchor   = doc.createComment('/if');
+          parentElem.appendChild(startAnchor);
+          parentElem.appendChild(endAnchor);
+
+          const vm = this;
+          // Track child regions registered by sub-module renders so we can remove
+          // stale ones before each re-render (prevents parentNode-null crashes).
+          let childRegions: ReactiveRegion[] = [];
+
+          const renderIf = () => {
+            // Remove previously registered child regions
+            for (const r of childRegions) {
+              const idx = vm.reactiveRegions.indexOf(r);
+              if (idx !== -1) vm.reactiveRegions.splice(idx, 1);
+            }
+            const before = vm.reactiveRegions.length;
+            const cond = evaluateExpression(condExpr, vm.scope, vm.declaredVars);
+            const subMod = cond ? consMod : altMod;
+            if (subMod) {
+              const frag = vm.runSubModule(subMod, vm.scope);
+              if (frag && endAnchor.parentNode) endAnchor.parentNode.insertBefore(frag, endAnchor);
+            }
+            childRegions = vm.reactiveRegions.slice(before);
+          };
+          renderIf();
+
+          this.reactiveRegions.push({
+            deps,
+            reRender: () => {
+              clearBetweenAnchors(startAnchor, endAnchor);
+              renderIf();
+            },
+          });
+
+          pc += 6;
+          break;
+        }
+
+        case Opcode.REACTIVE_FOR: {
+          const parentReg   = bytecode[pc + 1]!;
+          const iterIdx     = bytecode[pc + 2]!;
+          const itemNameIdx = bytecode[pc + 3]!;
+          const idxNameIdx  = bytecode[pc + 4]!;
+          const bodyIdx     = bytecode[pc + 5]!;
+          const depsIdx     = bytecode[pc + 6]!;
+
+          const parentElem  = this.getRegister(parentReg);
+          const iterExpr    = constants[iterIdx];
+          const itemName    = constants[itemNameIdx] as string;
+          const indexName   = idxNameIdx !== 0xFF ? constants[idxNameIdx] as string : null;
+          const bodyMod     = constants[bodyIdx];
+          const deps        = new Set<string>(constants[depsIdx] ?? []);
+          let forChildRegions: ReactiveRegion[] = [];
+
+          const startAnchor = doc.createComment('for');
+          const endAnchor   = doc.createComment('/for');
+          parentElem.appendChild(startAnchor);
+          parentElem.appendChild(endAnchor);
+
+          const vm = this;
+          const renderFor = () => {
+            // Remove stale child regions from previous render
+            for (const r of forChildRegions) {
+              const idx = vm.reactiveRegions.indexOf(r);
+              if (idx !== -1) vm.reactiveRegions.splice(idx, 1);
+            }
+            const before = vm.reactiveRegions.length;
+            const rawIter = evaluateExpression(iterExpr, vm.scope, vm.declaredVars);
+            const items = Array.isArray(rawIter) ? rawIter
+              : rawIter && typeof rawIter[Symbol.iterator] === 'function'
+              ? Array.from(rawIter) : [];
+
+            items.forEach((item: unknown, i: number) => {
+              const childScope = { ...vm.scope, [itemName]: item };
+              if (indexName) childScope[indexName] = i;
+              const frag = vm.runSubModule(bodyMod, childScope);
+              if (frag && endAnchor.parentNode) endAnchor.parentNode.insertBefore(frag, endAnchor);
+            });
+            forChildRegions = vm.reactiveRegions.slice(before);
+          };
+          renderFor();
+
+          this.reactiveRegions.push({
+            deps,
+            reRender: () => {
+              clearBetweenAnchors(startAnchor, endAnchor);
+              renderFor();
+            },
+          });
+
+          pc += 7;
+          break;
+        }
+
         default:
           throw new Error(`Unknown Opcode ${opcode} at PC ${pc}`);
       }
     }
 
     return null;
+  }
+
+  public execute(module: CompiledModule, options: VMExecutionOptions = {}): Node | null {
+    const doc = options.document || (typeof document !== 'undefined' ? document : null);
+    if (!doc) {
+      throw new Error('DriftClientVirtualMachine requires a DOM Document context to execute.');
+    }
+
+    this.doc = doc;
+    this.reactiveRegions = [];
+
+    const scope: Record<string, any> = { ...options.scope };
+    this.scope = scope;
+    this.module = module;
+    // Prefer the explicit declaredVars list emitted by the generator (contains ALL script-declared
+    // variables). Fall back to deriving from reactiveBindings for hand-crafted test modules.
+    if (module.declaredVars && module.declaredVars.length > 0) {
+      this.declaredVars = new Set(module.declaredVars);
+    } else {
+      this.declaredVars = new Set(
+        (module.reactiveBindings ?? []).map((b) => b.variable)
+      );
+    }
+    this.registers.fill(undefined);
+
+    return this.executeLoop(module.bytecode, module.constants, scope);
   }
 
   /**
@@ -515,17 +746,31 @@ export class DriftClientVirtualMachine {
   }
 
   /**
-   * Re-evaluates all reactive bindings, updating the DOM in-place.
+   * Re-evaluates reactive bindings whose variables are in `changedVars`, updating the DOM in-place.
+   * Also triggers re-render of reactive @if / @for regions whose deps intersect changedVars.
    */
-  public triggerUpdates(): void {
-    if (!this.module?.reactiveBindings) return;
+  public triggerUpdates(changedVars: Set<string>): void {
+    if (changedVars.size === 0) return;
 
-    for (const binding of this.module.reactiveBindings) {
-      if (!this.declaredVars.has(binding.variable)) continue;
+    // 1. Patch INTERPOLATE_TEXT / SET_ATTR in-place (existing logic)
+    if (this.module?.reactiveBindings) {
+      for (const binding of this.module.reactiveBindings) {
+        if (!changedVars.has(binding.variable)) continue;
 
-      for (const pos of binding.positions) {
-        if (pos.opcode === Opcode.INTERPOLATE_TEXT || pos.opcode === Opcode.SET_ATTR) {
-          this.updateAt(pos.pc, this.module, { scope: this.scope });
+        for (const pos of binding.positions) {
+          if (pos.opcode === Opcode.INTERPOLATE_TEXT || pos.opcode === Opcode.SET_ATTR) {
+            this.updateAt(pos.pc, this.module, { scope: this.scope });
+          }
+        }
+      }
+    }
+
+    // 2. Re-render reactive @if / @for regions whose deps intersect changedVars
+    for (const region of this.reactiveRegions) {
+      for (const dep of region.deps) {
+        if (changedVars.has(dep)) {
+          region.reRender();
+          break; // don't double-render the same region
         }
       }
     }
@@ -542,4 +787,3 @@ export function mount(component: CompiledModule, container: HTMLElement): void {
     container.appendChild(node);
   }
 }
-

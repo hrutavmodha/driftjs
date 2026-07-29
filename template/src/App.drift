@@ -1,6 +1,39 @@
 <script>
-    let count = 0;
+  let count = 0;
+
+  function increment() { count = count + 1; }
+  function decrement() { count = count - 1; }
+  function reset() { count = 0; }
 </script>
 
-<p>Count: {count}</p>
-<button onclick={() => { count++ }}>Increment</button>
+<div class="card">
+  <div class="badge">
+    <div class="badge-dot"></div>
+    DriftJS Live
+  </div>
+
+  <p class="title">Counter</p>
+
+  <div class="counter-wrap">
+    <div class="counter-glow"></div>
+    <div class="counter-num">{count}</div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-dec" onclick={decrement}>−</button>
+    <button class="btn btn-reset" onclick={reset}>Reset</button>
+    <button class="btn btn-inc" onclick={increment}>+</button>
+  </div>
+
+  @if count > 0 {
+    <p class="status status-positive">↑ Counting up — keep going!</p>
+  }
+  @else if count < 0 {
+    <p class="status status-negative">↓ Gone negative. Bold move.</p>
+  }
+  @else {
+    <p class="status status-zero">Click + or − to start</p>
+  }
+
+  <p class="footer">Powered by <strong>DriftJS</strong></p>
+</div>

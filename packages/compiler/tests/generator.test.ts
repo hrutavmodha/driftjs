@@ -71,56 +71,37 @@ describe('DriftGenerator', () => {
     expect(module.bytecode).toContain(Opcode.INTERPOLATE_TEXT);
   });
 
-  it('generates bytecode for @if, @else if, and @else control flows with valid jump targets', () => {
+  it('generates REACTIVE_IF opcode for @if, @else if, and @else control flows', () => {
     const src = `@if isLoggedIn { <span>Welcome</span> } @else if isGuest { <span>Guest</span> } @else { <span>Login</span> }`;
     const module = compile(src);
 
-    expect(module.bytecode).toContain(Opcode.EVAL_EXPR);
-    expect(module.bytecode).toContain(Opcode.JUMP_IF_FALSE);
-    expect(module.bytecode).toContain(Opcode.JUMP);
+    // New reactive encoding: no flat jumps for @if
+    expect(module.bytecode).toContain(Opcode.REACTIVE_IF);
+    expect(module.bytecode).not.toContain(Opcode.JUMP_IF_FALSE);
+    expect(module.bytecode).not.toContain(Opcode.EVAL_EXPR);
 
-    let i = 0;
-    while (i < module.bytecode.length) {
-      const op = module.bytecode[i];
-      if (op === Opcode.JUMP_IF_FALSE) {
-        const targetByte = (module.bytecode[i + 2]! << 8) | module.bytecode[i + 3]!;
-        expect(targetByte).toBeLessThanOrEqual(module.bytecode.length);
-        i += 4;
-      } else if (op === Opcode.JUMP) {
-        const targetByte = (module.bytecode[i + 1]! << 8) | module.bytecode[i + 2]!;
-        expect(targetByte).toBeLessThanOrEqual(module.bytecode.length);
-        i += 3;
-      } else if (op === Opcode.RETURN || op === Opcode.CREATE_FRAGMENT) {
-        i += 2;
-      } else if (
-        op === Opcode.CREATE_ELEMENT ||
-        op === Opcode.CREATE_TEXT ||
-        op === Opcode.CREATE_COMMENT ||
-        op === Opcode.INTERPOLATE_TEXT ||
-        op === Opcode.APPEND_CHILD ||
-        op === Opcode.EVAL_EXPR
-      ) {
-        i += 3;
-      } else if (op === Opcode.SET_ATTR) {
-        i += 5;
-      } else if (op === Opcode.LOOP_ITER) {
-        i += 10;
-      } else {
-        i += 1;
-      }
-    }
+    // The condition AST, consequent sub-module, and deps array must all be in the constant pool
+    const reactiveIfIdx = module.bytecode.indexOf(Opcode.REACTIVE_IF);
+    expect(reactiveIfIdx).toBeGreaterThan(-1);
+
+    // Operand layout: REACTIVE_IF parentReg condIdx consIdx altIdx depsIdx
+    expect(module.bytecode.length).toBeGreaterThan(reactiveIfIdx + 5);
   });
 
-  it('generates bytecode for @for loop directives with loop iter instruction', () => {
+  it('generates REACTIVE_FOR opcode for @for loop directives', () => {
     const src = `@for (item, index) in list { <li>{item}</li> }`;
     const module = compile(src);
 
-    expect(module.bytecode).toContain(Opcode.EVAL_EXPR);
-    expect(module.bytecode).toContain(Opcode.LOOP_ITER);
-    expect(module.bytecode).toContain(Opcode.JUMP);
+    // New reactive encoding: no flat LOOP_ITER for @for
+    expect(module.bytecode).toContain(Opcode.REACTIVE_FOR);
+    expect(module.bytecode).not.toContain(Opcode.LOOP_ITER);
+    expect(module.bytecode).not.toContain(Opcode.EVAL_EXPR);
 
-    const loopIterIdx = module.bytecode.indexOf(Opcode.LOOP_ITER);
-    expect(loopIterIdx).toBeGreaterThan(-1);
+    const reactiveForIdx = module.bytecode.indexOf(Opcode.REACTIVE_FOR);
+    expect(reactiveForIdx).toBeGreaterThan(-1);
+
+    // Operand layout: REACTIVE_FOR parentReg iterIdx itemNameIdx indexNameIdx bodyIdx depsIdx
+    expect(module.bytecode.length).toBeGreaterThan(reactiveForIdx + 6);
   });
 
   it('generates bytecode for @switch, @case, and @default directives', () => {

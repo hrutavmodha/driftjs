@@ -58,6 +58,7 @@ function generateESM(mod: CompiledModule, filePath: string): string {
   const bytecodeJSON = JSON.stringify(Array.from(mod.bytecode));
   const constantsJSON = serializeConstants(mod.constants);
   const bindingsJSON = JSON.stringify(mod.reactiveBindings ?? []);
+  const declaredVarsJSON = JSON.stringify(mod.declaredVars ?? []);
 
   return `\
 // [DriftJS] Auto-generated from: ${filePath}
@@ -68,6 +69,7 @@ const compiledModule = {
   bytecode: ${bytecodeJSON},
   constants: ${constantsJSON},
   reactiveBindings: ${bindingsJSON},
+  declaredVars: ${declaredVarsJSON},
 };
 
 export default compiledModule;

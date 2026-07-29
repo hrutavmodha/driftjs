@@ -53,6 +53,7 @@ export class DriftGenerator {
         bytecode: this.bytecode,
         constants: this.constants,
         reactiveBindings: this.buildReactiveBindings(),
+        declaredVars: [...this.declaredVars],
       };
     }
 
@@ -73,6 +74,7 @@ export class DriftGenerator {
       bytecode: this.bytecode,
       constants: this.constants,
       reactiveBindings: this.buildReactiveBindings(),
+      declaredVars: [...this.declaredVars],
     };
   }
 
@@ -82,7 +84,12 @@ export class DriftGenerator {
   private compileNode(node: TemplateChildNode, parentReg: number): void {
     switch (node.type) {
       case ASTNodeType.Element:
-        this.compileElementNode(node, parentReg);
+        // Script elements are not rendered into the DOM — they initialise scope.
+        if ((node as ElementNode).tagName === 'script') {
+          this.compileScriptElement(node as ElementNode);
+        } else {
+          this.compileElementNode(node, parentReg);
+        }
         break;
       case ASTNodeType.Text:
         this.compileTextNode(node, parentReg);
@@ -102,6 +109,21 @@ export class DriftGenerator {
       case ASTNodeType.Switch:
         this.compileSwitchNode(node, parentReg);
         break;
+    }
+  }
+
+  /**
+   * Emits an EXEC_SCRIPT instruction for a <script> element.
+   * The script body AST is stored in the constant pool and executed by the runtime
+   * before any DOM construction, populating the component scope with declared
+   * variables and functions.
+   */
+  private compileScriptElement(node: ElementNode): void {
+    for (const child of node.children) {
+      if (child.type === ASTNodeType.Text && typeof child.content === 'object' && child.content !== null) {
+        const scriptBodyIdx = this.addConstant(child.content);
+        this.emit(Opcode.EXEC_SCRIPT, scriptBodyIdx);
+      }
     }
   }
 
@@ -164,66 +186,110 @@ export class DriftGenerator {
     this.emit(Opcode.APPEND_CHILD, parentReg, commentReg);
   }
 
-  private compileIfNode(node: IfNode, parentReg: number): void {
-    const condReg = this.allocRegister();
-    const exprIdx = this.addConstant(node.test);
-    this.emit(Opcode.EVAL_EXPR, condReg, exprIdx);
+  /**
+   * Compiles a list of child nodes into an isolated sub-module.
+   * The sub-module shares `declaredVars` with the parent (so reactive var detection works)
+   * but has its own fresh bytecode, constants, and registers.
+   */
+  private compileNodesToSubModule(
+    nodes: readonly TemplateChildNode[]
+  ): { bytecode: number[]; constants: any[]; reactiveBindings: ReactiveBinding[] } {
+    // save parent state
+    const savedBytecode = this.bytecode;
+    const savedConstants = this.constants;
+    const savedNextReg = this.nextRegisterId;
+    const savedBindPos = this.bindingPositions;
 
-    const jumpIfFalsePos = this.emitJumpIfFalsePlaceholder(condReg);
+    // fresh slate for the sub-module
+    this.bytecode = [];
+    this.constants = [];
+    this.nextRegisterId = 0;
+    this.bindingPositions = new Map();
 
-    for (const child of node.consequent) {
-      this.compileNode(child, parentReg);
+    const rootReg = this.allocRegister();
+    this.emit(Opcode.CREATE_FRAGMENT, rootReg);
+    for (const node of nodes) {
+      this.compileNode(node, rootReg);
     }
+    this.emit(Opcode.RETURN, rootReg);
 
-    if (node.alternate !== null) {
-      const jumpToEndPos = this.emitJumpPlaceholder();
-      const altTarget = this.bytecode.length;
-      this.patchJump(jumpIfFalsePos, altTarget);
+    const result = {
+      bytecode: this.bytecode,
+      constants: this.constants,
+      reactiveBindings: this.buildReactiveBindings(),
+    };
 
-      if (Array.isArray(node.alternate)) {
-        for (const child of node.alternate) {
-          this.compileNode(child, parentReg);
-        }
-      } else {
-        this.compileIfNode(node.alternate as IfNode, parentReg);
+    // restore parent state
+    this.bytecode = savedBytecode;
+    this.constants = savedConstants;
+    this.nextRegisterId = savedNextReg;
+    this.bindingPositions = savedBindPos;
+
+    return result;
+  }
+
+  /**
+   * Collects all declared-var names referenced inside a sub-module's reactive bindings
+   * plus any identifiers from an optional extra AST expression node (e.g. the @if condition
+   * or @for iterable expression).
+   */
+  private collectDepsFromSubModule(
+    subMod: { reactiveBindings: ReactiveBinding[] },
+    extraExpr?: any
+  ): string[] {
+    const deps = new Set<string>(subMod.reactiveBindings.map((b) => b.variable));
+    if (extraExpr) {
+      for (const name of this.extractIdentifiers(extraExpr)) {
+        if (this.declaredVars.has(name)) deps.add(name);
       }
-
-      const endTarget = this.bytecode.length;
-      this.patchJump(jumpToEndPos, endTarget);
-    } else {
-      const altTarget = this.bytecode.length;
-      this.patchJump(jumpIfFalsePos, altTarget);
     }
+    return [...deps];
+  }
+
+  private compileIfNode(node: IfNode, parentReg: number): void {
+    // Build consequent sub-module
+    const consMod = this.compileNodesToSubModule(node.consequent);
+    const consIdx = this.addConstant(consMod);
+
+    // Build alternate sub-module (may be @else or @else if)
+    let altIdx = 0xFF;
+    if (node.alternate !== null) {
+      let altNodes: readonly TemplateChildNode[];
+      if (Array.isArray(node.alternate)) {
+        altNodes = node.alternate;
+      } else {
+        // @else if: wrap the nested IfNode so it compiles correctly inside a sub-module
+        altNodes = [node.alternate as TemplateChildNode];
+      }
+      const altMod = this.compileNodesToSubModule(altNodes);
+      altIdx = this.addConstant(altMod);
+    }
+
+    // Deps = union of both branches' reactive vars + condition identifiers
+    const consDeps = this.collectDepsFromSubModule(consMod, node.test);
+    const depsIdx = this.addConstant(consDeps);
+
+    const condIdx = this.addConstant(node.test);
+
+    // REACTIVE_IF parentReg condIdx consIdx altIdx depsIdx  (5 operand bytes)
+    this.emit(Opcode.REACTIVE_IF, parentReg, condIdx, consIdx, altIdx, depsIdx);
   }
 
   private compileForNode(node: ForNode, parentReg: number): void {
-    const arrayReg = this.allocRegister();
+    // Build body sub-module
+    const bodyMod = this.compileNodesToSubModule(node.body);
+    const bodyIdx = this.addConstant(bodyMod);
+
     const iterIdx = this.addConstant(node.iterable);
-    this.emit(Opcode.EVAL_EXPR, arrayReg, iterIdx);
+    const itemNameIdx = this.addConstant(node.item);
+    const indexNameIdx = node.index !== null ? this.addConstant(node.index) : 0xFF;
 
-    const itemReg = this.allocRegister();
-    const indexReg = node.index !== null ? this.allocRegister() : 0xff;
+    // Deps = body's reactive vars + identifiers from iterable expression
+    const deps = this.collectDepsFromSubModule(bodyMod, node.iterable);
+    const depsIdx = this.addConstant(deps);
 
-    const itemConstIdx = this.addConstant(node.item);
-    const indexConstIdx = node.index !== null ? this.addConstant(node.index) : 0xffff;
-
-    const loopStartPos = this.bytecode.length;
-    const loopPatchPos = this.emitLoopIterPlaceholder(
-      arrayReg,
-      itemReg,
-      indexReg,
-      itemConstIdx,
-      indexConstIdx
-    );
-
-    for (const child of node.body) {
-      this.compileNode(child, parentReg);
-    }
-
-    this.emitJump(loopStartPos);
-
-    const loopEndPos = this.bytecode.length;
-    this.patchJump(loopPatchPos, loopEndPos);
+    // REACTIVE_FOR parentReg iterIdx itemNameIdx indexNameIdx bodyIdx depsIdx  (6 operand bytes)
+    this.emit(Opcode.REACTIVE_FOR, parentReg, iterIdx, itemNameIdx, indexNameIdx, bodyIdx, depsIdx);
   }
 
   private compileSwitchNode(node: SwitchNode, parentReg: number): void {
@@ -299,6 +365,8 @@ export class DriftGenerator {
           this.declaredVars.add(decl.id.name);
         }
       }
+    } else if (node.type === 'FunctionDeclaration' && node.id?.type === 'Identifier') {
+      this.declaredVars.add(node.id.name);
     }
   }
 
