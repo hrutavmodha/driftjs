@@ -6,3 +6,4 @@ examples/
 .trae/
 *.js
 .agents/
+js-framework-benchmark/

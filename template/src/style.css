@@ -184,12 +184,44 @@ html, body {
 .status-zero     { color: var(--muted); }
 
 /* ── History ──────────────────────────────────── */
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+
 .history-label {
   font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 10px;
+}
+
+.btn-clear {
+  background: transparent;
+  border: 1px solid rgba(247, 68, 90, 0.25);
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all .18s ease;
+}
+
+.btn-clear:hover {
+  background: rgba(247, 68, 90, 0.12);
+  border-color: var(--danger);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(247, 68, 90, 0.2);
+}
+
+.btn-clear:active {
+  transform: translateY(0) scale(.96);
 }
 
 .history {

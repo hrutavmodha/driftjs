@@ -1,4 +1,5 @@
-import { CompiledModule, Opcode, ReactiveBinding } from '../../types/index.js';
+import { CompiledModule, Opcode, ReactiveBinding, ItemRecord } from '../../types/index.js';
+import { reconcileKeyedList } from './reconciler.js';
 
 export interface VMExecutionOptions {
   readonly scope?: Record<string, any>;
@@ -15,6 +16,22 @@ interface LoopFrame {
 interface ReactiveRegion {
   readonly deps: ReadonlySet<string>;
   readonly reRender: () => void;
+}
+
+/**
+ * Sets a variable in scope, updating the parent scope where the variable was defined
+ * if it exists higher up the prototype chain.
+ */
+function setScopeValue(targetScope: Record<string, any>, name: string, val: any): void {
+  let curr = targetScope;
+  while (curr && curr !== Object.prototype) {
+    if (Object.prototype.hasOwnProperty.call(curr, name)) {
+      curr[name] = val;
+      return;
+    }
+    curr = Object.getPrototypeOf(curr);
+  }
+  targetScope[name] = val;
 }
 
 /**
@@ -99,19 +116,14 @@ function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?
     case 'UpdateExpression': {
       const arg = evaluateExpression(node.argument, scope, declaredVars);
       const name = node.argument.name;
-      if (node.operator === '++') {
-        scope[name] = arg + 1;
-        return node.prefix ? scope[name] : arg;
-      }
-      if (node.operator === '--') {
-        scope[name] = arg - 1;
-        return node.prefix ? scope[name] : arg;
-      }
-      return undefined;
+      const newVal = node.operator === '++' ? arg + 1 : arg - 1;
+      setScopeValue(scope, name, newVal);
+      return node.prefix ? newVal : arg;
     }
 
     case 'MemberExpression': {
       const obj = evaluateExpression(node.object, scope, declaredVars);
+      if (!obj) return undefined;
       if (node.computed) {
         const prop = evaluateExpression(node.property, scope, declaredVars);
         return obj[prop];
@@ -122,11 +134,14 @@ function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?
     case 'CallExpression': {
       const callee = evaluateExpression(node.callee, scope, declaredVars);
       const args = node.arguments.map((arg: any) => evaluateExpression(arg, scope, declaredVars));
-      if (node.callee.type === 'MemberExpression') {
-        const thisObj = evaluateExpression(node.callee.object, scope, declaredVars);
-        return callee.apply(thisObj, args);
+      if (typeof callee === 'function') {
+        if (node.callee.type === 'MemberExpression') {
+          const thisObj = evaluateExpression(node.callee.object, scope, declaredVars);
+          return callee.apply(thisObj, args);
+        }
+        return callee(...args);
       }
-      return callee(...args);
+      return undefined;
     }
 
     case 'ConditionalExpression': {
@@ -138,9 +153,36 @@ function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?
 
     case 'AssignmentExpression': {
       const right = evaluateExpression(node.right, scope, declaredVars);
+      const getNewVal = (oldVal: any) => {
+        switch (node.operator) {
+          case '=': return right;
+          case '+=': return oldVal + right;
+          case '-=': return oldVal - right;
+          case '*=': return oldVal * right;
+          case '/=': return oldVal / right;
+          case '%=': return oldVal % right;
+          default: return right;
+        }
+      };
+
       if (node.left.type === 'Identifier') {
-        scope[node.left.name] = right;
-        return right;
+        const name = node.left.name;
+        const oldVal = scope[name];
+        const val = getNewVal(oldVal);
+        setScopeValue(scope, name, val);
+        return val;
+      }
+      if (node.left.type === 'MemberExpression') {
+        const obj = evaluateExpression(node.left.object, scope, declaredVars);
+        if (obj) {
+          const prop = node.left.computed
+            ? evaluateExpression(node.left.property, scope, declaredVars)
+            : node.left.property.name;
+          const oldVal = obj[prop];
+          const val = getNewVal(oldVal);
+          obj[prop] = val;
+          return val;
+        }
       }
       return undefined;
     }
@@ -184,28 +226,6 @@ function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?
 
     case 'SpreadElement': {
       return evaluateExpression(node.argument, scope, declaredVars);
-    }
-
-    case 'ArrowFunctionExpression': {
-      const capturedScope = scope;
-      const capturedDeclaredVars = declaredVars;
-      return (...args: any[]) => {
-        const childScope = { ...scope };
-        node.params.forEach((param: any, i: number) => {
-          if (param.type === 'Identifier') {
-            childScope[param.name] = args[i];
-          }
-        });
-        const result = evaluateExpression(node.body, childScope, capturedDeclaredVars);
-        if (capturedDeclaredVars && capturedDeclaredVars.size > 0) {
-          for (const name of capturedDeclaredVars) {
-            if (name in childScope && childScope[name] !== capturedScope[name]) {
-              capturedScope[name] = childScope[name];
-            }
-          }
-        }
-        return result;
-      };
     }
 
     case 'TemplateLiteral': {
@@ -252,6 +272,62 @@ function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?
       return node.alternate ? evaluateExpression(node.alternate, scope, declaredVars) : undefined;
     }
 
+    case 'NewExpression': {
+      const callee = evaluateExpression(node.callee, scope, declaredVars);
+      const args = node.arguments ? node.arguments.map((arg: any) => evaluateExpression(arg, scope, declaredVars)) : [];
+      if (typeof callee === 'function') {
+        return new (callee as any)(...args);
+      }
+      return undefined;
+    }
+
+    case 'ForStatement': {
+      if (node.init) evaluateExpression(node.init, scope, declaredVars);
+      while (node.test ? evaluateExpression(node.test, scope, declaredVars) : true) {
+        evaluateExpression(node.body, scope, declaredVars);
+        if (node.update) evaluateExpression(node.update, scope, declaredVars);
+      }
+      return undefined;
+    }
+
+    case 'ForOfStatement': {
+      const right = evaluateExpression(node.right, scope, declaredVars);
+      if (right && typeof right[Symbol.iterator] === 'function') {
+        const varName = node.left.type === 'VariableDeclaration' ? node.left.declarations[0].id.name : node.left.name;
+        for (const item of right) {
+          scope[varName] = item;
+          evaluateExpression(node.body, scope, declaredVars);
+        }
+      }
+      return undefined;
+    }
+
+    case 'ForInStatement': {
+      const right = evaluateExpression(node.right, scope, declaredVars);
+      if (right && typeof right === 'object') {
+        const varName = node.left.type === 'VariableDeclaration' ? node.left.declarations[0].id.name : node.left.name;
+        for (const key in right) {
+          scope[varName] = key;
+          evaluateExpression(node.body, scope, declaredVars);
+        }
+      }
+      return undefined;
+    }
+
+    case 'WhileStatement': {
+      while (evaluateExpression(node.test, scope, declaredVars)) {
+        evaluateExpression(node.body, scope, declaredVars);
+      }
+      return undefined;
+    }
+
+    case 'DoWhileStatement': {
+      do {
+        evaluateExpression(node.body, scope, declaredVars);
+      } while (evaluateExpression(node.test, scope, declaredVars));
+      return undefined;
+    }
+
     case 'VariableDeclaration': {
       for (const decl of node.declarations) {
         if (decl.id.type === 'Identifier') {
@@ -267,26 +343,44 @@ function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?
         const capturedScope = scope;
         const capturedDeclaredVars = declaredVars;
         const fn = (...args: any[]) => {
-          const childScope = { ...capturedScope };
+          const childScope = Object.create(capturedScope);
           node.params.forEach((param: any, i: number) => {
             if (param.type === 'Identifier') {
               childScope[param.name] = args[i];
-            }
-          });
-          const result = evaluateExpression(node.body, childScope, capturedDeclaredVars);
-          // Write back any mutations to declared vars into the parent scope.
-          if (capturedDeclaredVars && capturedDeclaredVars.size > 0) {
-            for (const name of capturedDeclaredVars) {
-              if (name in childScope && childScope[name] !== capturedScope[name]) {
-                capturedScope[name] = childScope[name];
+            } else if (param.type === 'AssignmentPattern') {
+              const name = param.left.type === 'Identifier' ? param.left.name : null;
+              if (name) {
+                const defaultVal = evaluateExpression(param.right, childScope, capturedDeclaredVars);
+                childScope[name] = args[i] !== undefined ? args[i] : defaultVal;
               }
             }
-          }
-          return result;
+          });
+          return evaluateExpression(node.body, childScope, capturedDeclaredVars);
         };
         scope[node.id.name] = fn;
       }
       return undefined;
+    }
+
+    case 'ArrowFunctionExpression':
+    case 'FunctionExpression': {
+      const capturedScope = scope;
+      const capturedDeclaredVars = declaredVars;
+      return (...args: any[]) => {
+        const childScope = Object.create(capturedScope);
+        node.params.forEach((param: any, i: number) => {
+          if (param.type === 'Identifier') {
+            childScope[param.name] = args[i];
+          } else if (param.type === 'AssignmentPattern') {
+            const name = param.left.type === 'Identifier' ? param.left.name : null;
+            if (name) {
+              const defaultVal = evaluateExpression(param.right, childScope, capturedDeclaredVars);
+              childScope[name] = args[i] !== undefined ? args[i] : defaultVal;
+            }
+          }
+        });
+        return evaluateExpression(node.body, childScope, capturedDeclaredVars);
+      };
     }
 
     default:
@@ -328,6 +422,30 @@ export class DriftClientVirtualMachine {
   private declaredVars: Set<string> = new Set();
   private doc: Document | null = null;
   private reactiveRegions: ReactiveRegion[] = [];
+  private delegatedEvents = new Set<string>();
+  private eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
+
+  private ensureEventDelegated(eventName: string): void {
+    if (this.delegatedEvents.has(eventName)) return;
+    this.delegatedEvents.add(eventName);
+
+    const root = this.doc || (typeof document !== 'undefined' ? document : null);
+    if (!root) return;
+
+    root.addEventListener(eventName, (e: Event) => {
+      let curr = e.target as Node | null;
+      while (curr && curr !== root) {
+        if (curr.nodeType === 1) {
+          const handlers = this.eventHandlersMap.get(curr);
+          if (handlers && handlers[eventName]) {
+            handlers[eventName](e);
+            break;
+          }
+        }
+        curr = curr.parentNode;
+      }
+    });
+  }
 
   private checkRegister(index: number): void {
     if (index < 0 || index >= DriftClientVirtualMachine.MAX_REGISTERS) {
@@ -436,8 +554,9 @@ export class DriftClientVirtualMachine {
           const val = isDynamic === 1 ? resolveValue(rawVal, scope, this.declaredVars) : rawVal;
 
           if (elem) {
-            if (attrName.startsWith('on') && typeof val === 'function' && typeof elem.addEventListener === 'function') {
+            if (attrName.startsWith('on') && typeof val === 'function') {
               const eventName = attrName.slice(2).toLowerCase();
+
               const vm = this;
               const wrappedHandler = function (this: any, ...args: any[]) {
                 const scopeSnapshot: Record<string, any> = { ...vm.scope };
@@ -446,24 +565,18 @@ export class DriftClientVirtualMachine {
                 for (const key of vm.declaredVars) {
                   if (vm.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
                 }
+                console.log('[DRIFT RUNTIME] Handled event:', eventName, 'changedVars:', Array.from(changedVars), 'data length:', vm.scope.data?.length);
                 if (changedVars.size > 0) vm.triggerUpdates(changedVars);
                 return result;
               };
-              elem.addEventListener(eventName, wrappedHandler);
-            } else if (attrName.startsWith('@') && typeof val === 'function' && typeof elem.addEventListener === 'function') {
-              const eventName = attrName.slice(1).toLowerCase();
-              const vm = this;
-              const wrappedHandler = function (this: any, ...args: any[]) {
-                const scopeSnapshot: Record<string, any> = { ...vm.scope };
-                const result = val.apply(this, args);
-                const changedVars = new Set<string>();
-                for (const key of vm.declaredVars) {
-                  if (vm.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
-                }
-                if (changedVars.size > 0) vm.triggerUpdates(changedVars);
-                return result;
-              };
-              elem.addEventListener(eventName, wrappedHandler);
+
+              let handlers = this.eventHandlersMap.get(elem);
+              if (!handlers) {
+                handlers = {};
+                this.eventHandlersMap.set(elem, handlers);
+              }
+              handlers[eventName] = wrappedHandler;
+              this.ensureEventDelegated(eventName);
             } else if (typeof elem.setAttribute === 'function') {
               if (val === true) {
                 elem.setAttribute(attrName, '');
@@ -593,10 +706,10 @@ export class DriftClientVirtualMachine {
               if (idx !== -1) vm.reactiveRegions.splice(idx, 1);
             }
             const before = vm.reactiveRegions.length;
-            const cond = evaluateExpression(condExpr, vm.scope, vm.declaredVars);
+            const cond = evaluateExpression(condExpr, scope, vm.declaredVars);
             const subMod = cond ? consMod : altMod;
             if (subMod) {
-              const frag = vm.runSubModule(subMod, vm.scope);
+              const frag = vm.runSubModule(subMod, scope);
               if (frag && endAnchor.parentNode) endAnchor.parentNode.insertBefore(frag, endAnchor);
             }
             childRegions = vm.reactiveRegions.slice(before);
@@ -629,7 +742,7 @@ export class DriftClientVirtualMachine {
           const indexName   = idxNameIdx !== 0xFF ? constants[idxNameIdx] as string : null;
           const bodyMod     = constants[bodyIdx];
           const deps        = new Set<string>(constants[depsIdx] ?? []);
-          let forChildRegions: ReactiveRegion[] = [];
+          const forCacheRef: { cache: ItemRecord[] } = { cache: [] };
 
           const startAnchor = doc.createComment('for');
           const endAnchor   = doc.createComment('/for');
@@ -638,31 +751,141 @@ export class DriftClientVirtualMachine {
 
           const vm = this;
           const renderFor = () => {
-            // Remove stale child regions from previous render
-            for (const r of forChildRegions) {
-              const idx = vm.reactiveRegions.indexOf(r);
-              if (idx !== -1) vm.reactiveRegions.splice(idx, 1);
-            }
-            const before = vm.reactiveRegions.length;
-            const rawIter = evaluateExpression(iterExpr, vm.scope, vm.declaredVars);
-            const items = Array.isArray(rawIter) ? rawIter
+            const rawIter = evaluateExpression(iterExpr, scope, vm.declaredVars);
+            const items = Array.isArray(rawIter)
+              ? rawIter
               : rawIter && typeof rawIter[Symbol.iterator] === 'function'
-              ? Array.from(rawIter) : [];
+              ? Array.from(rawIter)
+              : [];
 
-            items.forEach((item: unknown, i: number) => {
-              const childScope = { ...vm.scope, [itemName]: item };
-              if (indexName) childScope[indexName] = i;
-              const frag = vm.runSubModule(bodyMod, childScope);
-              if (frag && endAnchor.parentNode) endAnchor.parentNode.insertBefore(frag, endAnchor);
-            });
-            forChildRegions = vm.reactiveRegions.slice(before);
+            reconcileKeyedList(
+              endAnchor.parentNode || parentElem,
+              endAnchor,
+              forCacheRef,
+              items,
+              (itemVal, indexVal) => {
+                if (itemVal && typeof itemVal === 'object') {
+                  if ('key' in itemVal) return (itemVal as any).key;
+                  if ('id' in itemVal) return (itemVal as any).id;
+                }
+                return indexVal;
+              },
+              (itemVal, indexVal, refNode) => {
+                const childScope = { ...scope, [itemName]: itemVal };
+                if (indexName) childScope[indexName] = indexVal;
+
+                const before = vm.reactiveRegions.length;
+                const frag = vm.runSubModule(bodyMod, childScope);
+                const nodes: Node[] = frag
+                  ? frag.nodeType === 11
+                    ? Array.from(frag.childNodes)
+                    : [frag]
+                  : [];
+                const childRegions = vm.reactiveRegions.slice(before);
+
+                if (frag && refNode.parentNode) {
+                  refNode.parentNode.insertBefore(frag, refNode);
+                }
+
+                const itemKey =
+                  itemVal && typeof itemVal === 'object'
+                    ? 'key' in itemVal
+                      ? (itemVal as any).key
+                      : 'id' in itemVal
+                      ? (itemVal as any).id
+                      : indexVal
+                    : indexVal;
+
+                return {
+                  key: itemKey,
+                  nodes,
+                  childRegions,
+                  itemVal,
+                  indexVal,
+                };
+              },
+              (record, itemVal, indexVal) => {
+                const isObject = (val: any) => val && typeof val === 'object' && val !== null;
+                const itemsEqual = (a: any, b: any) => {
+                  if (a === b) return true;
+                  if (!isObject(a) || !isObject(b)) return false;
+                  const keysA = Object.keys(a);
+                  const keysB = Object.keys(b);
+                  if (keysA.length !== keysB.length) return false;
+                  for (const k of keysA) {
+                    if (a[k] !== b[k]) return false;
+                  }
+                  return true;
+                };
+
+                const childScope = Object.create(scope);
+                childScope[itemName] = itemVal;
+                if (indexName) childScope[indexName] = indexVal;
+
+                if (itemsEqual(record.itemVal, itemVal)) {
+                  record.indexVal = indexVal;
+                  if (record.nodes.length > 0) {
+                    vm.patchItemAttributes(bodyMod, childScope, record.nodes[0]);
+                  }
+                  return;
+                }
+
+                record.itemVal = itemVal;
+                record.indexVal = indexVal;
+
+                if (record.childRegions) {
+                  for (const r of record.childRegions) {
+                    const idx = vm.reactiveRegions.indexOf(r);
+                    if (idx !== -1) vm.reactiveRegions.splice(idx, 1);
+                  }
+                }
+
+                const before = vm.reactiveRegions.length;
+                const frag = vm.runSubModule(bodyMod, childScope);
+                record.childRegions = vm.reactiveRegions.slice(before);
+
+                if (frag && record.nodes.length > 0) {
+                  const rootNode = record.nodes[0];
+                  if (
+                    frag.childNodes.length === 1 &&
+                    frag.childNodes[0]?.nodeName === rootNode?.nodeName &&
+                    rootNode &&
+                    typeof (rootNode as any).setAttribute === 'function'
+                  ) {
+                    const newElem = frag.childNodes[0] as Element;
+                    const elem = rootNode as Element;
+                    while (elem.attributes.length > 0) {
+                      elem.removeAttribute(elem.attributes[0].name);
+                    }
+                    for (const attr of Array.from(newElem.attributes)) {
+                      elem.setAttribute(attr.name, attr.value);
+                    }
+                    while (elem.firstChild) {
+                      elem.removeChild(elem.firstChild);
+                    }
+                    while (newElem.firstChild) {
+                      elem.appendChild(newElem.firstChild);
+                    }
+                  } else if (rootNode?.parentNode) {
+                    const parent = rootNode.parentNode;
+                    const newNodes = frag.nodeType === 11 ? Array.from(frag.childNodes) : [frag];
+                    parent.insertBefore(frag, rootNode);
+                    for (const oldNode of record.nodes) {
+                      if (oldNode.parentNode === parent) {
+                        parent.removeChild(oldNode);
+                      }
+                    }
+                    record.nodes = newNodes;
+                  }
+                }
+              }
+            );
           };
           renderFor();
 
           this.reactiveRegions.push({
             deps,
             reRender: () => {
-              clearBetweenAnchors(startAnchor, endAnchor);
               renderFor();
             },
           });
@@ -677,6 +900,72 @@ export class DriftClientVirtualMachine {
     }
 
     return null;
+  }
+
+  /**
+   * Fast-path attribute patcher for reactive list items whose item data object hasn't changed.
+   * Evaluates dynamic SET_ATTR opcodes in bodyMod against childScope and updates the root DOM element
+   * only if an attribute value actually changed.
+   */
+  public patchItemAttributes(bodyMod: CompiledModule, childScope: Record<string, any>, rootNode: Node): void {
+    if (!rootNode || rootNode.nodeType !== 1) return;
+    const elem = rootNode as Element;
+    const bytecode = bodyMod.bytecode;
+    const constants = bodyMod.constants;
+
+    for (let pc = 0; pc < bytecode.length; ) {
+      const opcode = bytecode[pc]!;
+      switch (opcode) {
+        case Opcode.RETURN:
+          return;
+        case Opcode.CREATE_ELEMENT:
+        case Opcode.CREATE_TEXT:
+        case Opcode.CREATE_COMMENT:
+        case Opcode.APPEND_CHILD:
+        case Opcode.JUMP_IF_FALSE:
+        case Opcode.EVAL_EXPR:
+          pc += 3;
+          break;
+        case Opcode.SET_ATTR: {
+          const attrName = String(constants[bytecode[pc + 2]!]);
+          const rawVal = constants[bytecode[pc + 3]!];
+          const isDynamic = bytecode[pc + 4]!;
+          if (isDynamic === 1) {
+            const val = resolveValue(rawVal, childScope, this.declaredVars);
+            const targetVal = val === true ? '' : val === false || val == null ? null : String(val);
+            const currentVal = elem.hasAttribute(attrName) ? elem.getAttribute(attrName) : null;
+            if (targetVal !== currentVal) {
+              if (targetVal === null) {
+                elem.removeAttribute(attrName);
+              } else {
+                elem.setAttribute(attrName, targetVal);
+              }
+            }
+          }
+          pc += 5;
+          break;
+        }
+        case Opcode.CREATE_FRAGMENT:
+        case Opcode.JUMP:
+        case Opcode.EXEC_SCRIPT:
+          pc += 2;
+          break;
+        case Opcode.INTERPOLATE_TEXT:
+          pc += 3;
+          break;
+        case Opcode.LOOP_ITER:
+          pc += 5;
+          break;
+        case Opcode.REACTIVE_IF:
+          pc += 6;
+          break;
+        case Opcode.REACTIVE_FOR:
+          pc += 7;
+          break;
+        default:
+          return;
+      }
+    }
   }
 
   public execute(module: CompiledModule, options: VMExecutionOptions = {}): Node | null {
@@ -765,8 +1054,12 @@ export class DriftClientVirtualMachine {
       }
     }
 
-    // 2. Re-render reactive @if / @for regions whose deps intersect changedVars
-    for (const region of this.reactiveRegions) {
+    // 2. Re-render reactive @if / @for regions whose deps intersect changedVars.
+    // Take a snapshot array because region.reRender() may remove stale child regions
+    // from this.reactiveRegions, which would shift array indices during iteration.
+    const regionsSnapshot = [...this.reactiveRegions];
+    for (const region of regionsSnapshot) {
+      if (!this.reactiveRegions.includes(region)) continue;
       for (const dep of region.deps) {
         if (changedVars.has(dep)) {
           region.reRender();

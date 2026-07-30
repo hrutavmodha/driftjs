@@ -422,6 +422,31 @@ export class DriftGenerator {
           for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
         }
         break;
+      case 'NewExpression':
+        for (const id of this.extractIdentifiers(node.callee)) ids.add(id);
+        if (node.arguments) {
+          for (const arg of node.arguments) {
+            for (const id of this.extractIdentifiers(arg)) ids.add(id);
+          }
+        }
+        break;
+      case 'ForStatement':
+        if (node.init) for (const id of this.extractIdentifiers(node.init)) ids.add(id);
+        if (node.test) for (const id of this.extractIdentifiers(node.test)) ids.add(id);
+        if (node.update) for (const id of this.extractIdentifiers(node.update)) ids.add(id);
+        if (node.body) for (const id of this.extractIdentifiers(node.body)) ids.add(id);
+        break;
+      case 'ForOfStatement':
+      case 'ForInStatement':
+        if (node.left) for (const id of this.extractIdentifiers(node.left)) ids.add(id);
+        if (node.right) for (const id of this.extractIdentifiers(node.right)) ids.add(id);
+        if (node.body) for (const id of this.extractIdentifiers(node.body)) ids.add(id);
+        break;
+      case 'WhileStatement':
+      case 'DoWhileStatement':
+        if (node.test) for (const id of this.extractIdentifiers(node.test)) ids.add(id);
+        if (node.body) for (const id of this.extractIdentifiers(node.body)) ids.add(id);
+        break;
     }
     return ids;
   }

@@ -43,3 +43,15 @@ export interface CompiledModule {
   /** All variable names declared in the component's <script> block. Used by the runtime for change-detection. */
   readonly declaredVars?: readonly string[];
 }
+
+/**
+ * Cached row record used by the keyed list reconciler.
+ */
+export interface ItemRecord {
+  key: unknown;
+  nodes: any[];
+  childRegions?: any[];
+  itemVal: unknown;
+  indexVal: number;
+}
+

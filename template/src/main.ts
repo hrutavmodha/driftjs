@@ -4,7 +4,6 @@ import { mount } from '@driftjs/runtime'
 import App from './App.drift'
 import './style.css'
 
-const app = document.getElementById('app')!;
+const root = document.getElementById('app') as HTMLElement;
 
-mount(App, app);
-
+mount(App, root);
