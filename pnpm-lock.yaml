@@ -31,7 +31,46 @@ importers:
         specifier: ^6.0.4
         version: 6.0.4
 
-  packages/runtime: {}
+  packages/dom:
+    dependencies:
+      '@driftjs/utils':
+        specifier: workspace:*
+        version: link:../utils
+
+  packages/ssr:
+    dependencies:
+      '@driftjs/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@driftjs/utils':
+        specifier: workspace:*
+        version: link:../utils
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.1.5
+        version: 8.1.5(@types/node@26.1.1)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@26.1.1)(happy-dom@20.11.1)(vite@8.1.5(@types/node@26.1.1))
+
+  packages/utils:
+    dependencies:
+      '@driftjs/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.1.5
+        version: 8.1.5(@types/node@26.1.1)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@26.1.1)(happy-dom@20.11.1)(vite@8.1.5(@types/node@26.1.1))
 
   packages/vite-plugin:
     dependencies:
@@ -42,15 +81,21 @@ importers:
         specifier: 8.1.5
         version: 8.1.5(@types/node@26.1.1)
     devDependencies:
-      '@driftjs/runtime':
+      '@driftjs/dom':
         specifier: workspace:*
-        version: link:../runtime
+        version: link:../dom
 
   template:
     dependencies:
-      '@driftjs/runtime':
+      '@driftjs/compiler':
         specifier: workspace:*
-        version: link:../packages/runtime
+        version: link:../packages/compiler
+      '@driftjs/dom':
+        specifier: workspace:*
+        version: link:../packages/dom
+      '@driftjs/ssr':
+        specifier: workspace:*
+        version: link:../packages/ssr
     devDependencies:
       '@driftjs/vite-plugin':
         specifier: workspace:*

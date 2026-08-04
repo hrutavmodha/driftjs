@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "serve": "node server.js",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@driftjs/runtime": "workspace:*"
+    "@driftjs/compiler": "workspace:*",
+    "@driftjs/dom": "workspace:*",
+    "@driftjs/ssr": "workspace:*"
   },
   "devDependencies": {
     "@driftjs/vite-plugin": "workspace:*",

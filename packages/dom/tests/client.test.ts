@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { DriftClientVirtualMachine, mount } from '../src/client/index.js';
+import { describe, it, expect, vi } from 'vitest';
+import { DriftClientVM, mount } from '../src/index.js';
 import { Opcode, CompiledModule } from '../types/index.js';
+import { DriftLexer, DriftParser, DriftTransformer, DriftGenerator } from '../../compiler/src/index.js';
 
-describe('DriftClientVirtualMachine', () => {
-  const vm = new DriftClientVirtualMachine();
+describe('DriftClientVM', () => {
+  const vm = new DriftClientVM();
   const doc = document;
 
   it('renders simple static HTML elements', () => {
@@ -46,7 +47,6 @@ describe('DriftClientVirtualMachine', () => {
   });
 
   it('renders REACTIVE_IF: true branch shown, false branch hidden', () => {
-    // Consequent sub-module: CREATE_FRAGMENT r0 → CREATE_ELEMENT r1,'span' → CREATE_TEXT r2,'User' → APPEND_CHILD → APPEND_CHILD → RETURN r0
     const consMod: CompiledModule = {
       bytecode: [
         Opcode.CREATE_FRAGMENT, 0,
@@ -73,7 +73,6 @@ describe('DriftClientVirtualMachine', () => {
     };
     const condExpr = { type: 'Identifier', name: 'isLoggedIn' };
 
-    // Parent module: CREATE_FRAGMENT r0, REACTIVE_IF r0 condIdx=1 consIdx=2 altIdx=3 depsIdx=4, RETURN r0
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_FRAGMENT, 0,
@@ -83,18 +82,17 @@ describe('DriftClientVirtualMachine', () => {
       constants: [null, condExpr, consMod, altMod, ['isLoggedIn']],
     };
 
-    const userResult = new DriftClientVirtualMachine().execute(module, {
+    const userResult = new DriftClientVM().execute(module, {
       document: doc,
       scope: { isLoggedIn: true },
     }) as DocumentFragment;
 
-    // Fragment contains: <!--if--> <span>User</span> <!--/if-->
     const children = Array.from(userResult.childNodes);
-    expect(children.length).toBe(3); // comment, span, comment
+    expect(children.length).toBe(3);
     expect(children[1]).toBeInstanceOf(HTMLSpanElement);
     expect((children[1] as HTMLSpanElement).textContent).toBe('User');
 
-    const guestResult = new DriftClientVirtualMachine().execute(module, {
+    const guestResult = new DriftClientVM().execute(module, {
       document: doc,
       scope: { isLoggedIn: false },
     }) as DocumentFragment;
@@ -130,22 +128,17 @@ describe('DriftClientVirtualMachine', () => {
       reactiveBindings: [],
     };
 
-    const freshVm = new DriftClientVirtualMachine();
+    const freshVm = new DriftClientVM();
     const container = doc.createElement('div');
     const frag = freshVm.execute(module, { document: doc, scope: { show: true } }) as DocumentFragment;
     container.appendChild(frag);
 
-    // Initially the <p> is there
     expect(container.querySelector('p')).not.toBeNull();
 
-    // Toggle show=false and trigger update
     (freshVm as any).scope.show = false;
     freshVm.triggerUpdates(new Set(['show']));
-
-    // After update the <p> should be gone (empty between anchors)
     expect(container.querySelector('p')).toBeNull();
 
-    // Toggle back
     (freshVm as any).scope.show = true;
     freshVm.triggerUpdates(new Set(['show']));
     expect(container.querySelector('p')).not.toBeNull();
@@ -155,8 +148,8 @@ describe('DriftClientVirtualMachine', () => {
     const bodyMod: CompiledModule = {
       bytecode: [
         Opcode.CREATE_FRAGMENT, 0,
-        Opcode.CREATE_ELEMENT, 1, 0,       // r1 = <li>
-        Opcode.INTERPOLATE_TEXT, 2, 1,     // r2 = text(item)
+        Opcode.CREATE_ELEMENT, 1, 0,
+        Opcode.INTERPOLATE_TEXT, 2, 1,
         Opcode.APPEND_CHILD, 1, 2,
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.RETURN, 0,
@@ -168,20 +161,19 @@ describe('DriftClientVirtualMachine', () => {
 
     const module: CompiledModule = {
       bytecode: [
-        Opcode.CREATE_ELEMENT, 0, 0,         // r0 = <ul>
+        Opcode.CREATE_ELEMENT, 0, 0,
         Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 3, 4,
         Opcode.RETURN, 0,
       ],
       constants: ['ul', iterExpr, 'item', bodyMod, ['items']],
     };
 
-    const result = new DriftClientVirtualMachine().execute(module, {
+    const result = new DriftClientVM().execute(module, {
       document: doc,
       scope: { items: ['Apple', 'Banana', 'Cherry'] },
     }) as HTMLUListElement;
 
     expect(result).toBeInstanceOf(HTMLUListElement);
-    // ul contains: <!--for--> <li>Apple</li> <li>Banana</li> <li>Cherry</li> <!--/for-->
     const lis = result.querySelectorAll('li');
     expect(lis.length).toBe(3);
     expect(lis[0]?.textContent).toBe('Apple');
@@ -213,7 +205,7 @@ describe('DriftClientVirtualMachine', () => {
       constants: ['ul', iterExpr, 'item', bodyMod, ['items']],
     };
 
-    const freshVm = new DriftClientVirtualMachine();
+    const freshVm = new DriftClientVM();
     const ul = freshVm.execute(module, {
       document: doc,
       scope: { items: ['Apple', 'Banana'] },
@@ -221,7 +213,6 @@ describe('DriftClientVirtualMachine', () => {
 
     expect(ul.querySelectorAll('li').length).toBe(2);
 
-    // Add an item and trigger update
     (freshVm as any).scope.items = ['Apple', 'Banana', 'Cherry'];
     freshVm.triggerUpdates(new Set(['items']));
 
@@ -248,12 +239,7 @@ describe('DriftClientVirtualMachine', () => {
   });
 
   it('updates reactive nodes in-place via updateAt(pc, module, scope)', () => {
-    const vm = new DriftClientVirtualMachine();
-    // Bytecode for <p>{count}</p>
-    // PC 0: CREATE_ELEMENT r0, 'p'
-    // PC 3: INTERPOLATE_TEXT r1, expr (scope.count)
-    // PC 6: APPEND_CHILD r0, r1
-    // PC 9: RETURN r0
+    const vmInstance = new DriftClientVM();
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0,
@@ -265,25 +251,16 @@ describe('DriftClientVirtualMachine', () => {
     };
 
     const initialScope = { count: 0 };
-    const p = vm.execute(module, { document: doc, scope: initialScope }) as HTMLParagraphElement;
+    const p = vmInstance.execute(module, { document: doc, scope: initialScope }) as HTMLParagraphElement;
     expect(p.textContent).toBe('0');
 
-    // Perform state update to count = 1 by jumping directly to PC 3 (INTERPOLATE_TEXT)
     const updatedScope = { count: 1 };
-    vm.updateAt(3, module, { document: doc, scope: updatedScope });
-
-    // The live DOM paragraph element updates in-place!
+    vmInstance.updateAt(3, module, { document: doc, scope: updatedScope });
     expect(p.textContent).toBe('1');
   });
 
   it('EXEC_SCRIPT initialises scope from VariableDeclaration and FunctionDeclaration AST', () => {
-    const vm = new DriftClientVirtualMachine();
-    // Mirrors the compiled output of:
-    //   <script>
-    //     let count = 0;
-    //     function increment() { count++; }
-    //   </script>
-    //   <p>{count}</p>
+    const vmInstance = new DriftClientVM();
     const scriptBody = [
       {
         type: 'VariableDeclaration', kind: 'let',
@@ -303,29 +280,238 @@ describe('DriftClientVirtualMachine', () => {
 
     const module: CompiledModule = {
       bytecode: [
-        Opcode.EXEC_SCRIPT, 0,          // PC 0: run scriptBody => initialises scope
-        Opcode.CREATE_FRAGMENT, 1,      // PC 2
-        Opcode.CREATE_ELEMENT, 2, 1,    // PC 4: r2 = createElement('p')
-        Opcode.INTERPOLATE_TEXT, 3, 2,  // PC 7: r3 = text(count)
-        Opcode.APPEND_CHILD, 2, 3,      // PC 10
-        Opcode.APPEND_CHILD, 1, 2,      // PC 13
-        Opcode.RETURN, 1,               // PC 16
+        Opcode.EXEC_SCRIPT, 0,
+        Opcode.CREATE_FRAGMENT, 1,
+        Opcode.CREATE_ELEMENT, 2, 1,
+        Opcode.INTERPOLATE_TEXT, 3, 2,
+        Opcode.APPEND_CHILD, 2, 3,
+        Opcode.APPEND_CHILD, 1, 2,
+        Opcode.RETURN, 1,
       ],
       constants: [scriptBody, 'p', countExpr],
       reactiveBindings: [{ variable: 'count', positions: [{ pc: 7, opcode: Opcode.INTERPOLATE_TEXT }] }],
     };
 
-    const frag = vm.execute(module, { document: doc }) as DocumentFragment;
+    const frag = vmInstance.execute(module, { document: doc }) as DocumentFragment;
     const p = frag.firstChild as HTMLParagraphElement;
 
-    // count starts at 0
     expect(p.textContent).toBe('0');
 
-    // Simulate what happens when increment() is wired to onclick and the button is clicked
-    (vm as any).scope.increment();
-    vm.triggerUpdates(new Set(['count']));
+    (vmInstance as any).scope.increment();
+    vmInstance.triggerUpdates(new Set(['count']));
 
-    expect((vm as any).scope.count).toBe(1);
+    expect((vmInstance as any).scope.count).toBe(1);
     expect(p.textContent).toBe('1');
+  });
+
+  it('renders nested @for loops correctly', () => {
+    const src = `
+      <script>
+        let categories = [
+          { name: 'Fruits', items: ['Apple', 'Banana'] },
+          { name: 'Veggies', items: ['Carrot'] }
+        ];
+      </script>
+      <div>
+        @for cat in categories {
+          <div class="category">
+            <h3>{cat.name}</h3>
+            <ul>
+              @for item in cat.items {
+                <li>{item}</li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    const categories = container.querySelectorAll('.category');
+    expect(categories.length).toBe(2);
+
+    const fruitsLis = categories[0]?.querySelectorAll('li');
+    expect(fruitsLis?.length).toBe(2);
+    expect(fruitsLis?.[0]?.textContent).toBe('Apple');
+
+    const veggiesLis = categories[1]?.querySelectorAll('li');
+    expect(veggiesLis?.length).toBe(1);
+    expect(veggiesLis?.[0]?.textContent).toBe('Carrot');
+  });
+
+  it('uses a single delegated event listener on document for thousands of items', () => {
+    const src = `
+      <script>
+        let count = 0;
+        function inc() { count++; }
+      </script>
+      <div>
+        <button id="b1" onclick={inc}>Btn 1</button>
+        <button id="b2" onclick={inc}>Btn 2</button>
+        <button id="b3" onclick={inc}>Btn 3</button>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const addEventListenerSpy = vi.spyOn(document, 'addEventListener');
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    const clickListeners = addEventListenerSpy.mock.calls.filter((call) => call[0] === 'click');
+    expect(clickListeners.length).toBe(1);
+
+    addEventListenerSpy.mockRestore();
+  });
+
+  it('handles event bubbling when clicking nested children inside an event-bound element', () => {
+    const clicked = vi.fn();
+
+    const src = `
+      <script>
+        function handleClick() {
+          clicked();
+        }
+      </script>
+      <div>
+        <button id="btn" onclick={handleClick}>
+          <span id="inner-span">Click <strong>Me</strong></span>
+        </button>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const root = vmInstance.execute(mod, { scope: { clicked }, document });
+    if (root) container.appendChild(root);
+
+    const strong = container.querySelector('strong') as HTMLElement;
+    expect(strong).not.toBeNull();
+
+    strong.click();
+
+    expect(clicked).toHaveBeenCalledTimes(1);
+
+    document.body.removeChild(container);
+  });
+
+  it('updates list history on click event in template component', () => {
+    const src = `
+      <script>
+        let count = 0;
+        let history = [];
+
+        function increment() {
+          count++; 
+          history = [...history, 'Incremented'];
+        }
+      </script>
+
+      <div class="card">
+        <button class="btn btn-inc" onclick={increment}>+</button>
+        <ul class="history">
+          @for log in history {
+            <li class="pill">{log}</li>
+          }
+        </ul>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    const incBtn = container.querySelector('.btn-inc') as HTMLButtonElement;
+    incBtn.click();
+
+    const lis1 = container.querySelectorAll('.history .pill');
+    expect(lis1.length).toBe(1);
+
+    document.body.removeChild(container);
+  });
+
+  it('updates modified list item in-place without touching unchanged DOM nodes', () => {
+    const src = `
+      <script>
+        let items = [
+          { id: 1, text: 'Item 1' },
+          { id: 2, text: 'Item 2' },
+          { id: 3, text: 'Item 3' }
+        ];
+      </script>
+      <div>
+        <ul>
+          @for item in items {
+            <li id={'item-' + item.id}>{item.text}</li>
+          }
+        </ul>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    const li1Before = container.querySelector('#item-1');
+    const li2Before = container.querySelector('#item-2');
+    const li3Before = container.querySelector('#item-3');
+
+    expect(li2Before?.textContent).toBe('Item 2');
+
+    (vmInstance as any).scope.items = [
+      { id: 1, text: 'Item 1' },
+      { id: 2, text: 'Item 2 UPDATED' },
+      { id: 3, text: 'Item 3' }
+    ];
+
+    vmInstance.triggerUpdates(new Set(['items']));
+
+    const li1After = container.querySelector('#item-1');
+    const li2After = container.querySelector('#item-2');
+    const li3After = container.querySelector('#item-3');
+
+    expect(li1Before).toBe(li1After);
+    expect(li3Before).toBe(li3After);
+    expect(li2After?.textContent).toBe('Item 2 UPDATED');
   });
 });

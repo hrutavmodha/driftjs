@@ -1,9 +1,19 @@
-import { CompiledModule, Opcode, ReactiveBinding, ItemRecord } from '../../types/index.js';
-import { reconcileKeyedList } from './reconciler.js';
+import { CompiledModule, Opcode, ReactiveBinding, ItemRecord } from "../types/index.js";
+import { reconcileKeyedList } from "./reconciler.js";
+import { HydrationCursor } from "./hydration.js";
+import {
+  MAX_REGISTERS,
+  setScopeValue,
+  evaluateExpression,
+  executeBlockStatement,
+  resolveIterable,
+} from "@driftjs/utils";
 
 export interface VMExecutionOptions {
   readonly scope?: Record<string, any>;
   readonly document?: Document;
+  readonly container?: HTMLElement;
+  readonly hydrate?: boolean;
 }
 
 interface LoopFrame {
@@ -19,394 +29,16 @@ interface ReactiveRegion {
 }
 
 /**
- * Sets a variable in scope, updating the parent scope where the variable was defined
- * if it exists higher up the prototype chain.
+ * Removes all DOM nodes situated strictly between startAnchor and endAnchor comments.
  */
-function setScopeValue(targetScope: Record<string, any>, name: string, val: any): void {
-  let curr = targetScope;
-  while (curr && curr !== Object.prototype) {
-    if (Object.prototype.hasOwnProperty.call(curr, name)) {
-      curr[name] = val;
-      return;
-    }
-    curr = Object.getPrototypeOf(curr);
-  }
-  targetScope[name] = val;
-}
-
-/**
- * Evaluates an Acorn AST node against the given scope without eval/new Function (100% CSP compliant).
- */
-function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?: Set<string>): any {
-  if (node === null || node === undefined) return node;
-
-  if (typeof node !== 'object' || !node.type) {
-    return node;
-  }
-
-  switch (node.type) {
-    case 'Identifier':
-      if (node.name in scope) return scope[node.name];
-      if (typeof globalThis !== 'undefined' && node.name in globalThis) return (globalThis as any)[node.name];
-      return undefined;
-
-    case 'Literal':
-      return node.value;
-
-    case 'BinaryExpression': {
-      const left = evaluateExpression(node.left, scope, declaredVars);
-      const right = evaluateExpression(node.right, scope, declaredVars);
-      switch (node.operator) {
-        case '+': return left + right;
-        case '-': return left - right;
-        case '*': return left * right;
-        case '/': return left / right;
-        case '%': return left % right;
-        case '**': return left ** right;
-        case '<': return left < right;
-        case '>': return left > right;
-        case '<=': return left <= right;
-        case '>=': return left >= right;
-        case '==': return left == right;
-        case '!=': return left != right;
-        case '===': return left === right;
-        case '!==': return left !== right;
-        case '|': return left | right;
-        case '^': return left ^ right;
-        case '&': return left & right;
-        case '<<': return left << right;
-        case '>>': return left >> right;
-        case '>>>': return left >>> right;
-        case 'in': return left in right;
-        case 'instanceof': return left instanceof right;
-        default: return undefined;
-      }
-    }
-
-    case 'LogicalExpression': {
-      const left = evaluateExpression(node.left, scope, declaredVars);
-      if (node.operator === '||') {
-        if (left) return left;
-        return evaluateExpression(node.right, scope, declaredVars);
-      }
-      if (node.operator === '&&') {
-        if (!left) return left;
-        return evaluateExpression(node.right, scope, declaredVars);
-      }
-      if (node.operator === '??') {
-        return left ?? evaluateExpression(node.right, scope, declaredVars);
-      }
-      return undefined;
-    }
-
-    case 'UnaryExpression': {
-      const arg = evaluateExpression(node.argument, scope, declaredVars);
-      switch (node.operator) {
-        case '-': return -arg;
-        case '+': return +arg;
-        case '!': return !arg;
-        case '~': return ~arg;
-        case 'typeof': return typeof arg;
-        case 'void': return void arg;
-        case 'delete': return true;
-        default: return undefined;
-      }
-    }
-
-    case 'UpdateExpression': {
-      const arg = evaluateExpression(node.argument, scope, declaredVars);
-      const name = node.argument.name;
-      const newVal = node.operator === '++' ? arg + 1 : arg - 1;
-      setScopeValue(scope, name, newVal);
-      return node.prefix ? newVal : arg;
-    }
-
-    case 'MemberExpression': {
-      const obj = evaluateExpression(node.object, scope, declaredVars);
-      if (!obj) return undefined;
-      if (node.computed) {
-        const prop = evaluateExpression(node.property, scope, declaredVars);
-        return obj[prop];
-      }
-      return obj[node.property.name];
-    }
-
-    case 'CallExpression': {
-      const callee = evaluateExpression(node.callee, scope, declaredVars);
-      const args = node.arguments.map((arg: any) => evaluateExpression(arg, scope, declaredVars));
-      if (typeof callee === 'function') {
-        if (node.callee.type === 'MemberExpression') {
-          const thisObj = evaluateExpression(node.callee.object, scope, declaredVars);
-          return callee.apply(thisObj, args);
-        }
-        return callee(...args);
-      }
-      return undefined;
-    }
-
-    case 'ConditionalExpression': {
-      const test = evaluateExpression(node.test, scope, declaredVars);
-      return test
-        ? evaluateExpression(node.consequent, scope, declaredVars)
-        : evaluateExpression(node.alternate, scope, declaredVars);
-    }
-
-    case 'AssignmentExpression': {
-      const right = evaluateExpression(node.right, scope, declaredVars);
-      const getNewVal = (oldVal: any) => {
-        switch (node.operator) {
-          case '=': return right;
-          case '+=': return oldVal + right;
-          case '-=': return oldVal - right;
-          case '*=': return oldVal * right;
-          case '/=': return oldVal / right;
-          case '%=': return oldVal % right;
-          default: return right;
-        }
-      };
-
-      if (node.left.type === 'Identifier') {
-        const name = node.left.name;
-        const oldVal = scope[name];
-        const val = getNewVal(oldVal);
-        setScopeValue(scope, name, val);
-        return val;
-      }
-      if (node.left.type === 'MemberExpression') {
-        const obj = evaluateExpression(node.left.object, scope, declaredVars);
-        if (obj) {
-          const prop = node.left.computed
-            ? evaluateExpression(node.left.property, scope, declaredVars)
-            : node.left.property.name;
-          const oldVal = obj[prop];
-          const val = getNewVal(oldVal);
-          obj[prop] = val;
-          return val;
-        }
-      }
-      return undefined;
-    }
-
-    case 'SequenceExpression': {
-      let result: any;
-      for (const expr of node.expressions) {
-        result = evaluateExpression(expr, scope, declaredVars);
-      }
-      return result;
-    }
-
-    case 'ArrayExpression': {
-      const result: any[] = [];
-      for (const el of node.elements) {
-        if (el && el.type === 'SpreadElement') {
-          const spread = evaluateExpression(el.argument, scope, declaredVars);
-          if (Array.isArray(spread)) result.push(...spread);
-        } else {
-          result.push(evaluateExpression(el, scope, declaredVars));
-        }
-      }
-      return result;
-    }
-
-    case 'ObjectExpression': {
-      const obj: Record<string, any> = {};
-      for (const prop of node.properties) {
-        if (prop.type === 'SpreadElement') {
-          const spread = evaluateExpression(prop.argument, scope, declaredVars);
-          Object.assign(obj, spread);
-        } else {
-          const key = prop.computed
-            ? evaluateExpression(prop.key, scope, declaredVars)
-            : prop.key.name;
-          obj[key] = evaluateExpression(prop.value, scope, declaredVars);
-        }
-      }
-      return obj;
-    }
-
-    case 'SpreadElement': {
-      return evaluateExpression(node.argument, scope, declaredVars);
-    }
-
-    case 'TemplateLiteral': {
-      let result = '';
-      for (let i = 0; i < node.quasis.length; i++) {
-        result += node.quasis[i].value.raw;
-        if (i < node.expressions.length) {
-          result += String(evaluateExpression(node.expressions[i], scope, declaredVars));
-        }
-      }
-      return result;
-    }
-
-    case 'TaggedTemplateExpression': {
-      const tagFn = evaluateExpression(node.tag, scope, declaredVars);
-      const quasis = node.quasi.quasis.map((q: any) => q.value.raw);
-      quasis.raw = quasis;
-      const expressions = node.quasi.expressions.map((e: any) => evaluateExpression(e, scope, declaredVars));
-      return tagFn(quasis, ...expressions);
-    }
-
-    case 'ThisExpression':
-      return scope;
-
-    case 'BlockStatement': {
-      let result: any;
-      for (const stmt of node.body) {
-        result = evaluateExpression(stmt, scope, declaredVars);
-      }
-      return result;
-    }
-
-    case 'ExpressionStatement':
-      return evaluateExpression(node.expression, scope, declaredVars);
-
-    case 'ReturnStatement':
-      return node.argument ? evaluateExpression(node.argument, scope, declaredVars) : undefined;
-
-    case 'IfStatement': {
-      const test = evaluateExpression(node.test, scope, declaredVars);
-      if (test) {
-        return evaluateExpression(node.consequent, scope, declaredVars);
-      }
-      return node.alternate ? evaluateExpression(node.alternate, scope, declaredVars) : undefined;
-    }
-
-    case 'NewExpression': {
-      const callee = evaluateExpression(node.callee, scope, declaredVars);
-      const args = node.arguments ? node.arguments.map((arg: any) => evaluateExpression(arg, scope, declaredVars)) : [];
-      if (typeof callee === 'function') {
-        return new (callee as any)(...args);
-      }
-      return undefined;
-    }
-
-    case 'ForStatement': {
-      if (node.init) evaluateExpression(node.init, scope, declaredVars);
-      while (node.test ? evaluateExpression(node.test, scope, declaredVars) : true) {
-        evaluateExpression(node.body, scope, declaredVars);
-        if (node.update) evaluateExpression(node.update, scope, declaredVars);
-      }
-      return undefined;
-    }
-
-    case 'ForOfStatement': {
-      const right = evaluateExpression(node.right, scope, declaredVars);
-      if (right && typeof right[Symbol.iterator] === 'function') {
-        const varName = node.left.type === 'VariableDeclaration' ? node.left.declarations[0].id.name : node.left.name;
-        for (const item of right) {
-          scope[varName] = item;
-          evaluateExpression(node.body, scope, declaredVars);
-        }
-      }
-      return undefined;
-    }
-
-    case 'ForInStatement': {
-      const right = evaluateExpression(node.right, scope, declaredVars);
-      if (right && typeof right === 'object') {
-        const varName = node.left.type === 'VariableDeclaration' ? node.left.declarations[0].id.name : node.left.name;
-        for (const key in right) {
-          scope[varName] = key;
-          evaluateExpression(node.body, scope, declaredVars);
-        }
-      }
-      return undefined;
-    }
-
-    case 'WhileStatement': {
-      while (evaluateExpression(node.test, scope, declaredVars)) {
-        evaluateExpression(node.body, scope, declaredVars);
-      }
-      return undefined;
-    }
-
-    case 'DoWhileStatement': {
-      do {
-        evaluateExpression(node.body, scope, declaredVars);
-      } while (evaluateExpression(node.test, scope, declaredVars));
-      return undefined;
-    }
-
-    case 'VariableDeclaration': {
-      for (const decl of node.declarations) {
-        if (decl.id.type === 'Identifier') {
-          scope[decl.id.name] = decl.init ? evaluateExpression(decl.init, scope, declaredVars) : undefined;
-        }
-      }
-      return undefined;
-    }
-
-    case 'FunctionDeclaration': {
-      // Register the function in scope so it can be referenced by name (e.g. onclick={increment}).
-      if (node.id?.type === 'Identifier') {
-        const capturedScope = scope;
-        const capturedDeclaredVars = declaredVars;
-        const fn = (...args: any[]) => {
-          const childScope = Object.create(capturedScope);
-          node.params.forEach((param: any, i: number) => {
-            if (param.type === 'Identifier') {
-              childScope[param.name] = args[i];
-            } else if (param.type === 'AssignmentPattern') {
-              const name = param.left.type === 'Identifier' ? param.left.name : null;
-              if (name) {
-                const defaultVal = evaluateExpression(param.right, childScope, capturedDeclaredVars);
-                childScope[name] = args[i] !== undefined ? args[i] : defaultVal;
-              }
-            }
-          });
-          return evaluateExpression(node.body, childScope, capturedDeclaredVars);
-        };
-        scope[node.id.name] = fn;
-      }
-      return undefined;
-    }
-
-    case 'ArrowFunctionExpression':
-    case 'FunctionExpression': {
-      const capturedScope = scope;
-      const capturedDeclaredVars = declaredVars;
-      return (...args: any[]) => {
-        const childScope = Object.create(capturedScope);
-        node.params.forEach((param: any, i: number) => {
-          if (param.type === 'Identifier') {
-            childScope[param.name] = args[i];
-          } else if (param.type === 'AssignmentPattern') {
-            const name = param.left.type === 'Identifier' ? param.left.name : null;
-            if (name) {
-              const defaultVal = evaluateExpression(param.right, childScope, capturedDeclaredVars);
-              childScope[name] = args[i] !== undefined ? args[i] : defaultVal;
-            }
-          }
-        });
-        return evaluateExpression(node.body, childScope, capturedDeclaredVars);
-      };
-    }
-
-    default:
-      return undefined;
-  }
-}
-
-/**
- * Resolves constant or variable values against scope without eval/new Function (100% CSP compliant).
- */
-function resolveValue(val: any, scope: Record<string, any>, declaredVars?: Set<string>): any {
-  if (val === null || val === undefined) return val;
-  if (typeof val === 'string') return val in scope ? scope[val] : val;
-  if (typeof val === 'object' && val.type) return evaluateExpression(val, scope, declaredVars);
-  return val;
-}
-
-/**
- * Removes all DOM nodes between two comment anchor nodes (exclusive of the anchors themselves).
- */
-function clearBetweenAnchors(start: Comment, end: Comment): void {
-  let node = start.nextSibling;
-  while (node && node !== end) {
-    const next = node.nextSibling;
-    node.parentNode!.removeChild(node);
-    node = next;
+function clearBetweenAnchors(startAnchor: Node, endAnchor: Node): void {
+  const parent = startAnchor.parentNode;
+  if (!parent) return;
+  let curr = startAnchor.nextSibling;
+  while (curr && curr !== endAnchor) {
+    const next = curr.nextSibling;
+    parent.removeChild(curr);
+    curr = next;
   }
 }
 
@@ -414,9 +46,9 @@ function clearBetweenAnchors(start: Comment, end: Comment): void {
  * Register-based Virtual Machine for executing compiled DriftJS templates.
  * Clean, lightweight, and 100% CSP compliant.
  */
-export class DriftClientVirtualMachine {
+export class DriftClientVM {
   private static readonly MAX_REGISTERS = 256;
-  private readonly registers: (Node | any)[] = new Array(DriftClientVirtualMachine.MAX_REGISTERS);
+  private readonly registers: (Node | any)[] = new Array(DriftClientVM.MAX_REGISTERS);
   private scope: Record<string, any> = {};
   private module: CompiledModule | null = null;
   private declaredVars: Set<string> = new Set();
@@ -424,6 +56,7 @@ export class DriftClientVirtualMachine {
   private reactiveRegions: ReactiveRegion[] = [];
   private delegatedEvents = new Set<string>();
   private eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
+  private cursor: HydrationCursor | null = null;
 
   private ensureEventDelegated(eventName: string): void {
     if (this.delegatedEvents.has(eventName)) return;
@@ -448,8 +81,8 @@ export class DriftClientVirtualMachine {
   }
 
   private checkRegister(index: number): void {
-    if (index < 0 || index >= DriftClientVirtualMachine.MAX_REGISTERS) {
-      throw new Error(`Register index ${index} out of bounds (0-${DriftClientVirtualMachine.MAX_REGISTERS - 1})`);
+    if (index < 0 || index >= DriftClientVM.MAX_REGISTERS) {
+      throw new Error(`Register index ${index} out of bounds (0-${DriftClientVM.MAX_REGISTERS - 1})`);
     }
   }
 
@@ -506,8 +139,9 @@ export class DriftClientVirtualMachine {
 
         case Opcode.CREATE_ELEMENT: {
           const dstReg = bytecode[pc + 1]!;
-          const tag = constants[bytecode[pc + 2]!];
-          this.setRegister(dstReg, doc.createElement(String(tag)));
+          const tag = String(constants[bytecode[pc + 2]!]);
+          const elem = this.cursor ? this.cursor.claimElement(tag, doc) : doc.createElement(tag);
+          this.setRegister(dstReg, elem);
           pc += 3;
           break;
         }
@@ -515,16 +149,18 @@ export class DriftClientVirtualMachine {
         case Opcode.CREATE_TEXT: {
           const dstReg = bytecode[pc + 1]!;
           const text = constants[bytecode[pc + 2]!];
-          const val = resolveValue(text, scope, this.declaredVars);
-          this.setRegister(dstReg, doc.createTextNode(val != null ? String(val) : ''));
+          const val = evaluateExpression(text, scope, this.declaredVars);
+          const textNode = this.cursor ? this.cursor.claimText(doc) : doc.createTextNode(val != null ? String(val) : '');
+          this.setRegister(dstReg, textNode);
           pc += 3;
           break;
         }
 
         case Opcode.CREATE_COMMENT: {
           const dstReg = bytecode[pc + 1]!;
-          const comment = constants[bytecode[pc + 2]!];
-          this.setRegister(dstReg, doc.createComment(String(comment ?? '')));
+          const comment = String(constants[bytecode[pc + 2]!] ?? '');
+          const commentNode = this.cursor ? this.cursor.claimComment(comment, doc) : doc.createComment(comment);
+          this.setRegister(dstReg, commentNode);
           pc += 3;
           break;
         }
@@ -540,7 +176,9 @@ export class DriftClientVirtualMachine {
           const parent = this.getRegister(bytecode[pc + 1]!);
           const child = this.getRegister(bytecode[pc + 2]!);
           if (parent && child && typeof parent.appendChild === 'function') {
-            parent.appendChild(child);
+            if (!this.cursor || (child.parentNode !== parent && parent.nodeType !== 11)) {
+              parent.appendChild(child);
+            }
           }
           pc += 3;
           break;
@@ -551,7 +189,7 @@ export class DriftClientVirtualMachine {
           const attrName = String(constants[bytecode[pc + 2]!]);
           const rawVal = constants[bytecode[pc + 3]!];
           const isDynamic = bytecode[pc + 4]!;
-          const val = isDynamic === 1 ? resolveValue(rawVal, scope, this.declaredVars) : rawVal;
+          const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
 
           if (elem) {
             if (attrName.startsWith('on') && typeof val === 'function') {
@@ -594,8 +232,10 @@ export class DriftClientVirtualMachine {
         case Opcode.INTERPOLATE_TEXT: {
           const dstReg = bytecode[pc + 1]!;
           const expr = constants[bytecode[pc + 2]!];
-          const val = resolveValue(expr, scope, this.declaredVars);
-          this.setRegister(dstReg, doc.createTextNode(val != null ? String(val) : ''));
+          const val = evaluateExpression(expr, scope, this.declaredVars);
+          const textNode = this.cursor ? this.cursor.claimText(doc) : doc.createTextNode(val != null ? String(val) : '');
+          textNode.nodeValue = val != null ? String(val) : '';
+          this.setRegister(dstReg, textNode);
           pc += 3;
           break;
         }
@@ -603,7 +243,7 @@ export class DriftClientVirtualMachine {
         case Opcode.EVAL_EXPR: {
           const dstReg = bytecode[pc + 1]!;
           const expr = constants[bytecode[pc + 2]!];
-          this.setRegister(dstReg, resolveValue(expr, scope, this.declaredVars));
+          this.setRegister(dstReg, evaluateExpression(expr, scope, this.declaredVars));
           pc += 3;
           break;
         }
@@ -931,7 +571,7 @@ export class DriftClientVirtualMachine {
           const rawVal = constants[bytecode[pc + 3]!];
           const isDynamic = bytecode[pc + 4]!;
           if (isDynamic === 1) {
-            const val = resolveValue(rawVal, childScope, this.declaredVars);
+            const val = evaluateExpression(rawVal, childScope, this.declaredVars);
             const targetVal = val === true ? '' : val === false || val == null ? null : String(val);
             const currentVal = elem.hasAttribute(attrName) ? elem.getAttribute(attrName) : null;
             if (targetVal !== currentVal) {
@@ -971,11 +611,17 @@ export class DriftClientVirtualMachine {
   public execute(module: CompiledModule, options: VMExecutionOptions = {}): Node | null {
     const doc = options.document || (typeof document !== 'undefined' ? document : null);
     if (!doc) {
-      throw new Error('DriftClientVirtualMachine requires a DOM Document context to execute.');
+      throw new Error('DriftClientVM requires a DOM Document context to execute.');
     }
 
     this.doc = doc;
     this.reactiveRegions = [];
+
+    if (options.hydrate && options.container) {
+      this.cursor = new HydrationCursor(options.container, doc);
+    } else {
+      this.cursor = null;
+    }
 
     const scope: Record<string, any> = { ...options.scope };
     this.scope = scope;
@@ -1006,7 +652,7 @@ export class DriftClientVirtualMachine {
       case Opcode.INTERPOLATE_TEXT: {
         const dstReg = bytecode[pc + 1]!;
         const expr = constants[bytecode[pc + 2]!];
-        const val = resolveValue(expr, scope, this.declaredVars);
+        const val = evaluateExpression(expr, scope, this.declaredVars);
         const existingNode = this.getRegister(dstReg);
         if (existingNode && existingNode.nodeType === 3) {
           existingNode.nodeValue = val != null ? String(val) : '';
@@ -1018,7 +664,7 @@ export class DriftClientVirtualMachine {
         const attrName = String(constants[bytecode[pc + 2]!]);
         const rawVal = constants[bytecode[pc + 3]!];
         const isDynamic = bytecode[pc + 4]!;
-        const val = isDynamic === 1 ? resolveValue(rawVal, scope, this.declaredVars) : rawVal;
+        const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
 
         if (elem && typeof elem.setAttribute === 'function') {
           if (val === true) {
@@ -1074,9 +720,20 @@ export class DriftClientVirtualMachine {
  * Mounts a compiled Drift component into an HTMLElement container.
  */
 export function mount(component: CompiledModule, container: HTMLElement): void {
-  const vm = new DriftClientVirtualMachine();
+  const vm = new DriftClientVM();
   const node = vm.execute(component);
   if (node != null) {
     container.appendChild(node);
   }
 }
+
+/**
+ * Hydrates pre-rendered SSR HTML inside an HTMLElement container.
+ */
+export function hydrate(component: CompiledModule, container: HTMLElement, options: VMExecutionOptions = {}): DriftClientVM {
+  const vm = new DriftClientVM();
+  vm.execute(component, { ...options, container, hydrate: true });
+  return vm;
+}
+
+export * from "../types/index.js";

@@ -1,9 +1,14 @@
 // @ts-ignore
-import { mount } from '@driftjs/runtime'
+import { mount, hydrate } from '@driftjs/dom';
 // @ts-ignore
-import App from './App.drift'
-import './style.css'
+import App from './App.drift';
+import './style.css';
 
 const root = document.getElementById('app') as HTMLElement;
 
-mount(App, root);
+// If SSR HTML is already present inside root, hydrate it. Otherwise mount CSR.
+if (root.children.length > 0 || root.innerHTML.trim().length > 0) {
+  hydrate(App, root);
+} else {
+  mount(App, root);
+}

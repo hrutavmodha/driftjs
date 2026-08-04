@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { DriftClientVirtualMachine } from '../src/client/index.js';
+import { DriftClientVM } from '../src/index.js';
 import { Opcode, CompiledModule } from '../types/index.js';
 
 describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
   const doc = document;
 
   it('handles NewExpression and ForStatement in VM script execution', () => {
-    const vm = new DriftClientVirtualMachine();
+    const vm = new DriftClientVM();
     const scriptAst = [
       {
         type: 'VariableDeclaration',
@@ -80,7 +80,7 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
   });
 
   it('handles default parameter assignment (AssignmentPattern) and function scope writebacks', () => {
-    const vm = new DriftClientVirtualMachine();
+    const vm = new DriftClientVM();
     const scriptAst = [
       {
         type: 'VariableDeclaration',
@@ -191,7 +191,7 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
   });
 
   it('preserves TR node identity during row swap in REACTIVE_FOR list', () => {
-    const vm = new DriftClientVirtualMachine();
+    const vm = new DriftClientVM();
 
     const itemMod: CompiledModule = {
       bytecode: [
@@ -255,7 +255,7 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
   });
 
   it('fast-patches attributes in-place without rebuilding DOM when item data is unchanged', () => {
-    const vm = new DriftClientVirtualMachine();
+    const vm = new DriftClientVM();
 
     const itemMod: CompiledModule = {
       bytecode: [
