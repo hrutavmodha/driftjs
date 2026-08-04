@@ -34,25 +34,7 @@ Unlike traditional Virtual DOM frameworks (e.g., React) that re-evaluate large t
 
 ## 🏆 Benchmark Victories
 
-DriftJS maintains official performance comparisons using the [`js-framework-benchmark`](https://github.com/krausest/js-framework-benchmark) (`webdriver-ts`) suite.
-
-### Level 1: Ember JS (`v7.3.0`) — DEFEATED
-
-*Status: **DEFEATED** (DriftJS won 13 of 15 benchmarks)*
-
-- **Creation Speed**: ~1.55× faster for 1k rows, ~1.49× faster for 10k rows.
-- **Memory Footprint**: ~7.9× less memory on ready state, ~4.4× less memory on 1k row run.
-- **Bundle Size**: ~5.2× smaller compressed size (7.4 kB vs 38.4 kB).
-
-### Level 2: React 19 (`react-hooks`) — DEFEATED
-
-*Status: **DEFEATED** (DriftJS won 13 of 15 benchmarks)*
-
-- **Swap Rows (1k)**: **🚀 ~10.8× FASTER** (`119.0 ms` vs `1,285.7 ms`).
-- **Create 10,000 Rows**: **🚀 ~2.06× FASTER** (`1,842.9 ms` vs `3,804.5 ms`).
-- **Clear Rows (1k)**: **🚀 ~3.05× FASTER** (`92.4 ms` vs `282.0 ms`).
-- **First Paint**: **~3.68× FASTER** (`283.1 ms` vs `1,041.2 ms`).
-- **Bundle Size**: **~6.95× SMALLER** (`7.4 kB` vs `51.4 kB` compressed).
+DriftJS maintains official performance comparisons's local clone using the [`js-framework-benchmark`](https://github.com/krausest/js-framework-benchmark) (`webdriver-ts`) suite.
 
 *Detailed benchmark metrics can be viewed in [`docs/RESULTS.md`](docs/RESULTS.md).*
 
