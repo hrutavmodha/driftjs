@@ -111,23 +111,76 @@ export class DriftTransformer {
     }
 
     if (node.type === ASTNodeType.Switch) {
-      return {
-        ...node,
-        discriminant: typeof node.discriminant === 'string'
-          ? acorn.parseExpressionAt(node.discriminant, 0, { ecmaVersion: 'latest' })
-          : node.discriminant,
-        cases: node.cases.map((c) => ({
-          ...c,
-          expression: typeof c.expression === 'string' && c.expression.trim().length > 0
-            ? acorn.parseExpressionAt(c.expression, 0, { ecmaVersion: 'latest' })
-            : c.expression,
-          body: this.transformChildren(c.body),
-        })),
-      };
+      return this.transformSwitchToIfChain(node);
     }
 
     return node;
   }
+
+  /**
+   * Transforms @switch node into a reactive @if / @else if / @else chain.
+   */
+  private transformSwitchToIfChain(node: SwitchNode): TemplateChildNode {
+    const discAst = typeof node.discriminant === 'string'
+      ? acorn.parseExpressionAt(node.discriminant, 0, { ecmaVersion: 'latest' })
+      : node.discriminant;
+
+    const buildIfChain = (index: number): TemplateChildNode | TemplateChildNode[] | null => {
+      if (index >= node.cases.length) return null;
+      const c = node.cases[index];
+      if (c.expression === null) {
+        return this.transformChildren(c.body);
+      }
+
+      const caseAst = typeof c.expression === 'string' && c.expression.trim().length > 0
+        ? acorn.parseExpressionAt(c.expression, 0, { ecmaVersion: 'latest' })
+        : c.expression;
+
+      const parsedTest: acorn.Node = {
+        type: 'BinaryExpression',
+        operator: '===',
+        left: discAst as any,
+        right: caseAst as any,
+        start: 0,
+        end: 0,
+      } as any;
+
+      const consequent = this.transformChildren(c.body);
+      const nextAlt = buildIfChain(index + 1);
+
+      let alternate: TemplateChildNode[] | IfNode | null = null;
+      if (Array.isArray(nextAlt)) {
+        alternate = nextAlt;
+      } else if (nextAlt !== null && (nextAlt as TemplateChildNode).type === ASTNodeType.If) {
+        alternate = nextAlt as IfNode;
+      }
+
+      return {
+        type: ASTNodeType.If,
+        test: parsedTest,
+        consequent,
+        alternate,
+        loc: c.loc,
+      };
+    };
+
+    const res = buildIfChain(0);
+    if (!res) {
+      return {
+        type: ASTNodeType.Comment,
+        content: 'empty switch',
+        loc: node.loc,
+      };
+    }
+    if (Array.isArray(res)) {
+      return res[0] || { type: ASTNodeType.Comment, content: 'empty switch', loc: node.loc };
+    }
+    return res;
+  }
+
+
+
+
 
   /**
    * Parses raw JS string expression in interpolation into an Acorn AST node.

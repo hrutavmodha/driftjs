@@ -87,14 +87,11 @@ describe('DriftTransformer', () => {
     const transformer = new DriftTransformer(rawAst);
     const transformedAst = transformer.transform();
 
-    const switchNode = transformedAst.body[0] as any;
-    expect(switchNode.type).toBe(ASTNodeType.Switch);
-    expect(switchNode.discriminant.type).toBe('CallExpression');
+    const switchIfNode = transformedAst.body[0] as any;
+    expect(switchIfNode.type).toBe(ASTNodeType.If);
+    expect(switchIfNode.test.type).toBe('BinaryExpression');
 
-    const caseNode = switchNode.cases[0];
-    expect(caseNode.expression.type).toBe('Literal');
-
-    const forNode = caseNode.body.find((n: any) => n.type === ASTNodeType.For);
+    const forNode = switchIfNode.consequent.find((n: any) => n.type === ASTNodeType.For);
     expect(forNode.iterable.type).toBe('CallExpression');
 
     const ifNode = forNode.body.find((n: any) => n.type === ASTNodeType.If);

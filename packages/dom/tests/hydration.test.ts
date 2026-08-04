@@ -58,4 +58,68 @@ describe('SSR & Hydration End-to-End Integration', () => {
 
     document.body.removeChild(container);
   });
+
+  it('hydrates conditional @if and loop @for blocks without creating duplicate DOM nodes', () => {
+    const src = `
+      <script>
+        let count = 0;
+        let items = ['A', 'B'];
+      </script>
+      <div>
+        <p class="status">
+          @if count % 2 === 0 {
+            <span class="even">Even</span>
+          } @else {
+            <span class="odd">Odd</span>
+          }
+        </p>
+        <ul class="list">
+          @for item in items {
+            <li class="item">{item}</li>
+          }
+        </ul>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const compiledModule = new DriftGenerator(transformer.transform()).generate();
+
+    // 1. SSR HTML
+    const ssrHtml = renderToString(compiledModule);
+    const container = document.createElement('div');
+    container.innerHTML = ssrHtml;
+    document.body.appendChild(container);
+
+    // 2. Hydrate
+    const vm = hydrate(compiledModule, container);
+
+    // 3. Verify exactly 1 status span and 2 list items exist (no duplicate nodes created!)
+    const statusSpans = container.querySelectorAll('.status span');
+    expect(statusSpans.length).toBe(1);
+    expect(statusSpans[0].textContent).toBe('Even');
+
+    const listItems = container.querySelectorAll('.list li');
+    expect(listItems.length).toBe(2);
+    expect(listItems[0].textContent).toBe('A');
+    expect(listItems[1].textContent).toBe('B');
+
+    // 4. Post-hydration state transitions
+    (vm as any).scope.count = 1;
+    vm.triggerUpdates(new Set(['count']));
+    const spansAfterInc = container.querySelectorAll('.status span');
+    expect(spansAfterInc.length).toBe(1);
+    expect(spansAfterInc[0].textContent).toBe('Odd');
+
+    (vm as any).scope.count = 0;
+    vm.triggerUpdates(new Set(['count']));
+    const spansAfterReset = container.querySelectorAll('.status span');
+    expect(spansAfterReset.length).toBe(1);
+    expect(spansAfterReset[0].textContent).toBe('Even');
+
+    document.body.removeChild(container);
+  });
 });
+

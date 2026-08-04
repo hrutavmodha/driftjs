@@ -253,6 +253,7 @@ export class DriftGenerator {
 
     // Build alternate sub-module (may be @else or @else if)
     let altIdx = 0xFF;
+    let altMod: any = null;
     if (node.alternate !== null) {
       let altNodes: readonly TemplateChildNode[];
       if (Array.isArray(node.alternate)) {
@@ -261,13 +262,18 @@ export class DriftGenerator {
         // @else if: wrap the nested IfNode so it compiles correctly inside a sub-module
         altNodes = [node.alternate as TemplateChildNode];
       }
-      const altMod = this.compileNodesToSubModule(altNodes);
+      altMod = this.compileNodesToSubModule(altNodes);
       altIdx = this.addConstant(altMod);
     }
 
     // Deps = union of both branches' reactive vars + condition identifiers
-    const consDeps = this.collectDepsFromSubModule(consMod, node.test);
-    const depsIdx = this.addConstant(consDeps);
+    const depsSet = new Set<string>(this.collectDepsFromSubModule(consMod, node.test));
+    if (altMod) {
+      for (const dep of this.collectDepsFromSubModule(altMod)) {
+        depsSet.add(dep);
+      }
+    }
+    const depsIdx = this.addConstant(Array.from(depsSet));
 
     const condIdx = this.addConstant(node.test);
 

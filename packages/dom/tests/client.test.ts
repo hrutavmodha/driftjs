@@ -144,6 +144,51 @@ describe('DriftClientVM', () => {
     expect(container.querySelector('p')).not.toBeNull();
   });
 
+  it('correctly updates @if / @else if / @else chain when resetting count to 0', () => {
+    const src = `
+      <script>
+        let count = 0;
+      </script>
+      <div>
+        <p class="status">
+          @if count > 0 {
+            <span>Positive</span>
+          } @else if count < 0 {
+            <span>Negative</span>
+          } @else {
+            <span>Zero</span>
+          }
+        </p>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = doc.createElement('div');
+    const root = vmInstance.execute(mod, { document: doc });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelector('.status span')?.textContent).toBe('Zero');
+
+    (vmInstance as any).scope.count = 1;
+    vmInstance.triggerUpdates(new Set(['count']));
+    expect(container.querySelector('.status span')?.textContent).toBe('Positive');
+
+    (vmInstance as any).scope.count = -1;
+    vmInstance.triggerUpdates(new Set(['count']));
+    expect(container.querySelector('.status span')?.textContent).toBe('Negative');
+
+    (vmInstance as any).scope.count = 0;
+    vmInstance.triggerUpdates(new Set(['count']));
+    expect(container.querySelector('.status span')?.textContent).toBe('Zero');
+  });
+
+
   it('renders REACTIVE_FOR: list items rendered between anchors', () => {
     const bodyMod: CompiledModule = {
       bytecode: [
@@ -514,4 +559,344 @@ describe('DriftClientVM', () => {
     expect(li3Before).toBe(li3After);
     expect(li2After?.textContent).toBe('Item 2 UPDATED');
   });
+
+  it('re-renders @switch directive reactively when discriminant state variable changes', () => {
+    const src = `
+      <script>
+        let mode = 'all';
+      </script>
+      <div>
+        @switch mode {
+          @case 'all' {
+            <p class="content">Showing ALL</p>
+          }
+          @case 'active' {
+            <p class="content">Showing ACTIVE</p>
+          }
+          @default {
+            <p class="content">Showing DEFAULT</p>
+          }
+        }
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelector('.content')?.textContent).toBe('Showing ALL');
+
+    (vmInstance as any).scope.mode = 'active';
+    vmInstance.triggerUpdates(new Set(['mode']));
+
+    expect(container.querySelector('.content')?.textContent).toBe('Showing ACTIVE');
+
+    (vmInstance as any).scope.mode = 'other';
+    vmInstance.triggerUpdates(new Set(['mode']));
+
+    expect(container.querySelector('.content')?.textContent).toBe('Showing DEFAULT');
+  });
+
+  describe('Comprehensive Control Flow Nesting & All Directives Suite', () => {
+    // 1. @for inside @if / @else
+    it('renders @for nested inside @if and switches cleanly when outer condition toggles', () => {
+      const src = `
+        <script>
+          let showList = true;
+          let items = ['Alpha', 'Beta', 'Gamma'];
+        </script>
+        <div id="root">
+          @if showList {
+            <ul class="items-list">
+              @for item in items {
+                <li class="item">{item}</li>
+              }
+            </ul>
+          } @else {
+            <p class="empty">List Hidden</p>
+          }
+        </div>
+      `;
+
+      const mod = new DriftGenerator(new DriftTransformer(new DriftParser(new DriftLexer(src)).parse()).transform()).generate();
+      const vmInstance = new DriftClientVM();
+      const container = document.createElement('div');
+      const root = vmInstance.execute(mod, { document });
+      if (root) container.appendChild(root);
+
+      expect(container.querySelectorAll('.item').length).toBe(3);
+      expect(container.querySelector('.empty')).toBeNull();
+
+      // Mutate nested list state while visible
+      (vmInstance as any).scope.items = ['Delta', 'Epsilon'];
+      vmInstance.triggerUpdates(new Set(['items']));
+      expect(container.querySelectorAll('.item').length).toBe(2);
+      expect(container.querySelectorAll('.item')[0].textContent).toBe('Delta');
+
+      // Toggle outer @if to false
+      (vmInstance as any).scope.showList = false;
+      vmInstance.triggerUpdates(new Set(['showList']));
+      expect(container.querySelectorAll('.item').length).toBe(0);
+      expect(container.querySelector('.empty')?.textContent).toBe('List Hidden');
+
+      // Toggle outer @if back to true
+      (vmInstance as any).scope.showList = true;
+      vmInstance.triggerUpdates(new Set(['showList']));
+      expect(container.querySelectorAll('.item').length).toBe(2);
+      expect(container.querySelectorAll('.item')[0].textContent).toBe('Delta');
+    });
+
+    it('handles @if nested inside @for loop and re-evaluates conditionals per row on item/condition updates', () => {
+      const src = `
+        <script>
+          let numbers = [1, 2, 3, 4, 5];
+          let filterMode = 'even';
+        </script>
+        <div id="root">
+          <ul class="num-list">
+            @for num in numbers {
+              <li class="num-item">
+                @if num % 2 === 0 {
+                  <span class="even-tag">Even: {num}</span>
+                } @else {
+                  <span class="odd-tag">Odd: {num}</span>
+                }
+              </li>
+            }
+          </ul>
+        </div>
+      `;
+
+      const mod = new DriftGenerator(new DriftTransformer(new DriftParser(new DriftLexer(src)).parse()).transform()).generate();
+      const vmInstance = new DriftClientVM();
+      const container = document.createElement('div');
+      const root = vmInstance.execute(mod, { document });
+      if (root) container.appendChild(root);
+
+      expect(container.querySelectorAll('.even-tag').length).toBe(2);
+      expect(container.querySelectorAll('.odd-tag').length).toBe(3);
+
+      // Mutate list items
+      (vmInstance as any).scope.numbers = [10, 20, 30];
+      vmInstance.triggerUpdates(new Set(['numbers']));
+      expect(container.querySelectorAll('.even-tag').length).toBe(3);
+      expect(container.querySelectorAll('.odd-tag').length).toBe(0);
+    });
+
+    it('handles 4-level ultra-nested control flow (@if -> @for -> @if -> @switch) and maintains reactivity', () => {
+      const src = `
+        <script>
+          let activeSection = 'users';
+          let users = [
+            { id: 1, name: 'Alice', role: 'admin', active: true },
+            { id: 2, name: 'Bob', role: 'user', active: false },
+            { id: 3, name: 'Charlie', role: 'guest', active: true }
+          ];
+        </script>
+        <div id="app">
+          @if activeSection === 'users' {
+            <div class="users-view">
+              @for user in users {
+                <div class="user-card">
+                  @if user.active {
+                    <span class="status-active">{user.name}</span>
+                    @switch user.role {
+                      @case 'admin' {
+                        <strong class="role-badge admin">Full Access</strong>
+                      }
+                      @case 'user' {
+                        <strong class="role-badge user">Standard Access</strong>
+                      }
+                      @default {
+                        <strong class="role-badge guest">Restricted Access</strong>
+                      }
+                    }
+                  } @else {
+                    <span class="status-inactive">{user.name} (Disabled)</span>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="other-view">Section Offline</div>
+          }
+        </div>
+      `;
+
+      const mod = new DriftGenerator(new DriftTransformer(new DriftParser(new DriftLexer(src)).parse()).transform()).generate();
+      const vmInstance = new DriftClientVM();
+      const container = document.createElement('div');
+      const root = vmInstance.execute(mod, { document });
+      if (root) container.appendChild(root);
+
+      // User 1 (Alice): active admin -> status-active + role-badge admin
+      // User 2 (Bob): inactive user -> status-inactive
+      // User 3 (Charlie): active guest -> status-active + role-badge guest
+      expect(container.querySelectorAll('.user-card').length).toBe(3);
+      expect(container.querySelectorAll('.status-active').length).toBe(2);
+      expect(container.querySelectorAll('.status-inactive').length).toBe(1);
+      expect(container.querySelector('.role-badge.admin')?.textContent).toBe('Full Access');
+      expect(container.querySelector('.role-badge.guest')?.textContent).toBe('Restricted Access');
+
+      // Update inner list element
+      (vmInstance as any).scope.users = [
+        { id: 1, name: 'Alice', role: 'user', active: true },
+        { id: 2, name: 'Bob', role: 'admin', active: true }
+      ];
+      vmInstance.triggerUpdates(new Set(['users']));
+
+      expect(container.querySelectorAll('.user-card').length).toBe(2);
+      expect(container.querySelectorAll('.status-active').length).toBe(2);
+      expect(container.querySelectorAll('.status-inactive').length).toBe(0);
+      expect(container.querySelector('.role-badge.admin')?.textContent).toBe('Full Access');
+
+      // Switch top-level section
+      (vmInstance as any).scope.activeSection = 'other';
+      vmInstance.triggerUpdates(new Set(['activeSection']));
+
+      expect(container.querySelector('.users-view')).toBeNull();
+      expect(container.querySelector('.other-view')?.textContent).toBe('Section Offline');
+
+      // Switch back to users section
+      (vmInstance as any).scope.activeSection = 'users';
+      vmInstance.triggerUpdates(new Set(['activeSection']));
+      expect(container.querySelectorAll('.user-card').length).toBe(2);
+    });
+
+    // 4. Same-directive self-nesting: @if inside @if inside @if
+    it('handles 3-level deep self-nested @if inside @if inside @if', () => {
+      const src = `
+        <script>
+          let outer = true;
+          let mid = true;
+          let inner = true;
+        </script>
+        <div>
+          @if outer {
+            @if mid {
+              @if inner {
+                <span class="depth-node">DEEP TRUE</span>
+              } @else {
+                <span class="depth-node">INNER FALSE</span>
+              }
+            } @else {
+              <span class="depth-node">MID FALSE</span>
+            }
+          } @else {
+            <span class="depth-node">OUTER FALSE</span>
+          }
+        </div>
+      `;
+
+      const mod = new DriftGenerator(new DriftTransformer(new DriftParser(new DriftLexer(src)).parse()).transform()).generate();
+      const vmInstance = new DriftClientVM();
+      const container = document.createElement('div');
+      const root = vmInstance.execute(mod, { document });
+      if (root) container.appendChild(root);
+
+      expect(container.querySelector('.depth-node')?.textContent).toBe('DEEP TRUE');
+
+      (vmInstance as any).scope.inner = false;
+      vmInstance.triggerUpdates(new Set(['inner']));
+      expect(container.querySelector('.depth-node')?.textContent).toBe('INNER FALSE');
+
+      (vmInstance as any).scope.mid = false;
+      vmInstance.triggerUpdates(new Set(['mid']));
+      expect(container.querySelector('.depth-node')?.textContent).toBe('MID FALSE');
+
+      (vmInstance as any).scope.outer = false;
+      vmInstance.triggerUpdates(new Set(['outer']));
+      expect(container.querySelector('.depth-node')?.textContent).toBe('OUTER FALSE');
+    });
+
+    // 5. Same-directive self-nesting: @for inside @for (matrix grid)
+    it('handles self-nested @for inside @for (2D matrix grid)', () => {
+      const src = `
+        <script>
+          let matrix = [
+            [1, 2],
+            [3, 4]
+          ];
+        </script>
+        <div>
+          @for row in matrix {
+            <div class="row">
+              @for cell in row {
+                <span class="cell">{cell}</span>
+              }
+            </div>
+          }
+        </div>
+      `;
+
+      const mod = new DriftGenerator(new DriftTransformer(new DriftParser(new DriftLexer(src)).parse()).transform()).generate();
+      const vmInstance = new DriftClientVM();
+      const container = document.createElement('div');
+      const root = vmInstance.execute(mod, { document });
+      if (root) container.appendChild(root);
+
+      expect(container.querySelectorAll('.row').length).toBe(2);
+      expect(container.querySelectorAll('.cell').length).toBe(4);
+
+      (vmInstance as any).scope.matrix = [
+        [10, 20, 30],
+        [40, 50, 60]
+      ];
+      vmInstance.triggerUpdates(new Set(['matrix']));
+
+      expect(container.querySelectorAll('.row').length).toBe(2);
+      expect(container.querySelectorAll('.cell').length).toBe(6);
+    });
+
+    // 6. Same-directive self-nesting: @switch inside @switch
+    it('handles self-nested @switch inside @switch and re-evaluates both discriminants reactively', () => {
+      const src = `
+        <script>
+          let outer = 'a';
+          let inner = 'x';
+        </script>
+        <div>
+          @switch outer {
+            @case 'a' {
+              @switch inner {
+                @case 'x' {
+                  <span class="sw-res">A-X</span>
+                }
+                @case 'y' {
+                  <span class="sw-res">A-Y</span>
+                }
+              }
+            }
+            @case 'b' {
+              <span class="sw-res">OUTER-B</span>
+            }
+          }
+        </div>
+      `;
+
+      const mod = new DriftGenerator(new DriftTransformer(new DriftParser(new DriftLexer(src)).parse()).transform()).generate();
+      const vmInstance = new DriftClientVM();
+      const container = document.createElement('div');
+      const root = vmInstance.execute(mod, { document });
+      if (root) container.appendChild(root);
+
+      expect(container.querySelector('.sw-res')?.textContent).toBe('A-X');
+
+      (vmInstance as any).scope.inner = 'y';
+      vmInstance.triggerUpdates(new Set(['inner']));
+      expect(container.querySelector('.sw-res')?.textContent).toBe('A-Y');
+
+      (vmInstance as any).scope.outer = 'b';
+      vmInstance.triggerUpdates(new Set(['outer']));
+      expect(container.querySelector('.sw-res')?.textContent).toBe('OUTER-B');
+    });
+  });
 });
+

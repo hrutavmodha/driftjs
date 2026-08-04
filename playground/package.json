@@ -1,0 +1,22 @@
+{
+  "name": "driftjs-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "serve": "node server.js",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@driftjs/compiler": "workspace:*",
+    "@driftjs/dom": "workspace:*",
+    "@driftjs/ssr": "workspace:*"
+  },
+  "devDependencies": {
+    "@driftjs/vite-plugin": "workspace:*",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5"
+  }
+}

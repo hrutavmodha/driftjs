@@ -108,9 +108,7 @@ describe('DriftGenerator', () => {
     const src = `@switch role { @case "admin" { <p>Admin</p> } @default { <p>User</p> } }`;
     const module = compile(src);
 
-    expect(module.bytecode).toContain(Opcode.EVAL_EXPR);
-    expect(module.bytecode).toContain(Opcode.JUMP_IF_FALSE);
-    expect(module.bytecode).toContain(Opcode.JUMP);
+    expect(module.bytecode).toContain(Opcode.REACTIVE_IF);
   });
 
   it('works end-to-end via interpret() function', () => {

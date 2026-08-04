@@ -49,11 +49,9 @@ export class DriftServerVM {
     this.registers[index] = value;
   }
 
-  private getRegister(index: number): ServerNode {
+  private getRegister(index: number): any {
     this.checkRegister(index);
-    const val = this.registers[index];
-    if (!val) throw new Error(`Register r${index} is uninitialised`);
-    return val;
+    return this.registers[index];
   }
 
   public execute(module: CompiledModule, options: SSRExecutionOptions = {}): ServerNode | null {
@@ -168,6 +166,30 @@ export class DriftServerVM {
             children: [],
           });
           pc += 3;
+          break;
+        }
+
+        case Opcode.EVAL_EXPR: {
+          const dstReg = bytecode[pc + 1]!;
+          const exprIdx = bytecode[pc + 2]!;
+          const expr = constants[exprIdx];
+          this.setRegister(dstReg, evaluateExpression(expr, this.scope, this.declaredVars));
+          pc += 3;
+          break;
+        }
+
+        case Opcode.JUMP: {
+          pc = (bytecode[pc + 1]! << 8) | bytecode[pc + 2]!;
+          break;
+        }
+
+        case Opcode.JUMP_IF_FALSE: {
+          const cond = this.getRegister(bytecode[pc + 1]!);
+          if (!cond) {
+            pc = (bytecode[pc + 2]! << 8) | bytecode[pc + 3]!;
+          } else {
+            pc += 4;
+          }
           break;
         }
 

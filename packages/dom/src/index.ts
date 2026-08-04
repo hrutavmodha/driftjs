@@ -203,7 +203,6 @@ export class DriftClientVM {
                 for (const key of vm.declaredVars) {
                   if (vm.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
                 }
-                console.log('[DRIFT RUNTIME] Handled event:', eventName, 'changedVars:', Array.from(changedVars), 'data length:', vm.scope.data?.length);
                 if (changedVars.size > 0) vm.triggerUpdates(changedVars);
                 return result;
               };
@@ -328,11 +327,15 @@ export class DriftClientVM {
           const altMod     = altIdx !== 0xFF ? constants[altIdx] : null;
           const deps       = new Set<string>(constants[depsIdx] ?? []);
 
-          // Create comment anchor nodes and append to parent
-          const startAnchor = doc.createComment('if');
-          const endAnchor   = doc.createComment('/if');
-          parentElem.appendChild(startAnchor);
-          parentElem.appendChild(endAnchor);
+          const startAnchor = this.cursor ? this.cursor.claimComment('if', doc) : doc.createComment('if');
+          if (!startAnchor.parentNode || startAnchor.parentNode !== parentElem) {
+            parentElem.appendChild(startAnchor);
+          }
+
+          let actualEndAnchor: Comment = !this.cursor ? doc.createComment('/if') : (null as any);
+          if (actualEndAnchor) {
+            parentElem.appendChild(actualEndAnchor);
+          }
 
           const vm = this;
           // Track child regions registered by sub-module renders so we can remove
@@ -345,21 +348,36 @@ export class DriftClientVM {
               const idx = vm.reactiveRegions.indexOf(r);
               if (idx !== -1) vm.reactiveRegions.splice(idx, 1);
             }
+            if (actualEndAnchor && startAnchor.parentNode) {
+              clearBetweenAnchors(startAnchor, actualEndAnchor);
+            }
             const before = vm.reactiveRegions.length;
             const cond = evaluateExpression(condExpr, scope, vm.declaredVars);
             const subMod = cond ? consMod : altMod;
             if (subMod) {
               const frag = vm.runSubModule(subMod, scope);
-              if (frag && endAnchor.parentNode) endAnchor.parentNode.insertBefore(frag, endAnchor);
+              if (frag) {
+                if (actualEndAnchor && actualEndAnchor.parentNode) {
+                  actualEndAnchor.parentNode.insertBefore(frag, actualEndAnchor);
+                } else {
+                  parentElem.appendChild(frag);
+                }
+              }
             }
             childRegions = vm.reactiveRegions.slice(before);
           };
           renderIf();
 
+          if (this.cursor) {
+            actualEndAnchor = this.cursor.claimComment('/if', doc);
+            if (!actualEndAnchor.parentNode || actualEndAnchor.parentNode !== parentElem) {
+              parentElem.appendChild(actualEndAnchor);
+            }
+          }
+
           this.reactiveRegions.push({
             deps,
             reRender: () => {
-              clearBetweenAnchors(startAnchor, endAnchor);
               renderIf();
             },
           });
@@ -384,10 +402,15 @@ export class DriftClientVM {
           const deps        = new Set<string>(constants[depsIdx] ?? []);
           const forCacheRef: { cache: ItemRecord[] } = { cache: [] };
 
-          const startAnchor = doc.createComment('for');
-          const endAnchor   = doc.createComment('/for');
-          parentElem.appendChild(startAnchor);
-          parentElem.appendChild(endAnchor);
+          const startAnchor = this.cursor ? this.cursor.claimComment('for', doc) : doc.createComment('for');
+          if (!startAnchor.parentNode || startAnchor.parentNode !== parentElem) {
+            parentElem.appendChild(startAnchor);
+          }
+
+          let actualEndAnchor: Comment = !this.cursor ? doc.createComment('/for') : (null as any);
+          if (actualEndAnchor) {
+            parentElem.appendChild(actualEndAnchor);
+          }
 
           const vm = this;
           const renderFor = () => {
@@ -399,8 +422,8 @@ export class DriftClientVM {
               : [];
 
             reconcileKeyedList(
-              endAnchor.parentNode || parentElem,
-              endAnchor,
+              (actualEndAnchor && actualEndAnchor.parentNode) || parentElem,
+              actualEndAnchor,
               forCacheRef,
               items,
               (itemVal, indexVal) => {
@@ -423,8 +446,12 @@ export class DriftClientVM {
                   : [];
                 const childRegions = vm.reactiveRegions.slice(before);
 
-                if (frag && refNode.parentNode) {
-                  refNode.parentNode.insertBefore(frag, refNode);
+                if (frag) {
+                  if (refNode && refNode.parentNode) {
+                    refNode.parentNode.insertBefore(frag, refNode);
+                  } else {
+                    parentElem.appendChild(frag);
+                  }
                 }
 
                 const itemKey =
@@ -522,6 +549,13 @@ export class DriftClientVM {
             );
           };
           renderFor();
+
+          if (this.cursor) {
+            actualEndAnchor = this.cursor.claimComment('/for', doc);
+          }
+          if (!actualEndAnchor.parentNode || actualEndAnchor.parentNode !== parentElem) {
+            parentElem.appendChild(actualEndAnchor);
+          }
 
           this.reactiveRegions.push({
             deps,
@@ -637,7 +671,9 @@ export class DriftClientVM {
     }
     this.registers.fill(undefined);
 
-    return this.executeLoop(module.bytecode, module.constants, scope);
+    const result = this.executeLoop(module.bytecode, module.constants, scope);
+    this.cursor = null;
+    return result;
   }
 
   /**
