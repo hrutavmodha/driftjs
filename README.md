@@ -32,7 +32,7 @@ Unlike traditional Virtual DOM frameworks (e.g., React) that re-evaluate large t
 
 ---
 
-## 🏆 Benchmark Victories
+## 🏆 Benchmark Results
 
 DriftJS maintains official performance comparisons's local clone using the [`js-framework-benchmark`](https://github.com/krausest/js-framework-benchmark) (`webdriver-ts`) suite.
 
