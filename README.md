@@ -344,11 +344,9 @@ DriftJS relies on a streamlined 15-opcode ISA. Detailed specifications are in [`
 
 ---
 
-## 📚 Documentation Reference
+## 📚 Test Suites Reference
 
-- 📖 [Instruction Set Architecture](docs/ISA.md)
-- 🏆 [Official Benchmark Results &amp; Framework Ladder](docs/RESULTS.md)
-- 🧪 [Test Suite Inventory &amp; Coverage](docs/TESTS.md)
+- The official test suites documentation is available at [Test Suite Inventory &amp; Coverage](docs/TESTS.md)
 
 ---
 
