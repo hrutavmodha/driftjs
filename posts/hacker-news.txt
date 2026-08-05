@@ -1,0 +1,19 @@
+Title: Show HN: DriftJS - Ultra-Fast, Register-Based Bytecode Virtual Machine UI Framework
+
+Hi HN,
+
+I'm sharing an experimental frontend framework prototype called DriftJS. Instead of using a Virtual DOM or heavily relying on ahead-of-time reactivity compilation, DriftJS explores compiling templates into compact binary-serializable bytecode streams and executing them in the browser via a lightweight 256-register Virtual Machine.
+
+Key architectural details:
+- 100% CSP Compliant: Built-in Acorn AST interpreter safely evaluates JS expressions without eval() or new Function().
+- Register-Based VM: 256 fast virtual registers for DOM elements, minimizing memory allocation.
+- Keyed LIS Reconciliation: Uses the Longest Increasing Subsequence algorithm to minimize DOM operations during loop updates.
+- Fast-Path Attribute Patching: In-place attribute re-evaluation without rebuilding subtrees.
+
+The compilation pipeline includes a Lexer, Parser, Transformer (with Acorn enrichment), and Generator that emits a 15-opcode bytecode array to the VM.
+
+DriftJS is very early (no component composition, SSR, or stores yet). We're sharing it now to see if this register-based VM approach is an interesting direction for UI frameworks, and to invite compiler engineers and framework researchers to collaborate.
+
+Repo: https://github.com/hrutavmodha/driftjs
+
+Would love to hear your thoughts on the VM architecture!
