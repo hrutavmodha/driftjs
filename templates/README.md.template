@@ -1,0 +1,41 @@
+# {{PROJECT_NAME}}
+
+Built with [DriftJS](https://github.com/your-org/driftjs) — scaffolded by `driftjs-cli`.
+
+## Getting started
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:3000.
+
+## Scripts
+
+| Command        | What it does                              |
+|----------------|--------------------------------------------|
+| `npm run dev`  | Starts the dev server with live reload     |
+| `npm run build`| Builds an optimized bundle into `dist/`    |
+| `npm run serve`| Serves the built `dist/` folder             |
+
+## Project structure
+
+```
+{{PROJECT_NAME}}/
+├─ src/
+│  ├─ components/   Reusable UI pieces
+│  ├─ pages/        Route-level components
+│  ├─ assets/       CSS, images, fonts
+│  └─ main.js       App entry point
+├─ public/          Static files copied as-is
+├─ drift.config.js  CLI configuration
+└─ package.json
+```
+
+## Growing beyond the starter runtime
+
+The scaffold ships with a tiny built-in runtime (`src/drift-runtime.js`) so
+your app runs with zero extra installs. As your project grows, swap it for
+the full DriftJS package set (compiler, DOM runtime, SSR, Vite plugin) from
+the main DriftJS monorepo.

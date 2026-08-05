@@ -1,0 +1,20 @@
+/**
+ * drift.config.js
+ * Configuration for the DriftJS CLI (drift dev / drift build / drift serve).
+ */
+export default {
+  // Project name, used in logs and the generated <title>.
+  name: '{{PROJECT_NAME}}',
+
+  // Dev server port for `drift dev` and `drift serve`.
+  port: 3000,
+
+  // Source directory containing your app code.
+  srcDir: 'src',
+
+  // Output directory written by `drift build`.
+  outDir: 'dist',
+
+  // Static assets copied as-is into outDir on build.
+  publicDir: 'public',
+};

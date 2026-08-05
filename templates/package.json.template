@@ -1,0 +1,15 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "drift dev",
+    "build": "drift build",
+    "serve": "drift serve"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "driftjs-cli": "^1.0.0"
+  }
+}
