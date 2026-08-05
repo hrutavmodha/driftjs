@@ -1,0 +1,20 @@
+1/5 🚀 Meet DriftJS: An experimental Ultra-Fast, Register-Based Bytecode Virtual Machine UI Framework!
+
+Instead of a Virtual DOM or compiler-only approach, DriftJS uses a lightweight 256-register VM to execute bytecode directly against the DOM. 🧵👇
+
+#WebDev #JavaScript
+
+2/5 🔥 Why a Register-Based VM?
+It compiles `.drift` single-file templates into compact binary-serializable bytecode streams. At runtime, the VM executes instructions with minimal memory allocation and surgical updates. Zero VDOM overhead! ⚡️
+
+3/5 🛡️ 100% CSP Compliant!
+DriftJS features a built-in Acorn AST interpreter that evaluates JS expressions in scope *without* using `eval()` or `new Function()`. It’s safe for strict Content Security Policy environments. 🔒
+
+4/5 🔄 Smart Reconciliation & Fast Patching
+Uses Keyed LIS (Longest Increasing Subsequence) reconciliation to minimize DOM node movements. Plus, fast-path attribute patching re-evaluates attributes in-place without rebuilding subtrees! 🎯
+
+5/5 🤝 Join the Experiment!
+DriftJS is an early-stage prototype exploring new frontend architectures. We're looking for contributors to help build component composition, SSR, and more.
+
+Check out the repo, run the benchmarks, and let's chat!
+👉 https://github.com/hrutavmodha/driftjs
