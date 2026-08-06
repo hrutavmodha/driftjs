@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "./dist",
+    "declarationDir": "./dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "noEmit": false,
+    "paths": {
+      "@driftjs/runtime": ["../runtime/dist/index.d.ts"],
+      "@driftjs/runtime/*": ["../runtime/dist/*"]
+    }
+  },
+  "include": ["index.ts", "*.ts"],
+  "exclude": ["*.test.ts", "tests/**/*"]
+}

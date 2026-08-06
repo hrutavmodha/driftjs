@@ -1,0 +1,9 @@
+<div class="page">
+  <h1>User {id}</h1>
+  <p>The <code>:id</code> param is read straight off <code>window.__driftRoute.params</code>, set by the router before each mount.</p>
+  <a href="/" data-drift-link>&larr; Home</a>
+</div>
+
+<script>
+  let id = (window.__driftRoute && window.__driftRoute.params.id) || '?';
+</script>

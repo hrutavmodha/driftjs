@@ -1,0 +1,5 @@
+<div class="page">
+  <h1>404</h1>
+  <p>No route matched this URL.</p>
+  <a href="/" data-drift-link>&larr; Home</a>
+</div>
