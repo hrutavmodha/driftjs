@@ -1,0 +1,3 @@
+<div>
+  <p>Overview panel. This mounts into the layout's <code>[data-drift-outlet]</code> without remounting the layout itself.</p>
+</div>
