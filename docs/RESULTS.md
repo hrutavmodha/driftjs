@@ -6,7 +6,7 @@ This document maintains official benchmark results for **DriftJS** against compe
 
 ## 🏆 Level 1: Ember JS (`v7.3.0`) Comparison — DEFEATED
 
-*Status: **DEFEATED** (DriftJS won 13 of 15 benchmarks).*
+*Status: **DEFEATED** (DriftJS won 13 out of 15 benchmarks).*
 
 ### 1. CPU Benchmarks (Duration in ms)
 *Values reported as **Mean Duration** in milliseconds (with **Scripting Time** in parentheses).*
@@ -43,7 +43,7 @@ This document maintains official benchmark results for **DriftJS** against compe
 
 ## 🏆 Level 2: React 19 (`react-hooks`) Comparison — DEFEATED
 
-*Status: **DEFEATED** (DriftJS won 13 of 15 benchmarks including 7/9 CPU benchmarks, all memory benchmarks, and bundle size).*
+*Status: **DEFEATED** (DriftJS won 13 out of 15 benchmarks).*
 
 ### 1. CPU Benchmarks (Duration in ms)
 
@@ -74,3 +74,38 @@ This document maintains official benchmark results for **DriftJS** against compe
 | **41. Uncompressed Size (kB)** | `11.3` | `33.1` | `190.3` | ✅ DriftJS (~5.75× smaller) |
 | **42. Compressed Size (kB)** | `2.5` | `7.4` | `51.4` | ✅ DriftJS (~6.95× smaller) |
 | **43. First Paint (ms)** | `219.9` | `283.1` | `1,041.2` | ✅ DriftJS (~3.68× faster) |
+
+---
+
+## 🏆 Level 3: Vue 3.5 (`v3.5.39`) Comparison
+
+*Status: **COMPETITIVE** (DriftJS won 7 out of 14 benchmarks).*
+
+### 1. CPU Benchmarks (Duration in ms)
+
+| Metric / Benchmark | VanillaJS | DriftJS (`v0.0.0`) | Vue 3.5 (`v3.5.39`) | Result |
+| :--- | :---: | :---: | :---: | :--- |
+| **01. Create 1,000 rows** | `160.1` *(22.8)* | `218.8` *(59.1)* | `193.0` *(42.5)* | ❌ Vue (~1.13× faster) |
+| **02. Replace 1,000 rows** | `169.2` *(24.3)* | `223.7` *(75.5)* | `207.6` *(55.6)* | ❌ Vue (~1.07× faster; DriftJS 3× lower stddev) |
+| **04. Select row (1k)** | `24.7` *(2.4)* | `53.9` *(37.1)* | `22.8` *(5.4)* | ❌ Vue (~2.36× faster; DriftJS faster paint 12.1ms) |
+| **05. Swap rows (1k)** | `90.8` *(0.9)* | `165.3` *(44.4)* | `118.7` *(6.7)* | ❌ Vue (~1.39× faster) |
+| **06. Remove single row (1k)** | `100.0` *(2.1)* | `103.0` *(20.8)* | `101.5` *(16.2)* | ✅ DriftJS (Total Median `101.2ms` vs `102.2ms`) |
+| **07. Create 10,000 rows** | `1,336.6` *(183.2)* | `1,841.9` *(526.2)* | `1,761.2` *(364.4)* | ❌ Vue (~1.04× faster; DriftJS faster paint 1305ms) |
+| **08. Append 1,000 rows to 1k** | `178.8` *(17.9)* | `256.9` *(81.6)* | `238.1` *(41.9)* | ❌ Vue (~1.08× faster; DriftJS faster paint 169.8ms) |
+| **09. Clear 1,000 rows** | `56.0` *(64.2)* | `80.3` *(70.6)* | `83.9` *(72.1)* | ✅ DriftJS (Total Median `78.8ms` vs `82.1ms`) |
+
+### 2. Memory Footprint (in MB)
+
+| Metric / Benchmark | VanillaJS | DriftJS (`v0.0.0`) | Vue 3.5 (`v3.5.39`) | Result |
+| :--- | :---: | :---: | :---: | :--- |
+| **21. Ready Memory** | `0.55` | `0.69` | `0.86` | ✅ DriftJS (~1.25× less memory) |
+| **22. Run Memory (1k rows)** | `1.90` | `2.69` | `3.98` | ✅ DriftJS (~1.48× less memory) |
+| **25. Run-Clear Memory** | `0.62` | `1.07` | `1.11` | ✅ DriftJS (~1.04× less memory) |
+
+### 3. Implementation Size & Startup
+
+| Metric / Benchmark | VanillaJS | DriftJS (`v0.0.0`) | Vue 3.5 (`v3.5.39`) | Result |
+| :--- | :---: | :---: | :---: | :--- |
+| **41. Uncompressed Size (kB)** | `11.3` | `37.3` | `64.4` | ✅ DriftJS (~1.73× smaller) |
+| **42. Compressed Size (kB)** | `2.5` | `8.1` | `23.3` | ✅ DriftJS (~2.88× smaller / 65% reduction) |
+| **43. First Paint (ms)** | `219.9` | `297.9` | `273.8` | ❌ Vue (~1.08× faster) |

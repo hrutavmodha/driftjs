@@ -367,7 +367,16 @@ export class DriftParser {
     }
 
     const lhs = header.slice(0, inIndex).trim();
-    const iterable = header.slice(inIndex + 4).trim();
+    let rawIterable = header.slice(inIndex + 4).trim();
+    let key: string | null = null;
+
+    const keyMatch = rawIterable.match(/\s+key\s+(.+)$/);
+    if (keyMatch) {
+      key = keyMatch[1]!.trim();
+      rawIterable = rawIterable.slice(0, keyMatch.index).trim();
+    }
+
+    const iterable = rawIterable;
 
     let item = lhs;
     let index: string | null = null;
@@ -389,6 +398,7 @@ export class DriftParser {
       item,
       index,
       iterable,
+      key,
       body,
       loc: { start: startLoc, end: endBlockToken.loc.end },
     };

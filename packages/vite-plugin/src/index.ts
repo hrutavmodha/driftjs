@@ -1,43 +1,11 @@
 import type { Plugin } from 'vite';
 import {
-  DriftLexer,
-  DriftParser,
-  DriftTransformer,
-  DriftGenerator,
+  compile,
   type CompiledModule,
 } from '@driftjs/compiler';
 import { DRIFT_EXT, type DriftPluginOptions } from '../types/index.js';
 
 export type { DriftPluginOptions, DriftModule } from '../types/index.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Compilation
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Runs a `.drift` source string through the full DriftJS compiler pipeline and
- * returns the resulting `CompiledModule` (bytecode + constant pool).
- *
- * Pipeline: DriftLexer → DriftParser → DriftTransformer → DriftGenerator
- */
-function compile(src: string, debug: boolean): CompiledModule {
-  const lexer = new DriftLexer(src);
-  const parser = new DriftParser(lexer);
-  const ast = parser.parse();
-
-  const transformer = new DriftTransformer(ast);
-  const enrichedAst = transformer.transform();
-
-  const generator = new DriftGenerator(enrichedAst);
-  const mod = generator.generate();
-
-  if (debug) {
-    console.log('[DriftJS] Transformed AST:\n', JSON.stringify(enrichedAst, null, 2));
-    console.log('[DriftJS] Compiled module:\n', JSON.stringify(mod, null, 2));
-  }
-
-  return mod;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ESM code generation
@@ -48,16 +16,10 @@ function compile(src: string, debug: boolean): CompiledModule {
  * Acorn position fields (`start` / `end`) are stripped to keep the bundle lean.
  */
 function serializeConstants(constants: readonly unknown[]): string {
-  const items = constants.map((c) => {
-    if (c && typeof c === 'object' && '__drift_fn__' in (c as any)) {
-      return (c as any).__drift_fn__;
-    }
-    return JSON.stringify(c, (key, value) => {
-      if (key === 'start' || key === 'end' || key === 'loc') return undefined;
-      return value;
-    });
+  return JSON.stringify(constants, (key, value) => {
+    if (key === 'start' || key === 'end' || key === 'loc') return undefined;
+    return value;
   });
-  return `[\n  ${items.join(',\n  ')}\n]`;
 }
 
 function generateESM(mod: CompiledModule, filePath: string): string {

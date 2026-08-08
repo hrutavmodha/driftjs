@@ -211,7 +211,7 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // r0 = tbody
-        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 3, 4, // parent=r0, iter=data, itemName='row', bodyMod, deps=['data']
+        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 0xFF, 3, 4, // parent=r0, iter=data, itemName='row', bodyMod, deps=['data']
         Opcode.RETURN, 0
       ],
       constants: [
@@ -287,7 +287,7 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // r0 = tbody
-        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 3, 4, // parent=r0, iter=data, itemName='row', bodyMod, deps=['data', 'selected']
+        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 0xFF, 3, 4, // parent=r0, iter=data, itemName='row', bodyMod, deps=['data', 'selected']
         Opcode.RETURN, 0
       ],
       constants: [

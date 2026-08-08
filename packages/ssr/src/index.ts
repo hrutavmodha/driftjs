@@ -235,7 +235,8 @@ export class DriftServerVM {
           const iterIdx = bytecode[pc + 2]!;
           const itemNameIdx = bytecode[pc + 3]!;
           const idxNameIdx = bytecode[pc + 4]!;
-          const bodyIdx = bytecode[pc + 5]!;
+          const keyIdx = bytecode[pc + 5]!;
+          const bodyIdx = bytecode[pc + 6]!;
 
           const parentNode = this.getRegister(parentReg);
           const iterExpr = constants[iterIdx];
@@ -261,7 +262,7 @@ export class DriftServerVM {
             if (subResult) parentNode.children.push(subResult);
           }
           parentNode.children.push({ type: 'comment', content: '/for', children: [] });
-          pc += 7;
+          pc += 8;
           break;
         }
 

@@ -101,7 +101,7 @@ describe('DriftServerVM (SSR Engine)', () => {
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // ul
-        Opcode.REACTIVE_FOR, 0, 1, 2, 3, 4, 5,
+        Opcode.REACTIVE_FOR, 0, 1, 2, 3, 0xFF, 4, 5,
         Opcode.RETURN, 0,
       ],
       constants: [

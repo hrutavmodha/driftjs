@@ -1,22 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { DriftLexer } from '../src/lexer.js';
-import { DriftParser } from '../src/parser.js';
-import { DriftTransformer } from '../src/transformer.js';
-import { DriftGenerator } from '../src/generator.js';
-import { interpret } from '../src/index.js';
+import { compile } from '../src/index.js';
 import { Opcode } from '../types/index.js';
 
 describe('DriftGenerator', () => {
-  function compile(src: string) {
-    const lexer = new DriftLexer(src);
-    const parser = new DriftParser(lexer);
-    const ast = parser.parse();
-    const transformer = new DriftTransformer(ast);
-    const transformedAst = transformer.transform();
-    const generator = new DriftGenerator(transformedAst);
-    return generator.generate();
-  }
-
   it('generates fragment and return for empty templates', () => {
     const module = compile('');
 
@@ -31,7 +17,6 @@ describe('DriftGenerator', () => {
     expect(module.constants).toContain('Hello World');
 
     const tagIdx = module.constants.indexOf('div');
-    const textIdx = module.constants.indexOf('Hello World');
 
     expect(module.bytecode[0]).toBe(Opcode.CREATE_ELEMENT);
     expect(module.bytecode[1]).toBe(0); // rootReg = 0
@@ -111,7 +96,7 @@ describe('DriftGenerator', () => {
     expect(module.bytecode).toContain(Opcode.REACTIVE_IF);
   });
 
-  it('works end-to-end via interpret() function', () => {
+  it('works end-to-end via compile() function', () => {
     const template = `
       <ul>
         @for (item, index) in list {
@@ -119,7 +104,7 @@ describe('DriftGenerator', () => {
         }
       </ul>
     `;
-    const module = interpret(template, false);
+    const module = compile(template, false);
 
     expect(module.bytecode.length).toBeGreaterThan(0);
     expect(module.constants.length).toBeGreaterThan(0);

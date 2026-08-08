@@ -326,7 +326,8 @@ export class DriftClientVM {
           const condExpr   = constants[condIdx];
           const consMod    = constants[consIdx];
           const altMod     = altIdx !== 0xFF ? constants[altIdx] : null;
-          const deps       = new Set<string>(constants[depsIdx] ?? []);
+          const depsRaw    = constants[depsIdx];
+          const deps       = new Set<string>(Array.isArray(depsRaw) ? depsRaw : []);
 
           const startAnchor = this.cursor ? this.cursor.claimComment('if', doc) : doc.createComment('if');
           if (!startAnchor.parentNode || startAnchor.parentNode !== parentElem) {
@@ -392,15 +393,18 @@ export class DriftClientVM {
           const iterIdx     = bytecode[pc + 2]!;
           const itemNameIdx = bytecode[pc + 3]!;
           const idxNameIdx  = bytecode[pc + 4]!;
-          const bodyIdx     = bytecode[pc + 5]!;
-          const depsIdx     = bytecode[pc + 6]!;
+          const keyIdx      = bytecode[pc + 5]!;
+          const bodyIdx     = bytecode[pc + 6]!;
+          const depsIdx     = bytecode[pc + 7]!;
 
           const parentElem  = this.getRegister(parentReg);
           const iterExpr    = constants[iterIdx];
           const itemName    = constants[itemNameIdx] as string;
           const indexName   = idxNameIdx !== 0xFF ? constants[idxNameIdx] as string : null;
+          const keyExpr     = keyIdx !== 0xFF ? constants[keyIdx] : null;
           const bodyMod     = constants[bodyIdx];
-          const deps        = new Set<string>(constants[depsIdx] ?? []);
+          const depsRaw     = constants[depsIdx];
+          const deps        = new Set<string>(Array.isArray(depsRaw) ? depsRaw : []);
           const forCacheRef: { cache: ItemRecord[] } = { cache: [] };
 
           const startAnchor = this.cursor ? this.cursor.claimComment('for', doc) : doc.createComment('for');
@@ -428,6 +432,12 @@ export class DriftClientVM {
               forCacheRef,
               items,
               (itemVal, indexVal) => {
+                if (keyExpr) {
+                  const itemScope = Object.create(scope);
+                  itemScope[itemName] = itemVal;
+                  if (indexName) itemScope[indexName] = indexVal;
+                  return evaluateExpression(keyExpr, itemScope, vm.declaredVars);
+                }
                 if (itemVal && typeof itemVal === 'object') {
                   if ('key' in itemVal) return (itemVal as any).key;
                   if ('id' in itemVal) return (itemVal as any).id;
@@ -455,14 +465,15 @@ export class DriftClientVM {
                   }
                 }
 
-                const itemKey =
-                  itemVal && typeof itemVal === 'object'
-                    ? 'key' in itemVal
-                      ? (itemVal as any).key
-                      : 'id' in itemVal
-                      ? (itemVal as any).id
-                      : indexVal
-                    : indexVal;
+                const itemKey = keyExpr
+                  ? evaluateExpression(keyExpr, childScope, vm.declaredVars)
+                  : itemVal && typeof itemVal === 'object'
+                  ? 'key' in itemVal
+                    ? (itemVal as any).key
+                    : 'id' in itemVal
+                    ? (itemVal as any).id
+                    : indexVal
+                  : indexVal;
 
                 return {
                   key: itemKey,
@@ -522,8 +533,8 @@ export class DriftClientVM {
                   ) {
                     const newElem = frag.childNodes[0] as Element;
                     const elem = rootNode as Element;
-                    while (elem.attributes.length > 0) {
-                      elem.removeAttribute(elem.attributes[0].name);
+                    for (const attr of Array.from(elem.attributes)) {
+                      elem.removeAttribute(attr.name);
                     }
                     for (const attr of Array.from(newElem.attributes)) {
                       elem.setAttribute(attr.name, attr.value);
@@ -565,7 +576,7 @@ export class DriftClientVM {
             },
           });
 
-          pc += 7;
+          pc += 8;
           break;
         }
 
@@ -635,7 +646,7 @@ export class DriftClientVM {
           pc += 6;
           break;
         case Opcode.REACTIVE_FOR:
-          pc += 7;
+          pc += 8;
           break;
         default:
           return;

@@ -108,6 +108,9 @@ export class DriftTransformer {
         iterable: typeof node.iterable === 'string'
           ? acorn.parseExpressionAt(node.iterable, 0, { ecmaVersion: 'latest' })
           : node.iterable,
+        key: typeof node.key === 'string' && node.key.trim().length > 0
+          ? acorn.parseExpressionAt(node.key, 0, { ecmaVersion: 'latest' })
+          : node.key,
         body: this.transformChildren(node.body),
       };
     }

@@ -15,7 +15,7 @@ import { DriftGenerator } from './generator.js';
  * @param src - The template source string to compile.
  * @param debug - If true, logs intermediate AST and final compiled module.
  */
-export function interpret(src: string, debug: boolean = false) {
+export function compile(src: string, debug: boolean = false) {
     const lexer = new DriftLexer(src);
     const parser = new DriftParser(lexer);
     const ast = parser.parse();

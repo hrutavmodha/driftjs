@@ -56,6 +56,7 @@ export interface ForNode extends BaseASTNode {
   readonly item: string;
   readonly index: string | null;
   readonly iterable: string | AcornNode;
+  readonly key?: string | AcornNode | null;
   readonly body: readonly TemplateChildNode[];
 }
 

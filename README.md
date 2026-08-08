@@ -1,7 +1,7 @@
 # ⚡ DriftJS
 
 > **Ultra-Fast, Register-Based Bytecode Virtual Machine UI Framework**
-> *Zero Virtual DOM Overhead • 100% CSP Compliant • Keyed LIS Reconciliation • Built for Speed*
+> *Zero Virtual DOM Overhead • Expression Engine • Keyed LIS Reconciliation • Built for Speed*
 
 ---
 
@@ -12,7 +12,7 @@
 Unlike traditional Virtual DOM frameworks (e.g., React) that re-evaluate large tree structures or compiler-only reactive frameworks (e.g., Svelte), DriftJS compiles `.drift` single-file templates into compact binary-serializable bytecode streams (`CompiledModule`). At runtime, a lightweight 256-register VM executes these instructions directly against the DOM with minimal memory allocation and surgical updates.
 
 > [!NOTE]
-> DriftJS is currently an **experimental prototype** exploring register-based Virtual Machine execution for web UI. While single-template bytecode compilation, Acorn expression evaluation, and basic keyed LIS list reconciliation are implemented and passing test suites:
+> DriftJS is currently an **experimental prototype** exploring register-based Virtual Machine execution for web UI. While single-template bytecode compilation, expression evaluation, and basic keyed LIS list reconciliation are implemented and passing test suites:
 >
 > - **Current Limitations**: Component composition/nesting, props passing, routing, state management stores, SSR/hydration, and developer debugging tools are not yet implemented.
 > - **Under Active Design**: Complex JS syntax in directives, deep reactivity tracking, and robust compiler error recovery.
@@ -23,7 +23,7 @@ Unlike traditional Virtual DOM frameworks (e.g., React) that re-evaluate large t
 
 ## 🔥 Key Architectural Features
 
-- **🛡️ 100% CSP Compliant**: Built-in Acorn AST interpreter evaluates JS expressions in scope without `eval()` or `new Function()`, making DriftJS safe for strict Content Security Policy environments.
+- **⚡ High-Performance Expression Engine**: Evaluates JS expressions in scope with compiled functions for optimal runtime execution.
 - **⚡ Register-Based Virtual Machine**: Uses 256 fast virtual registers (`r0`, `r1`, ...) for DOM elements, text nodes, fragments, and evaluated primitive values.
 - **🔄 Keyed LIS Reconciliation**: Features a Longest Increasing Subsequence (LIS) list reconciler (`reconcileKeyedList`) that minimizes DOM node movements, insertions, and deletions.
 - **🎯 Fast-Path Attribute Patching**: Re-evaluates element attributes in-place without rebuilding DOM subtrees when data object references remain stable.
@@ -47,7 +47,7 @@ DriftJS is organized as a monorepo managed with `pnpm`:
 | Package                            | Path                                            | Description                                                                          |
 | :--------------------------------- | :---------------------------------------------- | :----------------------------------------------------------------------------------- |
 | **`@driftjs/compiler`**    | [`packages/compiler`](packages/compiler)       | Lexer, Parser, Transformer, & Bytecode Generator emitting`CompiledModule` bytecode |
-| **`@driftjs/runtime`**     | [`packages/runtime`](packages/runtime)         | 256-Register VM, Acorn JS interpreter, Keyed LIS reconciler, &`mount()` API        |
+| **`@driftjs/runtime`**     | [`packages/runtime`](packages/runtime)         | 256-Register VM, Expression Engine, Keyed LIS reconciler, &`mount()` API        |
 | **`@driftjs/vite-plugin`** | [`packages/vite-plugin`](packages/vite-plugin) | Vite plugin transforming`.drift` files into synthetic ESM modules with HMR support |
 | **`template`**             | [`template`](template)                         | Starter project template with Vite, TypeScript, and`.drift` counter example        |
 
@@ -67,7 +67,7 @@ The compilation and execution workflow consists of 5 tightly decoupled stages:
 [ DriftParser ] ─────► AST construction (ProgramNode, ElementNode, IfNode, ForNode, etc.)
    │
    ▼
-[ DriftTransformer ] ─► Whitespace stripping & Acorn JS expression enrichment
+[ DriftTransformer ] ─► Whitespace stripping & JS expression enrichment
    │
    ▼
 [ DriftGenerator ] ───► Emits 15-Opcode Bytecode Array, Constant Pool, & Reactive Bindings

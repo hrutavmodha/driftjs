@@ -473,3 +473,13 @@ This pattern holds for `DriftJSLexer`/`tokenize`, `DriftJSParser`/`parseTemplate
 - **Register overflow:** The `depMask` is a single byte (8-bit) in the instruction encoding, but `markDirty` uses `1 << (regIdx % 32)` which wraps at 32. Components with >32 state variables will have bitmask collisions.
 - **`new Function` and CSP:** Thunk construction via `new Function()` will fail under strict Content Security Policy headers. This is a known limitation.
 - **The `JUMP` back-patch:** The generator emits a placeholder `JUMP 0` instruction after the mount block and patches it later with the update block offset. The offset is encoded as a 24-bit value split across the B and C operand bytes.
+
+---
+
+## Framework & Code Generation Guidelines
+
+1. **Compiler vs. Utils Scope**: AST code generation (`astToJS`) must remain within `@driftjs/compiler` (`generator.ts`). `@driftjs/utils` only provides runtime evaluation and scope helpers.
+2. **ESM Strict Mode Compliance**: Generated JavaScript function strings emitted into ESM bundles must never include `with (scope)` statements. All identifier lookups must be explicitly generated (`'x' in scope ? scope.x : ...`).
+3. **Single Source of Truth**: Keep constants (e.g. `Opcode` definitions) defined in a single source location rather than duplicating definitions across packages.
+4. **Vite Build Scripts**: Vite-based apps/templates must configure `"build": "vite build"` in `package.json`.
+5. **Harness Verification**: Always run official validation commands (e.g., `npm run isKeyed` in `webdriver-ts`) to verify framework benchmark structure and keyed behavior instead of writing ad-hoc validation scripts.

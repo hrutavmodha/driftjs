@@ -1,4 +1,4 @@
-import { evaluateExpression } from './evaluator.js';
+import { evaluateExpression, executePrecompiledFn } from './evaluator.js';
 import { setScopeValue } from './scope.js';
 
 /**
@@ -13,10 +13,7 @@ export function executeBlockStatement(statements: any, scope: Record<string, any
   }
 
   if (typeof statements === 'object' && statements !== null && '__drift_fn__' in statements) {
-    if (!statements._executableFn) {
-      statements._executableFn = new Function('return (' + statements.__drift_fn__ + ')')();
-    }
-    return statements._executableFn(scope, declaredVars, setScopeValue);
+    return executePrecompiledFn(statements, scope, declaredVars);
   }
 
   if (Array.isArray(statements)) {

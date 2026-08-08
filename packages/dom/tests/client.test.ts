@@ -207,7 +207,7 @@ describe('DriftClientVM', () => {
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0,
-        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 3, 4,
+        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 0xFF, 3, 4,
         Opcode.RETURN, 0,
       ],
       constants: ['ul', iterExpr, 'item', bodyMod, ['items']],
@@ -244,7 +244,7 @@ describe('DriftClientVM', () => {
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0,
-        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 3, 4,
+        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 0xFF, 3, 4,
         Opcode.RETURN, 0,
       ],
       constants: ['ul', iterExpr, 'item', bodyMod, ['items']],
