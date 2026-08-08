@@ -1,17 +1,6 @@
 import { defineConfig } from 'vite';
-import { driftPlugin } from 'vite-plugin-drift';
+import { driftPlugin } from '@driftjs/vite-plugin';
 
 export default defineConfig({
-  plugins: [driftPlugin() as any],
-  optimizeDeps: {
-    exclude: ['driftjs']
-  },
-  build: {
-    rollupOptions: {
-      input: {
-        main: 'index.html',
-        router: 'router.html'
-      }
-    }
-  }
-});
+  plugins: [driftPlugin() as any]
+})

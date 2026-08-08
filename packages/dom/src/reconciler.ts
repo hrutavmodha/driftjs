@@ -1,4 +1,4 @@
-import { ItemRecord } from '../types/index.js';
+import type { ItemRecord } from '../types/index.js';
 
 function getSequence(arr: Int32Array): number[] {
   const p = new Int32Array(arr.length);

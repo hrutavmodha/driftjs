@@ -1,4 +1,4 @@
-import {
+import type {
   ProgramNode,
   TemplateChildNode,
   ElementNode,
@@ -9,10 +9,12 @@ import {
   IfNode,
   ForNode,
   SwitchNode,
-  ASTNodeType,
-  Opcode,
   CompiledModule,
   ReactiveBinding,
+} from '../types/index.js';
+import {
+  ASTNodeType,
+  Opcode,
 } from '../types/index.js';
 
 /**
@@ -483,12 +485,30 @@ export class DriftGenerator {
   }
 
   private addConstant(value: any): number {
-    const existingIndex = this.constants.findIndex((c) => this.isConstantEqual(c, value));
+    let processedValue = value;
+
+    if (
+      (typeof value === 'object' && value !== null && typeof value.type === 'string') ||
+      (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0] !== null && typeof value[0].type === 'string')
+    ) {
+      const isStatement = Array.isArray(value) || value.type === 'BlockStatement' || value.type === 'ExpressionStatement' || value.type === 'IfStatement' || value.type === 'VariableDeclaration' || value.type === 'FunctionDeclaration';
+      const jsCode = astToJS(value);
+      const fnStr = isStatement
+        ? `(scope, declaredVars, setScopeValue) => { ${jsCode} }`
+        : `(scope, declaredVars, setScopeValue) => { return (${jsCode}); }`;
+      
+      processedValue = {
+        __drift_fn__: fnStr,
+        ast: value,
+      };
+    }
+
+    const existingIndex = this.constants.findIndex((c) => this.isConstantEqual(c, processedValue));
     if (existingIndex !== -1) {
       return existingIndex;
     }
 
-    this.constants.push(value);
+    this.constants.push(processedValue);
     return this.constants.length - 1;
   }
 
@@ -565,5 +585,152 @@ export class DriftGenerator {
       this.bytecode[pos + 8] = high;
       this.bytecode[pos + 9] = low;
     }
+  }
+}
+
+/**
+ * Converts Acorn AST nodes or arrays of statements into valid JavaScript source code strings.
+ */
+export function astToJS(node: any): string {
+  if (node === null || node === undefined) return 'undefined';
+  if (typeof node !== 'object') return typeof node === 'string' ? JSON.stringify(node) : String(node);
+  if (Array.isArray(node)) return node.map(astToJS).join('; ');
+
+  switch (node.type) {
+    case 'Identifier':
+      return `('${node.name}' in (scope || {}) ? scope[${JSON.stringify(node.name)}] : (typeof globalThis !== 'undefined' && '${node.name}' in globalThis ? globalThis[${JSON.stringify(node.name)}] : undefined))`;
+
+    case 'Literal':
+      if (typeof node.raw === 'string') return node.raw;
+      return typeof node.value === 'string' ? JSON.stringify(node.value) : String(node.value);
+
+    case 'BinaryExpression':
+    case 'LogicalExpression':
+      return `(${astToJS(node.left)} ${node.operator} ${astToJS(node.right)})`;
+
+    case 'UnaryExpression':
+      return `(${node.operator} ${astToJS(node.argument)})`;
+
+    case 'ConditionalExpression':
+      return `(${astToJS(node.test)} ? ${astToJS(node.consequent)} : ${astToJS(node.alternate)})`;
+
+    case 'MemberExpression':
+      return node.computed
+        ? `(${astToJS(node.object)}?.[${astToJS(node.property)}])`
+        : `(${astToJS(node.object)}?.${node.property.name})`;
+
+    case 'CallExpression': {
+      const calleeJS = astToJS(node.callee);
+      const argsJS = node.arguments ? node.arguments.map(astToJS).join(', ') : '';
+      if (node.callee?.type === 'MemberExpression') {
+        const objJS = astToJS(node.callee.object);
+        const propJS = node.callee.computed ? astToJS(node.callee.property) : JSON.stringify(node.callee.property.name);
+        return `(${objJS}?.[${propJS}]?.(${argsJS}))`;
+      }
+      return `(${calleeJS}?.(${argsJS}))`;
+    }
+
+    case 'AssignmentExpression': {
+      if (node.left?.type === 'Identifier') {
+        const name = node.left.name;
+        const valJS = astToJS(node.right);
+        if (node.operator === '=') {
+          return `(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${valJS}) : ((scope || {})[${JSON.stringify(name)}] = ${valJS}))`;
+        } else {
+          const op = node.operator.slice(0, -1);
+          return `(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, (scope[${JSON.stringify(name)}] ${op} ${valJS})) : ((scope || {})[${JSON.stringify(name)}] ${node.operator} ${valJS}))`;
+        }
+      }
+      return `(${astToJS(node.left)} ${node.operator} ${astToJS(node.right)})`;
+    }
+
+    case 'UpdateExpression': {
+      if (node.argument?.type === 'Identifier') {
+        const name = node.argument.name;
+        const op = node.operator === '++' ? '+' : '-';
+        if (node.prefix) {
+          return `(typeof setScopeValue === 'function' ? (setScopeValue(scope, ${JSON.stringify(name)}, (Number(scope[${JSON.stringify(name)}]) || 0) ${op} 1), scope[${JSON.stringify(name)}]) : ((scope || {})[${JSON.stringify(name)}] = (Number((scope || {})[${JSON.stringify(name)}]) || 0) ${op} 1))`;
+        } else {
+          return `(() => { const _v = Number(scope[${JSON.stringify(name)}]) || 0; if (typeof setScopeValue === 'function') setScopeValue(scope, ${JSON.stringify(name)}, _v ${op} 1); else (scope || {})[${JSON.stringify(name)}] = _v ${op} 1; return _v; })()`;
+        }
+      }
+      return node.prefix
+        ? `(${node.operator}${astToJS(node.argument)})`
+        : `(${astToJS(node.argument)}${node.operator})`;
+    }
+
+    case 'SequenceExpression':
+      return `(${node.expressions ? node.expressions.map(astToJS).join(', ') : ''})`;
+
+    case 'ArrayExpression':
+      return `[${node.elements ? node.elements.map((el: any) => el?.type === 'SpreadElement' ? '...' + astToJS(el.argument) : astToJS(el)).join(', ') : ''}]`;
+
+    case 'ObjectExpression':
+      return `{${node.properties ? node.properties.map((prop: any) => prop.type === 'SpreadElement' ? '...' + astToJS(prop.argument) : `${prop.computed ? '[' + astToJS(prop.key) + ']' : prop.key.name}: ${astToJS(prop.value)}`).join(', ') : ''}}`;
+
+    case 'TemplateLiteral':
+      return `\`${node.quasis ? node.quasis.map((q: any, i: number) => (q.value?.raw ?? '') + (node.expressions && node.expressions[i] ? '\${' + astToJS(node.expressions[i]) + '}' : '')).join('') : ''}\``;
+
+    case 'ThisExpression':
+      return 'scope';
+
+    case 'BlockStatement':
+      return `{ ${node.body ? node.body.map(astToJS).join('; ') : ''} }`;
+
+    case 'ExpressionStatement':
+      return `${astToJS(node.expression)};`;
+
+    case 'ReturnStatement':
+      return `return ${node.argument ? astToJS(node.argument) : ''};`;
+
+    case 'IfStatement':
+      return `if (${astToJS(node.test)}) ${astToJS(node.consequent)} ${node.alternate ? 'else ' + astToJS(node.alternate) : ''}`;
+
+    case 'ForStatement':
+      return `for (${node.init ? astToJS(node.init) : ''}; ${node.test ? astToJS(node.test) : ''}; ${node.update ? astToJS(node.update) : ''}) ${astToJS(node.body)}`;
+
+    case 'ForOfStatement': {
+      const varName = node.left?.type === 'VariableDeclaration' ? node.left.declarations[0]?.id?.name : node.left?.name;
+      return `for (let ${varName} of ${astToJS(node.right)}) ${astToJS(node.body)}`;
+    }
+
+    case 'ForInStatement': {
+      const varName = node.left?.type === 'VariableDeclaration' ? node.left.declarations[0]?.id?.name : node.left?.name;
+      return `for (let ${varName} in ${astToJS(node.right)}) ${astToJS(node.body)}`;
+    }
+
+    case 'WhileStatement':
+      return `while (${astToJS(node.test)}) ${astToJS(node.body)}`;
+
+    case 'DoWhileStatement':
+      return `do ${astToJS(node.body)} while (${astToJS(node.test)})`;
+
+    case 'VariableDeclaration':
+      return `var ${node.declarations ? node.declarations.map((d: any) => {
+        const name = d.id?.name || astToJS(d.id);
+        const valJS = d.init ? astToJS(d.init) : 'undefined';
+        return `_res_${name} = (typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${valJS}) : ((scope || {})[${JSON.stringify(name)}] = ${valJS}))`;
+      }).join(', ') : ''};`;
+
+    case 'FunctionDeclaration': {
+      const name = node.id?.name;
+      const paramsJS = node.params ? node.params.map((p: any) => p.name || astToJS(p)).join(', ') : '';
+      const bodyJS = astToJS(node.body);
+      const fnCode = `function ${name || ''}(${paramsJS}) ${bodyJS}`;
+      if (name) {
+        return `(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${fnCode}) : ((scope || {})[${JSON.stringify(name)}] = ${fnCode}))`;
+      }
+      return fnCode;
+    }
+
+    case 'ArrowFunctionExpression':
+    case 'FunctionExpression':
+      return `((${node.params ? node.params.map((p: any) => p.name || astToJS(p)).join(', ') : ''}) => ${astToJS(node.body)})`;
+
+    case 'NewExpression':
+      return `new (${astToJS(node.callee)})(${node.arguments ? node.arguments.map(astToJS).join(', ') : ''})`;
+
+    default:
+      return '';
   }
 }

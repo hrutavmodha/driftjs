@@ -1,5 +1,5 @@
 import type { Node as AcornNode } from 'acorn';
-import { SourceRange } from './token.js';
+import type { SourceRange } from './token.js';
 
 /**
  * AST Node Types supported by DriftParser.

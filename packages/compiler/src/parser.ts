@@ -1,7 +1,6 @@
 import { DriftLexer } from './lexer.js';
-import {
+import type {
   Token,
-  TokenType,
   ProgramNode,
   TemplateChildNode,
   ElementNode,
@@ -11,6 +10,9 @@ import {
   ForNode,
   SwitchNode,
   CaseBranch,
+} from '../types/index.js';
+import {
+  TokenType,
   ASTNodeType,
   DriftParserError,
 } from '../types/index.js';

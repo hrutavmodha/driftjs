@@ -1,9 +1,0 @@
-<div class="page dashboard-layout">
-  <h1>Dashboard</h1>
-  <nav class="page-nav">
-    <a href="/dashboard" data-drift-link>Overview</a>
-    <a href="/dashboard/settings" data-drift-link>Settings</a>
-    <a href="/" data-drift-link>&larr; Home</a>
-  </nav>
-  <div class="outlet" data-drift-outlet></div>
-</div>

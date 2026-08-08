@@ -4,17 +4,17 @@
 
   function increment() {
     count++;
-    history = [...history, `Incremented to ${count}`];
+    history = [`Incremented to ${count}`, ...history];
   }
 
   function decrement() {
     count--;
-    history = [...history, `Decremented to ${count}`];
+    history = [`Decremented to ${count}`, ...history];
   }
 
   function reset() {
     count = 0;
-    history = [...history, 'Reset counter to 0'];
+    history = ['Reset counter to 0', ...history];
   }
 
   function clearHistory() {
@@ -24,32 +24,45 @@
 
 <div class="card">
   <div class="header">
-    <div class="logo-badge">DriftJS</div>
-    <h1>Counter App</h1>
-    <p class="subtitle">100% CSP Compliant • SSR & Hydrated Engine</p>
+    <div class="logo-badge">DriftJS VM</div>
+    <h1>Reactive Counter Engine</h1>
+    <p class="subtitle">Bytecode Register VM & AOT Pre-compiled Reactivity</p>
   </div>
 
   <div class="counter-display">
     <span class="label">CURRENT COUNT</span>
     <div class="count-value">{count}</div>
-    @if count % 2 === 0 {
-      <span class="badge badge-even">Even Number</span>
-    }
-    @else {
-      <span class="badge badge-odd">Odd Number</span>
-    }
+    
+    <div class="badge-container">
+      @if count === 0 {
+        <span class="badge badge-zero">Zero State</span>
+      }
+      @else if count > 0 {
+        <span class="badge badge-positive">Positive (+{count})</span>
+      }
+      @else {
+        <span class="badge badge-negative">Negative ({count})</span>
+      }
+
+      @if count % 2 === 0 {
+        <span class="badge badge-even">Even</span>
+      }
+      @else {
+        <span class="badge badge-odd">Odd</span>
+      }
+    </div>
   </div>
 
   <div class="button-group">
-    <button class="btn btn-dec" onclick={decrement}>−</button>
+    <button class="btn btn-dec" onclick={decrement}>− Decrement</button>
     <button class="btn btn-reset" onclick={reset}>Reset</button>
-    <button class="btn btn-inc" onclick={increment}>+</button>
+    <button class="btn btn-inc" onclick={increment}>+ Increment</button>
   </div>
 
   <div class="history-section">
     <div class="history-header">
-      <h2>Event Activity Log</h2>
-      <button class="btn-clear" onclick={clearHistory}>Clear</button>
+      <h2>Activity History Log</h2>
+      <button class="btn-clear" onclick={clearHistory}>Clear Log</button>
     </div>
     <ul class="history-list">
       @for log in history {

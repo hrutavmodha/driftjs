@@ -1,5 +1,0 @@
-<div class="page">
-  <h1>About</h1>
-  <p>Lazily loaded via <code>() => import('./pages/About.drift')</code> — only fetched the first time this route is visited.</p>
-  <a href="/" data-drift-link>&larr; Home</a>
-</div>

@@ -1,3 +1,0 @@
-<div>
-  <p>Settings panel. Its route has a <code>beforeEnter</code> guard that just logs and allows entry — swap in real auth logic here.</p>
-</div>

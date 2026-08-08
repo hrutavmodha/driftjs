@@ -2,7 +2,7 @@ export * from '../types/index.js';
 export { DriftLexer } from './lexer.js';
 export { DriftParser } from './parser.js';
 export { DriftTransformer } from './transformer.js';
-export { DriftGenerator } from './generator.js';
+export { DriftGenerator, astToJS } from './generator.js';
 
 import { DriftLexer } from './lexer.js';
 import { DriftParser } from './parser.js';

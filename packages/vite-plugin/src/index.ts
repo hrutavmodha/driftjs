@@ -48,10 +48,16 @@ function compile(src: string, debug: boolean): CompiledModule {
  * Acorn position fields (`start` / `end`) are stripped to keep the bundle lean.
  */
 function serializeConstants(constants: readonly unknown[]): string {
-  return JSON.stringify(constants, (key, value) => {
-    if (key === 'start' || key === 'end') return undefined;
-    return value;
+  const items = constants.map((c) => {
+    if (c && typeof c === 'object' && '__drift_fn__' in (c as any)) {
+      return (c as any).__drift_fn__;
+    }
+    return JSON.stringify(c, (key, value) => {
+      if (key === 'start' || key === 'end' || key === 'loc') return undefined;
+      return value;
+    });
   });
+  return `[\n  ${items.join(',\n  ')}\n]`;
 }
 
 function generateESM(mod: CompiledModule, filePath: string): string {

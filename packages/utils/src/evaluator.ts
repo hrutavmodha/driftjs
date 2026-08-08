@@ -17,6 +17,17 @@ export function resolveIterable(rawIter: any): any[] {
 export function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?: Set<string>): any {
   if (node === null || node === undefined) return node;
 
+  if (typeof node === 'function') {
+    return node(scope, declaredVars, setScopeValue);
+  }
+
+  if (typeof node === 'object' && node !== null && '__drift_fn__' in node) {
+    if (!node._executableFn) {
+      node._executableFn = new Function('return (' + node.__drift_fn__ + ')')();
+    }
+    return node._executableFn(scope, declaredVars, setScopeValue);
+  }
+
   if (typeof node !== 'object' || !node.type) {
     return node;
   }

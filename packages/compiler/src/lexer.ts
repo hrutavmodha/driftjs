@@ -1,12 +1,14 @@
-import {
+import type {
   Token,
-  TokenType,
   SourceLocation,
-  DriftLexerError,
   DriftLexerState,
-  LexerStateKind,
   LexerStateTransition,
   RawTextTagName,
+} from '../types/index.js';
+import {
+  TokenType,
+  DriftLexerError,
+  LexerStateKind,
 } from '../types/index.js';
 
 /**

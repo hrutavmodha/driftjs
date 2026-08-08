@@ -1,22 +1,22 @@
 {
-  "name": "temp-reactivity-test",
+  "name": "@driftjs/template",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "ssr": "node server.js",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
     "vite": "^8.1.5",
-    "vite-plugin-drift": "file:../packages/vite-plugin"
+    "@driftjs/vite-plugin": "workspace:*"
   },
   "dependencies": {
-    "@driftjs/compiler": "file:../packages/compiler",
-    "@driftjs/router": "file:../packages/router",
-    "@driftjs/runtime": "file:../packages/runtime"
+    "@driftjs/compiler": "workspace:*",
+    "@driftjs/dom": "workspace:*",
+    "@driftjs/ssr": "workspace:*"
   }
 }

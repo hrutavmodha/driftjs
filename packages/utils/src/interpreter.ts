@@ -1,10 +1,24 @@
 import { evaluateExpression } from './evaluator.js';
+import { setScopeValue } from './scope.js';
 
 /**
  * Interprets a block of Acorn AST statements (used by <script> AST and functions).
  */
 export function executeBlockStatement(statements: any, scope: Record<string, any>, declaredVars?: Set<string>): any {
   let result: any;
+  if (!statements) return result;
+
+  if (typeof statements === 'function') {
+    return statements(scope, declaredVars, setScopeValue);
+  }
+
+  if (typeof statements === 'object' && statements !== null && '__drift_fn__' in statements) {
+    if (!statements._executableFn) {
+      statements._executableFn = new Function('return (' + statements.__drift_fn__ + ')')();
+    }
+    return statements._executableFn(scope, declaredVars, setScopeValue);
+  }
+
   if (Array.isArray(statements)) {
     for (const stmt of statements) {
       result = evaluateExpression(stmt, scope, declaredVars);

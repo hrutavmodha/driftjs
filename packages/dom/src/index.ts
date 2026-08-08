@@ -1,4 +1,5 @@
-import { CompiledModule, Opcode, ReactiveBinding, ItemRecord } from "../types/index.js";
+import type { CompiledModule, ReactiveBinding, ItemRecord } from "../types/index.js";
+import { Opcode } from "../types/index.js";
 import { reconcileKeyedList } from "./reconciler.js";
 import { HydrationCursor } from "./hydration.js";
 import {

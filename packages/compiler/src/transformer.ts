@@ -1,10 +1,12 @@
 import * as acorn from 'acorn';
-import {
+import type {
   ProgramNode,
   TemplateChildNode,
   ElementNode,
   InterpolationNode,
   IfNode,
+} from '../types/index.js';
+import {
   ASTNodeType,
   DriftParserError,
 } from '../types/index.js';
