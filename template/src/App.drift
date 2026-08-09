@@ -1,6 +1,8 @@
 <script>
   let count = 0;
   let history = [];
+  let autoRunning = false;
+  let _intervalId = null;
 
   function increment() {
     count++;
@@ -19,6 +21,32 @@
 
   function clearHistory() {
     history = [];
+  }
+
+  function startAutoIncrement() {
+    if (autoRunning) return;
+    autoRunning = true;
+    history = ['▶ Auto-increment started', ...history];
+    _intervalId = setInterval(() => {
+      count++;
+      history = [`Auto → ${count}`, ...history];
+    }, 1000);
+  }
+
+  function stopAutoIncrement() {
+    if (!autoRunning) return;
+    clearInterval(_intervalId);
+    _intervalId = null;
+    autoRunning = false;
+    history = ['■ Auto-increment stopped', ...history];
+  }
+
+  function toggleAuto() {
+    if (autoRunning) {
+      stopAutoIncrement();
+    } else {
+      startAutoIncrement();
+    }
   }
 </script>
 
@@ -56,6 +84,12 @@
   <div class="button-group">
     <button class="btn btn-dec" onclick={decrement}>− Decrement</button>
     <button class="btn btn-reset" onclick={reset}>Reset</button>
+    @if autoRunning {
+      <button class="btn btn-auto btn-auto-stop" onclick={stopAutoIncrement}>■ Stop Auto</button>
+    }
+    @else {
+      <button class="btn btn-auto" onclick={startAutoIncrement}>▶ Auto</button>
+    }
     <button class="btn btn-inc" onclick={increment}>+ Increment</button>
   </div>
 

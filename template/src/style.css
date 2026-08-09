@@ -262,6 +262,32 @@ body {
   color: #ffffff;
 }
 
+.btn-auto {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(234, 88, 12, 0.15) 100%);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fcd34d;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-auto:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.35) 0%, rgba(234, 88, 12, 0.3) 100%);
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.2);
+}
+
+.btn-auto-stop {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.15) 100%);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.btn-auto-stop:hover {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(220, 38, 38, 0.3) 100%);
+  border-color: rgba(239, 68, 68, 0.65);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.2);
+}
+
 .btn-inc {
   background: linear-gradient(135deg, rgba(6, 182, 212, 0.25) 0%, rgba(59, 130, 246, 0.15) 100%);
   border-color: rgba(6, 182, 212, 0.4);

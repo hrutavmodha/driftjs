@@ -722,7 +722,9 @@ export function astToJS(node: any, locals?: Set<string>): string {
 
     case 'BlockStatement': {
       const newLocals = new Set(locals);
-      return `(${node.body ? node.body.map((stmt: any) => astToJS(stmt, newLocals)).filter(Boolean).join(', ') : 'undefined'})`;
+      const stmts = node.body ? node.body.map((stmt: any) => astToJS(stmt, newLocals)).filter(Boolean) : [];
+      // Emit as a real block `{ }` so that `return`/`break`/`continue` inside are valid statements.
+      return `{ ${stmts.join('; ')}; }`;
     }
 
     case 'ExpressionStatement':
@@ -731,8 +733,26 @@ export function astToJS(node: any, locals?: Set<string>): string {
     case 'ReturnStatement':
       return `return ${node.argument ? astToJS(node.argument, locals) : ''}`;
 
-    case 'IfStatement':
-      return `(${astToJS(node.test, locals)} ? ${astToJS(node.consequent, locals)} : ${node.alternate ? astToJS(node.alternate, locals) : 'undefined'})`;
+    case 'BreakStatement':
+      return node.label ? `break ${node.label.name}` : 'break';
+
+    case 'ContinueStatement':
+      return node.label ? `continue ${node.label.name}` : 'continue';
+
+    case 'IfStatement': {
+      // Emit a real if/else statement (not a ternary) so that `return`, `break`,
+      // and `continue` inside branches are valid in their enclosing function/loop.
+      const testJS = astToJS(node.test, locals);
+      const consJS = node.consequent.type === 'BlockStatement'
+        ? astToJS(node.consequent, locals)
+        : `{ ${astToJS(node.consequent, locals)}; }`;
+      const altJS = node.alternate
+        ? ` else ${node.alternate.type === 'BlockStatement' || node.alternate.type === 'IfStatement'
+            ? astToJS(node.alternate, locals)
+            : `{ ${astToJS(node.alternate, locals)}; }`}`
+        : '';
+      return `if (${testJS}) ${consJS}${altJS}`;
+    }
 
     case 'ForStatement': {
       const newLocals = new Set(locals);
