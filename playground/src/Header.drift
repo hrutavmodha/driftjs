@@ -1,1 +1,17 @@
-<h1>Hello, from Header!</h1>
+<script>
+    let { title, subtitle } = props;
+
+    console.log("Title is:", title);
+    console.log("Sub Title is:", subtitle);
+
+    console.log("4 second baad milenge!")
+    
+    setTimeout(() => {
+        title = "Hello, World!"
+        console.log("4 second baad mil gaye. Title =",title)
+    }, 4000)
+
+</script>
+
+<h1>{title}</h1>
+<p>{subtitle}</p>

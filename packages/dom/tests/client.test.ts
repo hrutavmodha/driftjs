@@ -929,5 +929,152 @@ describe('DriftClientVM', () => {
     expect(root.querySelector('h1')?.textContent).toBe('Hello from Header');
     expect(root.querySelector('header')).toBeNull();
   });
+
+  it('passes static and dynamic props into nested child component', () => {
+    const childComponent = {
+      bytecode: new Uint32Array([
+        Opcode.EXEC_SCRIPT, 0,
+        Opcode.CREATE_ELEMENT, 1, 1,
+        Opcode.CREATE_TEXT, 2, 2,
+        Opcode.APPEND_CHILD, 1, 2,
+        Opcode.RETURN, 1,
+      ]),
+      constants: [
+        {
+          type: 'VariableDeclaration',
+          declarations: [
+            {
+              type: 'VariableDeclarator',
+              id: {
+                type: 'ObjectPattern',
+                properties: [
+                  { type: 'Property', key: { type: 'Identifier', name: 'title' }, value: { type: 'Identifier', name: 'title' } },
+                ],
+              },
+              init: { type: 'Identifier', name: 'props' },
+            },
+          ],
+        },
+        'h1',
+        { type: 'Identifier', name: 'title' },
+      ],
+      declaredVars: ['title'],
+      scope: {},
+    };
+
+    const parentComponent = {
+      bytecode: new Uint32Array([
+        Opcode.CREATE_ELEMENT, 0, 0, 1,
+        Opcode.RETURN, 0,
+      ]),
+      constants: [
+        'Header',
+        { __drift_props__: true, title: 'Hello from Prop!' },
+      ],
+      declaredVars: ['Header'],
+      scope: {
+        Header: childComponent,
+      },
+    };
+
+    const vm = new DriftClientVM();
+    const root = vm.execute(parentComponent as any, { document });
+
+    expect(root).toBeDefined();
+    expect(root?.textContent).toContain('Hello from Prop!');
+  });
+
+  it('reactively updates child component props when parent state changes', () => {
+    const childComponent = {
+      bytecode: new Uint32Array([
+        Opcode.CREATE_ELEMENT, 1, 0,
+        Opcode.INTERPOLATE_TEXT, 2, 1,
+        Opcode.APPEND_CHILD, 1, 2,
+        Opcode.RETURN, 1,
+      ]),
+      constants: [
+        'span',
+        { type: 'Identifier', name: 'count' },
+      ],
+      reactiveBindings: [
+        { variable: 'count', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 3 }] },
+      ],
+      declaredVars: ['count'],
+      scope: {},
+    };
+
+    const parentComponent = {
+      bytecode: new Uint32Array([
+        Opcode.CREATE_ELEMENT, 0, 0, 1,
+        Opcode.RETURN, 0,
+      ]),
+      constants: [
+        'CounterDisplay',
+        { __drift_props__: true, count: { type: 'Identifier', name: 'parentCount' } },
+      ],
+      reactiveBindings: [
+        { variable: 'parentCount', positions: [{ opcode: Opcode.CREATE_ELEMENT, pc: 0 }] },
+      ],
+      declaredVars: ['CounterDisplay', 'parentCount'],
+      scope: {
+        CounterDisplay: childComponent,
+        parentCount: 10,
+      },
+    };
+
+    const vm = new DriftClientVM();
+    const root = vm.execute(parentComponent as any, { document }) as HTMLElement;
+
+    expect(root).toBeDefined();
+    expect(root.textContent).toBe('10');
+
+    (vm as any).scope.parentCount = 42;
+    vm.triggerUpdates(new Set(['parentCount']));
+
+    expect(root.textContent).toBe('42');
+  });
+
+  it('supports direct props.key expressions in child templates', () => {
+    const childComponent = {
+      bytecode: new Uint32Array([
+        Opcode.CREATE_ELEMENT, 1, 0,
+        Opcode.INTERPOLATE_TEXT, 2, 1,
+        Opcode.APPEND_CHILD, 1, 2,
+        Opcode.RETURN, 1,
+      ]),
+      constants: [
+        'p',
+        {
+          type: 'MemberExpression',
+          object: { type: 'Identifier', name: 'props' },
+          property: { type: 'Identifier', name: 'message' },
+          computed: false,
+        },
+      ],
+      declaredVars: [],
+      scope: {},
+    };
+
+    const parentComponent = {
+      bytecode: new Uint32Array([
+        Opcode.CREATE_ELEMENT, 0, 0, 1,
+        Opcode.RETURN, 0,
+      ]),
+      constants: [
+        'Child',
+        { __drift_props__: true, message: 'Direct Prop Access' },
+      ],
+      declaredVars: ['Child'],
+      scope: {
+        Child: childComponent,
+      },
+    };
+
+    const vm = new DriftClientVM();
+    const root = vm.execute(parentComponent as any, { document }) as HTMLElement;
+
+    expect(root).toBeDefined();
+    expect(root.textContent).toBe('Direct Prop Access');
+  });
 });
 

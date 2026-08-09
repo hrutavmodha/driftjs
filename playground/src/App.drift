@@ -3,4 +3,5 @@
 </script>
 
 <h1>DriftJS Functionality Playground</h1>
-<Header />
+<Header title="Hello," subtitle="World!" />
+<Header title="How are" subtitle="You?" />

@@ -50,7 +50,7 @@ function generateESM(mod: CompiledModule, filePath: string): string {
 // Do not edit — regenerated on every save / build.
 ${importsHeader}/** @type {import('@driftjs/compiler').CompiledModule} */
 const compiledModule = {
-  bytecode: ${bytecodeJSON},
+  bytecode: new Uint32Array(${bytecodeJSON}),
   constants: ${constantsJSON},
   reactiveBindings: ${bindingsJSON},
   declaredVars: ${declaredVarsJSON},

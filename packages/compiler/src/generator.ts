@@ -145,16 +145,48 @@ export class DriftGenerator {
     }
   }
 
+  private isComponentTag(tagName: string): boolean {
+    if (this.imports.some((imp) => imp.localName === tagName)) return true;
+    const firstChar = tagName.charAt(0);
+    return firstChar !== '' && firstChar === firstChar.toUpperCase() && firstChar !== firstChar.toLowerCase();
+  }
+
   private compileElement(node: ElementNode, targetReg: number): void {
+    const isComp = this.isComponentTag(node.tagName);
     const tagConstIdx = this.addConstant(node.tagName);
-    this.emit(Opcode.CREATE_ELEMENT, targetReg, tagConstIdx);
 
-    for (const attr of node.attributes) {
-      this.compileAttributeNode(attr, targetReg);
-    }
+    if (isComp) {
+      const propsSpec: Record<string, any> = { __drift_props__: true };
+      for (const attr of node.attributes) {
+        if (attr.type === ASTNodeType.Attribute) {
+          if (attr.value === null) {
+            propsSpec[attr.name] = true;
+          } else if (typeof attr.value === 'string') {
+            propsSpec[attr.name] = attr.value;
+          } else if (attr.value.type === ASTNodeType.Interpolation) {
+            propsSpec[attr.name] = attr.value.expression;
+          }
+        }
+      }
+      const propsSpecIdx = this.addConstant(propsSpec);
+      const pc = this.bytecode.length;
+      this.emit(Opcode.CREATE_ELEMENT, targetReg, tagConstIdx, propsSpecIdx);
 
-    for (const child of node.children) {
-      this.compileNode(child, targetReg);
+      for (const attr of node.attributes) {
+        if (attr.type === ASTNodeType.Attribute && attr.value !== null && typeof attr.value !== 'string' && attr.value.type === ASTNodeType.Interpolation) {
+          this.recordBindingPositions(attr.value.expression, pc, Opcode.CREATE_ELEMENT);
+        }
+      }
+    } else {
+      this.emit(Opcode.CREATE_ELEMENT, targetReg, tagConstIdx);
+
+      for (const attr of node.attributes) {
+        this.compileAttributeNode(attr, targetReg);
+      }
+
+      for (const child of node.children) {
+        this.compileNode(child, targetReg);
+      }
     }
   }
 
@@ -340,9 +372,7 @@ export class DriftGenerator {
     if (!node || typeof node !== 'object') return;
     if (node.type === 'VariableDeclaration') {
       for (const decl of node.declarations) {
-        if (decl.id?.type === 'Identifier') {
-          this.declaredVars.add(decl.id.name);
-        }
+        this.extractBindingIdentifiers(decl.id);
       }
     } else if (node.type === 'FunctionDeclaration' && node.id?.type === 'Identifier') {
       this.declaredVars.add(node.id.name);
@@ -359,6 +389,27 @@ export class DriftGenerator {
           this.imports.push({ localName, source, isDefault, importedName });
         }
       }
+    }
+  }
+
+  private extractBindingIdentifiers(idNode: any): void {
+    if (!idNode || typeof idNode !== 'object') return;
+    if (idNode.type === 'Identifier') {
+      this.declaredVars.add(idNode.name);
+    } else if (idNode.type === 'ObjectPattern' && Array.isArray(idNode.properties)) {
+      for (const prop of idNode.properties) {
+        if (prop.type === 'Property') {
+          this.extractBindingIdentifiers(prop.value);
+        } else if (prop.type === 'RestElement') {
+          this.extractBindingIdentifiers(prop.argument);
+        }
+      }
+    } else if (idNode.type === 'ArrayPattern' && Array.isArray(idNode.elements)) {
+      for (const elem of idNode.elements) {
+        if (elem) this.extractBindingIdentifiers(elem);
+      }
+    } else if (idNode.type === 'AssignmentPattern') {
+      this.extractBindingIdentifiers(idNode.left);
     }
   }
 
@@ -594,7 +645,20 @@ export function astToJS(node: any, locals?: Set<string>): string {
     case 'CallExpression': {
       const calleeJS = astToJS(node.callee, locals);
       const argsJS = node.arguments ? node.arguments.map((arg: any) => astToJS(arg, locals)).join(', ') : '';
-      return `(${calleeJS}(${argsJS}))`;
+      const rawCall = `(${calleeJS}(${argsJS}))`;
+      if (
+        node.callee?.type === 'MemberExpression' &&
+        node.callee.object?.type === 'Identifier' &&
+        node.callee.property?.type === 'Identifier'
+      ) {
+        const objName = node.callee.object.name;
+        const methodName = node.callee.property.name;
+        const arrayMutators = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'];
+        if (arrayMutators.includes(methodName) && (!locals || !locals.has(objName))) {
+          return `(() => { const _res = ${rawCall}; if (typeof setScopeValue === 'function') setScopeValue(scope, ${JSON.stringify(objName)}, ('${objName}' in (scope || {}) ? scope[${JSON.stringify(objName)}] : undefined)); return _res; })()`;
+        }
+      }
+      return rawCall;
     }
 
     case 'AssignmentExpression': {
@@ -710,18 +774,59 @@ export function astToJS(node: any, locals?: Set<string>): string {
     case 'DoWhileStatement':
       return `(() => { do ${astToJS(node.body, locals)} while (${astToJS(node.test, locals)}); })()`;
 
+    case 'ObjectPattern': {
+      const propsJS = node.properties ? node.properties.map((p: any) => {
+        if (p.type === 'Property') {
+          const k = p.key?.name || astToJS(p.key, locals);
+          const v = p.value?.name || astToJS(p.value, locals);
+          return k === v ? k : `${k}: ${v}`;
+        }
+        if (p.type === 'RestElement') {
+          return `...${astToJS(p.argument, locals)}`;
+        }
+        return '';
+      }).filter(Boolean).join(', ') : '';
+      return `{ ${propsJS} }`;
+    }
+
     case 'VariableDeclaration': {
       const newLocals = new Set(locals);
-      const decls = node.declarations ? node.declarations.map((d: any) => {
-        const name = d.id?.name || astToJS(d.id, locals);
-        if (d.id?.name) newLocals.add(d.id.name);
-        const valJS = d.init ? astToJS(d.init, locals) : 'undefined';
-        if (locals && d.id?.name && locals.has(d.id.name)) {
-          return `${d.id.name} = ${valJS}`;
+      const declsArr: string[] = [];
+      if (node.declarations) {
+        for (const d of node.declarations) {
+          if (d.id?.type === 'ObjectPattern') {
+            const valJS = d.init ? astToJS(d.init, locals) : 'undefined';
+            for (const prop of (d.id.properties || [])) {
+              if (prop.type === 'Property') {
+                const propKey = prop.key?.name || (typeof prop.key?.value === 'string' ? prop.key.value : astToJS(prop.key, locals));
+                let varName = prop.value?.name;
+                let defaultValJS: string | null = null;
+                if (prop.value?.type === 'AssignmentPattern') {
+                  varName = prop.value.left?.name || astToJS(prop.value.left, locals);
+                  defaultValJS = astToJS(prop.value.right, locals);
+                } else if (!varName) {
+                  varName = astToJS(prop.value, locals);
+                }
+                if (varName) {
+                  newLocals.add(varName);
+                  const expr = `((${valJS} && (${JSON.stringify(propKey)} in ${valJS})) ? ${valJS}[${JSON.stringify(propKey)}] : ${defaultValJS ?? 'undefined'})`;
+                  declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`);
+                }
+              }
+            }
+          } else {
+            const name = d.id?.name || astToJS(d.id, locals);
+            if (d.id?.name) newLocals.add(d.id.name);
+            const valJS = d.init ? astToJS(d.init, locals) : 'undefined';
+            if (locals && d.id?.name && locals.has(d.id.name)) {
+              declsArr.push(`${d.id.name} = ${valJS}`);
+            } else {
+              declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${valJS}) : ((scope || {})[${JSON.stringify(name)}] = ${valJS}))`);
+            }
+          }
         }
-        return `(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${valJS}) : ((scope || {})[${JSON.stringify(name)}] = ${valJS}))`;
-      }).filter(Boolean).join(', ') : 'undefined';
-      return `(${decls})`;
+      }
+      return `(${declsArr.filter(Boolean).join(', ') || 'undefined'})`;
     }
 
     case 'FunctionDeclaration': {

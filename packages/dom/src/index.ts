@@ -16,6 +16,7 @@ import {
   executeBlockStatement,
   resolveIterable,
   resolveComponentModule,
+  evaluatePropsSpec,
 } from "@driftjs/utils";
 
 
@@ -48,6 +49,49 @@ export class DriftClientVM {
   private delegatedEvents = new Set<string>();
   private eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
   private cursor: HydrationCursor | null = null;
+  private childVMs = new WeakMap<Node, { vm: DriftClientVM; scope: Record<string, any>; propsSpec: any }>();
+  private pendingDirtyVars = new Set<string>();
+  private isUpdateScheduled = false;
+
+  public markDirty(varName: string): void {
+    this.pendingDirtyVars.add(varName);
+    if (!this.isUpdateScheduled) {
+      this.isUpdateScheduled = true;
+      queueMicrotask(() => this.flushUpdates());
+    }
+  }
+
+  private flushUpdates(): void {
+    this.isUpdateScheduled = false;
+    if (this.pendingDirtyVars.size === 0) return;
+    const dirty = new Set(this.pendingDirtyVars);
+    this.pendingDirtyVars.clear();
+    this.triggerUpdates(dirty);
+  }
+
+  private updateChildComponentProps(childScope: Record<string, any>, childVM: DriftClientVM, newPropsObj: Record<string, any>): void {
+    const oldProps = childScope.props || {};
+    childScope.props = newPropsObj;
+
+    const dirtyPropVars = new Set<string>();
+
+    for (const key of Object.keys(newPropsObj)) {
+      if (key === '__drift_props__') continue;
+      const newVal = newPropsObj[key];
+      const oldVal = oldProps[key];
+      if (newVal !== oldVal) {
+        setScopeValue(childScope, key, newVal);
+        dirtyPropVars.add(key);
+      }
+    }
+
+    if (dirtyPropVars.size > 0) {
+      dirtyPropVars.add('props');
+      if (childVM) {
+        childVM.triggerUpdates(dirtyPropVars);
+      }
+    }
+  }
 
   private ensureEventDelegated(eventName: string): void {
     if (this.delegatedEvents.has(eventName)) return;
@@ -93,7 +137,8 @@ export class DriftClientVM {
    */
   private runSubModule(
     rawSubMod: { bytecode: readonly number[]; constants: readonly any[] },
-    scope: Record<string, any>
+    scope: Record<string, any>,
+    props: Record<string, any> = {}
   ): Node | null {
     const subMod = (resolveComponentModule(rawSubMod) || rawSubMod) as CompiledModule;
     const savedRegisters = [...this.registers];
@@ -106,7 +151,9 @@ export class DriftClientVM {
       this.declaredVars = new Set(subMod.declaredVars);
     }
 
-    const subScope = subMod.scope && Object.keys(subMod.scope).length > 0 ? { ...subMod.scope, ...scope } : scope;
+    const subScope = subMod.scope && Object.keys(subMod.scope).length > 0
+      ? Object.assign(Object.create(scope), subMod.scope, { props })
+      : (Object.keys(props).length > 0 ? Object.assign(Object.create(scope), { props }) : scope);
     const result = this.executeLoop(subMod.bytecode, subMod.constants, subScope);
 
     this.registers.fill(undefined);
@@ -138,17 +185,30 @@ export class DriftClientVM {
 
         case Opcode.CREATE_ELEMENT: {
           const dstReg = bytecode[pc + 1]!;
-          const tag = String(constants[bytecode[pc + 2]!]);
+          const tagConstIdx = bytecode[pc + 2]!;
+          const tag = String(constants[tagConstIdx]);
+          const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
+          const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
+          const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
+          const propsSpecIdx = isPropsSpec ? maybePropsIdx : 0xFF;
+
           const rawComp = (scope && tag in scope) ? scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
           const compMod = resolveComponentModule(rawComp);
           if (compMod) {
-            const compNode = this.runSubModule(compMod, scope);
-            this.setRegister(dstReg, compNode);
+            const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
+            const propsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
+            const childVM = new DriftClientVM();
+            const compNode = childVM.execute(compMod, { scope: { props: propsObj, ...propsObj, ...scope }, document: doc });
+            this.updateChildComponentProps(childVM.scope, childVM, propsObj);
+            if (compNode) {
+              this.childVMs.set(compNode, { vm: childVM, scope: childVM.scope, propsSpec });
+              this.setRegister(dstReg, compNode);
+            }
           } else {
             const elem = this.cursor ? this.cursor.claimElement(tag, doc) : doc.createElement(tag);
             this.setRegister(dstReg, elem);
           }
-          pc += 3;
+          pc += isPropsSpec ? 4 : 3;
           break;
         }
 
@@ -676,6 +736,12 @@ export class DriftClientVM {
     }
 
     const scope: Record<string, any> = { ...module.scope, ...options.scope };
+    Object.defineProperty(scope, '__drift_mark_dirty__', {
+      value: (name: string) => this.markDirty(name),
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
     this.scope = scope;
     this.module = module;
     // Prefer the explicit declaredVars list emitted by the generator (contains ALL script-declared
@@ -731,6 +797,22 @@ export class DriftClientVM {
         }
         break;
       }
+      case Opcode.CREATE_ELEMENT: {
+        const dstReg = bytecode[pc + 1]!;
+        const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
+        const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
+        const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
+        if (isPropsSpec) {
+          const compNode = this.getRegister(dstReg);
+          const childEntry = compNode ? this.childVMs.get(compNode) : null;
+          if (childEntry) {
+            const { vm: childVM, scope: childScope, propsSpec } = childEntry;
+            const newPropsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
+            this.updateChildComponentProps(childScope, childVM, newPropsObj);
+          }
+        }
+        break;
+      }
     }
   }
 
@@ -741,13 +823,17 @@ export class DriftClientVM {
   public triggerUpdates(changedVars: Set<string>): void {
     if (changedVars.size === 0) return;
 
-    // 1. Patch INTERPOLATE_TEXT / SET_ATTR in-place (existing logic)
+    // 1. Patch INTERPOLATE_TEXT / SET_ATTR / CREATE_ELEMENT in-place (existing logic)
     if (this.module?.reactiveBindings) {
       for (const binding of this.module.reactiveBindings) {
         if (!changedVars.has(binding.variable)) continue;
 
         for (const pos of binding.positions) {
-          if (pos.opcode === Opcode.INTERPOLATE_TEXT || pos.opcode === Opcode.SET_ATTR) {
+          if (
+            pos.opcode === Opcode.INTERPOLATE_TEXT ||
+            pos.opcode === Opcode.SET_ATTR ||
+            pos.opcode === Opcode.CREATE_ELEMENT
+          ) {
             this.updateAt(pos.pc, this.module, { scope: this.scope });
           }
         }

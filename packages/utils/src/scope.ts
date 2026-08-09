@@ -3,14 +3,22 @@
  */
 export function setScopeValue(targetScope: Record<string, any>, name: string, val: any): void {
   let curr = targetScope;
+  let setOn = targetScope;
   while (curr && curr !== Object.prototype) {
     if (Object.prototype.hasOwnProperty.call(curr, name)) {
       curr[name] = val;
-      return;
+      setOn = curr;
+      break;
     }
     curr = Object.getPrototypeOf(curr);
   }
-  targetScope[name] = val;
+  if (setOn === targetScope && !Object.prototype.hasOwnProperty.call(targetScope, name)) {
+    targetScope[name] = val;
+  }
+
+  if (targetScope && typeof (targetScope as any).__drift_mark_dirty__ === 'function') {
+    (targetScope as any).__drift_mark_dirty__(name);
+  }
 }
 
 /**

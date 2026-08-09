@@ -124,4 +124,26 @@ describe('DriftGenerator', () => {
     });
     expect(module.declaredVars).toContain('Header');
   });
+
+  it('generates propsSpec for component elements with static and dynamic attributes', () => {
+    const src = `<script>import Header from "./Header.drift"; let count = 5;</script><div><Header title="Drift" count={count} /></div>`;
+    const module = compile(src);
+
+    expect(module.declaredVars).toContain('Header');
+    expect(module.declaredVars).toContain('count');
+
+    const propsSpec = module.constants.find(
+      (c) => typeof c === 'object' && c !== null && 'title' in c && 'count' in c
+    );
+    expect(propsSpec).toBeDefined();
+    expect((propsSpec as any).title).toBe('Drift');
+  });
+
+  it('extracts destructured prop variables from script block', () => {
+    const src = `<script>let { title = "Default", count = 0 } = props;</script><h1>{title}</h1>`;
+    const module = compile(src);
+
+    expect(module.declaredVars).toContain('title');
+    expect(module.declaredVars).toContain('count');
+  });
 });

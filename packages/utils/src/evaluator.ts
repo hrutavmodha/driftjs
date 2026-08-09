@@ -83,3 +83,18 @@ export function resolveComponentModule(raw: any): any | null {
   if (raw.compiledModule) return resolveComponentModule(raw.compiledModule);
   return null;
 }
+
+/**
+ * Evaluates a props specification object (mapping prop keys to static values or expression ASTs)
+ * against a VM scope, returning a plain JavaScript props object.
+ */
+export function evaluatePropsSpec(propsSpec: Record<string, any> | null | undefined, scope: Record<string, any>, declaredVars?: Set<string>): Record<string, any> {
+  if (!propsSpec || typeof propsSpec !== 'object') return {};
+  const res: Record<string, any> = {};
+  for (const key of Object.keys(propsSpec)) {
+    if (key === '__drift_props__') continue;
+    const rawVal = propsSpec[key];
+    res[key] = evaluateExpression(rawVal, scope, declaredVars);
+  }
+  return res;
+}

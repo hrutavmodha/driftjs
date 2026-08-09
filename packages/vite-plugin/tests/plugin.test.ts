@@ -56,7 +56,7 @@ describe('driftPlugin – emitted ESM structure', () => {
   it('compiledModule has bytecode and constants arrays', () => {
     const plugin = makePlugin();
     const code = transform(plugin, '<div>test</div>')!;
-    expect(code).toMatch(/bytecode:\s*\[/);
+    expect(code).toMatch(/bytecode:\s*(new Uint32Array\(|\[)/);
     expect(code).toMatch(/constants:\s*\[/);
   });
 });
