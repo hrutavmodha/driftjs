@@ -28,16 +28,33 @@ function generateESM(mod: CompiledModule, filePath: string): string {
   const bindingsJSON = JSON.stringify(mod.reactiveBindings ?? []);
   const declaredVarsJSON = JSON.stringify(mod.declaredVars ?? []);
 
+  const importStatements: string[] = [];
+  const scopeEntries: string[] = [];
+
+  if (mod.imports && mod.imports.length > 0) {
+    for (const imp of mod.imports) {
+      if (imp.isDefault) {
+        importStatements.push(`import ${imp.localName} from ${JSON.stringify(imp.source)};`);
+      } else if (imp.importedName) {
+        importStatements.push(`import { ${imp.importedName} as ${imp.localName} } from ${JSON.stringify(imp.source)};`);
+      }
+      scopeEntries.push(imp.localName);
+    }
+  }
+
+  const importsHeader = importStatements.length > 0 ? importStatements.join('\n') + '\n\n' : '';
+  const scopeObj = scopeEntries.length > 0 ? `{\n    ${scopeEntries.join(',\n    ')}\n  }` : '{}';
+
   return `\
 // [DriftJS] Auto-generated from: ${filePath}
 // Do not edit — regenerated on every save / build.
-
-/** @type {import('@driftjs/compiler').CompiledModule} */
+${importsHeader}/** @type {import('@driftjs/compiler').CompiledModule} */
 const compiledModule = {
   bytecode: ${bytecodeJSON},
   constants: ${constantsJSON},
   reactiveBindings: ${bindingsJSON},
   declaredVars: ${declaredVarsJSON},
+  scope: ${scopeObj},
 };
 
 export default compiledModule;

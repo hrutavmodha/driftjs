@@ -11,6 +11,7 @@ import type {
   SwitchNode,
   CompiledModule,
   ReactiveBinding,
+  ImportSpec,
 } from '../types/index.js';
 import {
   ASTNodeType,
@@ -28,6 +29,7 @@ export class DriftGenerator {
   private constants: any[] = [];
   private nextRegisterId = 0;
   private declaredVars: Set<string> = new Set();
+  private imports: ImportSpec[] = [];
   private bindingPositions: Map<string, { pc: number; opcode: Opcode }[]> = new Map();
 
   constructor(ast: ProgramNode) {
@@ -43,6 +45,7 @@ export class DriftGenerator {
     this.constants = [];
     this.nextRegisterId = 0;
     this.declaredVars = new Set();
+    this.imports = [];
     this.bindingPositions = new Map();
 
     this.collectDeclaredVars(this.ast.body);
@@ -56,6 +59,7 @@ export class DriftGenerator {
         constants: this.constants,
         reactiveBindings: this.buildReactiveBindings(),
         declaredVars: [...this.declaredVars],
+        imports: this.imports,
       };
     }
 
@@ -77,6 +81,7 @@ export class DriftGenerator {
       constants: this.constants,
       reactiveBindings: this.buildReactiveBindings(),
       declaredVars: [...this.declaredVars],
+      imports: this.imports,
     };
   }
 
@@ -111,6 +116,17 @@ export class DriftGenerator {
     }
   }
 
+  private filterRuntimeScriptAst(content: any): any {
+    if (Array.isArray(content)) {
+      const filtered = content.filter((stmt: any) => stmt && stmt.type !== 'ImportDeclaration');
+      return filtered.length === 1 ? filtered[0] : filtered;
+    }
+    if (content && typeof content === 'object' && content.type === 'ImportDeclaration') {
+      return null;
+    }
+    return content;
+  }
+
   /**
    * Emits an EXEC_SCRIPT instruction for a <script> element.
    * The script body AST is stored in the constant pool and executed by the runtime
@@ -120,8 +136,11 @@ export class DriftGenerator {
   private compileScriptElement(node: ElementNode): void {
     for (const child of node.children) {
       if (child.type === ASTNodeType.Text && typeof child.content === 'object' && child.content !== null) {
-        const scriptBodyIdx = this.addConstant(child.content);
-        this.emit(Opcode.EXEC_SCRIPT, scriptBodyIdx);
+        const filtered = this.filterRuntimeScriptAst(child.content);
+        if (filtered !== null && (!Array.isArray(filtered) || filtered.length > 0)) {
+          const scriptBodyIdx = this.addConstant(filtered);
+          this.emit(Opcode.EXEC_SCRIPT, scriptBodyIdx);
+        }
       }
     }
   }
@@ -327,6 +346,19 @@ export class DriftGenerator {
       }
     } else if (node.type === 'FunctionDeclaration' && node.id?.type === 'Identifier') {
       this.declaredVars.add(node.id.name);
+    } else if (node.type === 'ImportDeclaration' && Array.isArray(node.specifiers)) {
+      const source = typeof node.source?.value === 'string' ? node.source.value : '';
+      for (const spec of node.specifiers) {
+        if (spec.local?.type === 'Identifier') {
+          const localName = spec.local.name;
+          this.declaredVars.add(localName);
+          const isDefault = spec.type === 'ImportDefaultSpecifier';
+          const importedName = spec.type === 'ImportSpecifier' && spec.imported?.type === 'Identifier'
+            ? spec.imported.name
+            : undefined;
+          this.imports.push({ localName, source, isDefault, importedName });
+        }
+      }
     }
   }
 
@@ -779,6 +811,10 @@ export function astToJS(node: any, locals?: Set<string>): string {
       return `new (${astToJS(node.callee, locals)})(${node.arguments ? node.arguments.map((a: any) => astToJS(a, locals)).join(', ') : ''})`;
 
     case 'EmptyStatement':
+    case 'ImportDeclaration':
+    case 'ImportSpecifier':
+    case 'ImportDefaultSpecifier':
+    case 'ImportNamespaceSpecifier':
       return '';
 
     case 'ParenthesizedExpression':

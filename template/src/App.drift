@@ -24,9 +24,9 @@
 
 <div class="card">
   <div class="header">
-    <div class="logo-badge">DriftJS VM</div>
-    <h1>Reactive Counter Engine</h1>
-    <p class="subtitle">Bytecode Register VM & AOT Pre-compiled Reactivity</p>
+    <div class="logo-badge">Powered by DriftJS</div>
+    <p class="subtitle">A Register-based Virtual Machine</p>
+    <h1>Basic Counter Application</h1>
   </div>
 
   <div class="counter-display">

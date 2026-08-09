@@ -45,6 +45,10 @@ export function evaluateExpression(node: any, scope: Record<string, any>, declar
   }
 
   const codeStr = astToJS(node);
+  if (!codeStr || codeStr.trim().length === 0) {
+    return undefined;
+  }
+
   let executableFn: any;
   try {
     executableFn = new Function('scope', 'declaredVars', 'setScopeValue', 'return (' + codeStr + ')');
@@ -65,4 +69,17 @@ export function resolveValue(val: any, scope: Record<string, any>, declaredVars?
     return evaluateExpression(val, scope, declaredVars);
   }
   return val;
+}
+
+/**
+ * Safely unwraps an imported component module (handling ESM default exports,
+ * CompiledModule wrappers, and program objects).
+ */
+export function resolveComponentModule(raw: any): any | null {
+  if (!raw || typeof raw !== 'object') return null;
+  if (Array.isArray(raw.bytecode) || ArrayBuffer.isView(raw.bytecode)) return raw;
+  if (raw.program && (Array.isArray(raw.program.bytecode) || ArrayBuffer.isView(raw.program.bytecode))) return raw.program;
+  if (raw.default) return resolveComponentModule(raw.default);
+  if (raw.compiledModule) return resolveComponentModule(raw.compiledModule);
+  return null;
 }

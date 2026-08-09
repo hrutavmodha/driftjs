@@ -15,6 +15,7 @@ import {
   evaluateExpression,
   executeBlockStatement,
   resolveIterable,
+  resolveComponentModule,
 } from "@driftjs/utils";
 
 
@@ -91,19 +92,27 @@ export class DriftClientVM {
    * declaredVars, doc, and reactiveRegions. Used by REACTIVE_IF / REACTIVE_FOR handlers.
    */
   private runSubModule(
-    subMod: { bytecode: readonly number[]; constants: readonly any[] },
+    rawSubMod: { bytecode: readonly number[]; constants: readonly any[] },
     scope: Record<string, any>
   ): Node | null {
+    const subMod = (resolveComponentModule(rawSubMod) || rawSubMod) as CompiledModule;
     const savedRegisters = [...this.registers];
     const savedModule = this.module;
-    this.registers.fill(undefined);
-    this.module = subMod as CompiledModule;
+    const savedDeclaredVars = this.declaredVars;
 
-    const result = this.executeLoop(subMod.bytecode, subMod.constants, scope);
+    this.registers.fill(undefined);
+    this.module = subMod;
+    if (subMod.declaredVars && subMod.declaredVars.length > 0) {
+      this.declaredVars = new Set(subMod.declaredVars);
+    }
+
+    const subScope = subMod.scope && Object.keys(subMod.scope).length > 0 ? { ...subMod.scope, ...scope } : scope;
+    const result = this.executeLoop(subMod.bytecode, subMod.constants, subScope);
 
     this.registers.fill(undefined);
     for (let i = 0; i < savedRegisters.length; i++) this.registers[i] = savedRegisters[i];
     this.module = savedModule;
+    this.declaredVars = savedDeclaredVars;
     return result;
   }
 
@@ -130,8 +139,15 @@ export class DriftClientVM {
         case Opcode.CREATE_ELEMENT: {
           const dstReg = bytecode[pc + 1]!;
           const tag = String(constants[bytecode[pc + 2]!]);
-          const elem = this.cursor ? this.cursor.claimElement(tag, doc) : doc.createElement(tag);
-          this.setRegister(dstReg, elem);
+          const rawComp = (scope && tag in scope) ? scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
+          const compMod = resolveComponentModule(rawComp);
+          if (compMod) {
+            const compNode = this.runSubModule(compMod, scope);
+            this.setRegister(dstReg, compNode);
+          } else {
+            const elem = this.cursor ? this.cursor.claimElement(tag, doc) : doc.createElement(tag);
+            this.setRegister(dstReg, elem);
+          }
           pc += 3;
           break;
         }
@@ -643,7 +659,8 @@ export class DriftClientVM {
     }
   }
 
-  public execute(module: CompiledModule, options: VMExecutionOptions = {}): Node | null {
+  public execute(rawModule: CompiledModule, options: VMExecutionOptions = {}): Node | null {
+    const module = (resolveComponentModule(rawModule) || rawModule) as CompiledModule;
     const doc = options.document || (typeof document !== 'undefined' ? document : null);
     if (!doc) {
       throw new Error('DriftClientVM requires a DOM Document context to execute.');
@@ -658,7 +675,7 @@ export class DriftClientVM {
       this.cursor = null;
     }
 
-    const scope: Record<string, any> = { ...options.scope };
+    const scope: Record<string, any> = { ...module.scope, ...options.scope };
     this.scope = scope;
     this.module = module;
     // Prefer the explicit declaredVars list emitted by the generator (contains ALL script-declared

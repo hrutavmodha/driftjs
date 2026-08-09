@@ -898,5 +898,36 @@ describe('DriftClientVM', () => {
       expect(container.querySelector('.sw-res')?.textContent).toBe('OUTER-B');
     });
   });
+
+  it('renders nested components correctly when tag matches scope (raw or ESM default)', () => {
+    const childModule: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.CREATE_TEXT, 1, 1,
+        Opcode.APPEND_CHILD, 0, 1,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['h1', 'Hello from Header'],
+    };
+
+    const parentModule: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.CREATE_ELEMENT, 1, 1,
+        Opcode.APPEND_CHILD, 0, 1,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['div', 'Header'],
+      scope: {
+        Header: { default: childModule },
+      },
+    };
+
+    const vmInstance = new DriftClientVM();
+    const root = vmInstance.execute(parentModule, { document }) as HTMLElement;
+    expect(root.tagName).toBe('DIV');
+    expect(root.querySelector('h1')?.textContent).toBe('Hello from Header');
+    expect(root.querySelector('header')).toBeNull();
+  });
 });
 

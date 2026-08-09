@@ -109,4 +109,19 @@ describe('DriftGenerator', () => {
     expect(module.bytecode.length).toBeGreaterThan(0);
     expect(module.constants.length).toBeGreaterThan(0);
   });
+
+  it('extracts imports metadata from script block', () => {
+    const src = `<script>import Header from "./Header.drift";</script><div><Header /></div>`;
+    const module = compile(src);
+
+    expect(module.imports).toBeDefined();
+    expect(module.imports).toHaveLength(1);
+    expect(module.imports![0]).toEqual({
+      localName: 'Header',
+      source: './Header.drift',
+      isDefault: true,
+      importedName: undefined,
+    });
+    expect(module.declaredVars).toContain('Header');
+  });
 });

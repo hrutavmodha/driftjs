@@ -31,6 +31,13 @@ export interface ReactiveBinding {
   readonly positions: readonly { readonly pc: number; readonly opcode: Opcode }[];
 }
 
+export interface ImportSpec {
+  readonly localName: string;
+  readonly source: string;
+  readonly isDefault: boolean;
+  readonly importedName?: string;
+}
+
 /**
  * Output module emitted by DriftGenerator.
  */
@@ -40,6 +47,10 @@ export interface CompiledModule {
   readonly reactiveBindings?: readonly ReactiveBinding[];
   /** All variable names declared in the component's <script> block. Used by the runtime for change-detection. */
   readonly declaredVars?: readonly string[];
+  /** Import statements declared in the component's <script> block. */
+  readonly imports?: readonly ImportSpec[];
+  /** Component scope containing imported components or scope bindings. */
+  readonly scope?: Record<string, any>;
 }
 
 /**

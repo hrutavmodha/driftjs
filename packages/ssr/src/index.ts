@@ -2,6 +2,7 @@ import { type CompiledModule, Opcode } from "@driftjs/compiler";
 import {
   evaluateExpression,
   executeBlockStatement,
+  resolveComponentModule,
 } from "@driftjs/utils";
 import type { SSRExecutionOptions, ServerNode } from "../types/index.js";
 
@@ -46,8 +47,9 @@ export class DriftServerVM {
     return this.registers[index];
   }
 
-  public execute(module: CompiledModule, options: SSRExecutionOptions = {}): ServerNode | null {
-    this.scope = options.scope ? Object.create(options.scope) : {};
+  public execute(rawModule: CompiledModule, options: SSRExecutionOptions = {}): ServerNode | null {
+    const module = (resolveComponentModule(rawModule) || rawModule) as CompiledModule;
+    this.scope = { ...module.scope, ...options.scope };
     this.declaredVars = new Set(module.declaredVars ?? []);
     this.registers.fill(null as any);
 
@@ -68,12 +70,20 @@ export class DriftServerVM {
           const dstReg = bytecode[pc + 1]!;
           const tagIdx = bytecode[pc + 2]!;
           const tag = String(constants[tagIdx]);
-          this.setRegister(dstReg, {
-            type: 'element',
-            tag,
-            attrs: new Map(),
-            children: [],
-          });
+          const rawComp = (this.scope && tag in this.scope) ? this.scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
+          const compMod = resolveComponentModule(rawComp);
+          if (compMod) {
+            const subVm = new DriftServerVM();
+            const compNode = subVm.execute(compMod, { scope: this.scope });
+            if (compNode) this.setRegister(dstReg, compNode);
+          } else {
+            this.setRegister(dstReg, {
+              type: 'element',
+              tag,
+              attrs: new Map(),
+              children: [],
+            });
+          }
           pc += 3;
           break;
         }
