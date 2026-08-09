@@ -5,6 +5,7 @@ import type {
   ElementNode,
   InterpolationNode,
   IfNode,
+  SwitchNode,
 } from '../types/index.js';
 import {
   ASTNodeType,
@@ -110,7 +111,7 @@ export class DriftTransformer {
           : node.iterable,
         key: typeof node.key === 'string' && node.key.trim().length > 0
           ? acorn.parseExpressionAt(node.key, 0, { ecmaVersion: 'latest' })
-          : node.key,
+          : (node.key ?? null),
         body: this.transformChildren(node.body),
       };
     }
@@ -131,8 +132,8 @@ export class DriftTransformer {
       : node.discriminant;
 
     const buildIfChain = (index: number): TemplateChildNode | TemplateChildNode[] | null => {
-      if (index >= node.cases.length) return null;
       const c = node.cases[index];
+      if (!c) return null;
       if (c.expression === null) {
         return this.transformChildren(c.body);
       }

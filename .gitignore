@@ -7,3 +7,4 @@ examples/
 *.js
 .agents/
 js-framework-benchmark/
+temp/

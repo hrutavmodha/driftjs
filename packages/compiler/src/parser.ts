@@ -1,6 +1,7 @@
 import { DriftLexer } from './lexer.js';
 import type {
   Token,
+  TokenSource,
   ProgramNode,
   TemplateChildNode,
   ElementNode,
@@ -16,10 +17,6 @@ import {
   ASTNodeType,
   DriftParserError,
 } from '../types/index.js';
-
-interface TokenSource {
-  nextToken(): Token;
-}
 
 class ArrayTokenSource implements TokenSource {
   private readonly tokens: readonly Token[];

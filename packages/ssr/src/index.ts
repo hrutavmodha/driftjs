@@ -3,18 +3,10 @@ import {
   evaluateExpression,
   executeBlockStatement,
 } from "@driftjs/utils";
+import type { SSRExecutionOptions, ServerNode } from "../types/index.js";
 
-export interface SSRExecutionOptions {
-  readonly scope?: Record<string, any>;
-}
+export * from "../types/index.js";
 
-export interface ServerNode {
-  type: "element" | "text" | "comment" | "fragment";
-  tag?: string;
-  attrs?: Map<string, string | boolean | null>;
-  children: (ServerNode | string)[];
-  content?: string;
-}
 
 /**
  * Escapes special HTML characters to prevent XSS.

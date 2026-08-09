@@ -1,4 +1,11 @@
-import type { CompiledModule, ReactiveBinding, ItemRecord } from "../types/index.js";
+import type {
+  CompiledModule,
+  ReactiveBinding,
+  ItemRecord,
+  VMExecutionOptions,
+  LoopFrame,
+  ReactiveRegion,
+} from "../types/index.js";
 import { Opcode } from "../types/index.js";
 import { reconcileKeyedList } from "./reconciler.js";
 import { HydrationCursor } from "./hydration.js";
@@ -10,24 +17,6 @@ import {
   resolveIterable,
 } from "@driftjs/utils";
 
-export interface VMExecutionOptions {
-  readonly scope?: Record<string, any>;
-  readonly document?: Document;
-  readonly container?: HTMLElement;
-  readonly hydrate?: boolean;
-}
-
-interface LoopFrame {
-  readonly pc: number;
-  index: number;
-  readonly items: any[];
-}
-
-/** A self-contained reactive region that re-renders its DOM subtree when deps change. */
-interface ReactiveRegion {
-  readonly deps: ReadonlySet<string>;
-  readonly reRender: () => void;
-}
 
 /**
  * Removes all DOM nodes situated strictly between startAnchor and endAnchor comments.

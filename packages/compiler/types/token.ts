@@ -51,3 +51,11 @@ export interface Token {
   readonly value: string;
   readonly loc: SourceRange;
 }
+
+/**
+ * Token source interface for parser consumption.
+ */
+export interface TokenSource {
+  nextToken(): Token;
+}
+

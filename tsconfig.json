@@ -2,21 +2,21 @@
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     "paths": {
-      "@driftjs/compiler": ["./packages/compiler/index.ts"],
-      "@driftjs/compiler/src": ["./packages/compiler/src/index.ts"],
-      "@driftjs/compiler/lexer": ["./packages/compiler/src/lexer/index.ts"],
-      "@driftjs/compiler/parser": ["./packages/compiler/src/parser/index.ts"],
-      "@driftjs/compiler/analyzer": ["./packages/compiler/src/analyzer/index.ts"],
-      "@driftjs/compiler/generator": ["./packages/compiler/src/generator/index.ts"],
+      "@driftjs/compiler": ["./packages/compiler/src/index.ts"],
       "@driftjs/compiler/types": ["./packages/compiler/types/index.ts"],
       "@driftjs/compiler/*": ["./packages/compiler/*"],
       "@driftjs/dom": ["./packages/dom/src/index.ts"],
-      "@driftjs/dom/*": ["./packages/dom/src/*"],
-      "@driftjs/vite-plugin": ["./packages/vite-plugin/index.ts"],
-      "@driftjs/vite-plugin/src": ["./packages/vite-plugin/src/index.ts"],
+      "@driftjs/dom/types": ["./packages/dom/types/index.ts"],
+      "@driftjs/dom/*": ["./packages/dom/*"],
+      "@driftjs/ssr": ["./packages/ssr/src/index.ts"],
+      "@driftjs/ssr/types": ["./packages/ssr/types/index.ts"],
+      "@driftjs/ssr/*": ["./packages/ssr/*"],
+      "@driftjs/utils": ["./packages/utils/src/index.ts"],
+      "@driftjs/utils/types": ["./packages/utils/types/index.ts"],
+      "@driftjs/utils/*": ["./packages/utils/*"],
+      "@driftjs/vite-plugin": ["./packages/vite-plugin/src/index.ts"],
       "@driftjs/vite-plugin/types": ["./packages/vite-plugin/types/index.ts"],
-      "@driftjs/vite-plugin/*": ["./packages/vite-plugin/*"],
-      "vite-plugin-drift": ["./packages/vite-plugin/index.ts"]
+      "@driftjs/vite-plugin/*": ["./packages/vite-plugin/*"]
     },
 
     // Environment Settings
