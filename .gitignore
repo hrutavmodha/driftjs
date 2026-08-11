@@ -8,3 +8,4 @@ examples/
 .agents/
 js-framework-benchmark/
 temp/
+*.vsix

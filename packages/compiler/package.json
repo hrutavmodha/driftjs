@@ -7,8 +7,13 @@
     "build": "vite build",
     "test": "vitest run"
   },
+  "types": "./src/index.ts",
   "exports": {
-    ".": "./dist/index-es.js"
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index-es.js",
+      "default": "./dist/index-es.js"
+    }
   },
   "license": "MIT",
   "dependencies": {

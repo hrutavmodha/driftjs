@@ -1,0 +1,64 @@
+{
+  "Drift If Directive": {
+    "prefix": "@if",
+    "body": [
+      "@if ${1:condition} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "DriftJS @if conditional block"
+  },
+  "Drift Else If Directive": {
+    "prefix": "@elseif",
+    "body": [
+      "@else if ${1:condition} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "DriftJS @else if conditional block"
+  },
+  "Drift Else Directive": {
+    "prefix": "@else",
+    "body": [
+      "@else {",
+      "\t$0",
+      "}"
+    ],
+    "description": "DriftJS @else block"
+  },
+  "Drift For Loop Directive": {
+    "prefix": "@for",
+    "body": [
+      "@for (${1:item}, ${2:index}) in ${3:items} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "DriftJS @for loop block"
+  },
+  "Drift Switch Directive": {
+    "prefix": "@switch",
+    "body": [
+      "@switch ${1:status} {",
+      "\t@case ${2:value} {",
+      "\t\t$0",
+      "\t}",
+      "\t@default {",
+      "\t\t",
+      "\t}",
+      "}"
+    ],
+    "description": "DriftJS @switch control block"
+  },
+  "Drift Script Tag": {
+    "prefix": "script",
+    "body": [
+      "<script>",
+      "\tlet ${1:count} = 0;",
+      "\tfunction ${2:handleClick}() {",
+      "\t\t$0",
+      "\t}",
+      "</script>"
+    ],
+    "description": "DriftJS SFC logic <script> block"
+  }
+}

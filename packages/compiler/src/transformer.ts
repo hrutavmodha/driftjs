@@ -12,6 +12,16 @@ import {
   DriftParserError,
 } from '../types/index.js';
 
+function cloneAstNode<T>(node: T): T {
+  if (node === null || typeof node !== 'object') return node;
+  if (Array.isArray(node)) return node.map(cloneAstNode) as any;
+  const copy: any = {};
+  for (const key of Object.keys(node)) {
+    copy[key] = cloneAstNode((node as any)[key]);
+  }
+  return copy as T;
+}
+
 /**
  * Transformer for raw Drift template AST.
  * Performs AST enrichment by:
@@ -145,7 +155,7 @@ export class DriftTransformer {
       const parsedTest: acorn.Node = {
         type: 'BinaryExpression',
         operator: '===',
-        left: discAst as any,
+        left: cloneAstNode(discAst) as any,
         right: caseAst as any,
         start: 0,
         end: 0,

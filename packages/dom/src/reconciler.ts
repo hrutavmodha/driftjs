@@ -53,8 +53,21 @@ export function reconcileKeyedList(
   list: unknown[],
   getKey: (item: unknown, index: number) => unknown,
   createItem: (item: unknown, index: number, refNode: Node) => ItemRecord,
-  updateItem: (record: ItemRecord, item: unknown, index: number) => void
+  updateItem: (record: ItemRecord, item: unknown, index: number) => void,
+  removeItem?: (record: ItemRecord) => void
 ): void {
+  const removeRecordNodes = (rec: ItemRecord) => {
+    if (removeItem) {
+      try { removeItem(rec); } catch {}
+    }
+    for (let nIdx = 0; nIdx < rec.nodes.length; nIdx++) {
+      const n = rec.nodes[nIdx];
+      if (n && n.parentNode) {
+        n.parentNode.removeChild(n);
+      }
+    }
+  };
+
   const oldCache: ItemRecord[] = cacheRef.cache;
   const newCache: ItemRecord[] = [];
   const newKeySet = new Set<unknown>();
@@ -69,11 +82,12 @@ export function reconcileKeyedList(
     const itemVal = safeList[i];
     const indexVal = i;
     const rawKeyVal = getKey(itemVal, indexVal);
-    let keyVal = rawKeyVal;
+    const baseKey = rawKeyVal !== null && rawKeyVal !== undefined ? rawKeyVal : indexVal;
+    let keyVal = baseKey;
     let dupIdx = 0;
     while (newKeySet.has(keyVal)) {
       dupIdx++;
-      keyVal = String(rawKeyVal) + '__dup_' + dupIdx;
+      keyVal = String(baseKey) + '__dup_' + dupIdx;
     }
     newKeySet.add(keyVal);
     newCache.push({ key: keyVal, nodes: [], childRegions: [], itemVal, indexVal });
@@ -119,13 +133,7 @@ export function reconcileKeyedList(
   // 4. Pure deletions
   else if (i > newEnd) {
     for (let k = i; k <= oldEnd; k++) {
-      const oldRec = oldCache[k]!;
-      for (let nIdx = 0; nIdx < oldRec.nodes.length; nIdx++) {
-        const n = oldRec.nodes[nIdx];
-        if (n && n.parentNode) {
-          n.parentNode.removeChild(n);
-        }
-      }
+      removeRecordNodes(oldCache[k]!);
     }
   }
   // 5. Complex keyed reconciliation with LIS
@@ -152,12 +160,7 @@ export function reconcileKeyedList(
       const oldRec = oldCache[k]!;
       const newIndex = keyToNewIndexMap.get(oldRec.key);
       if (newIndex === undefined) {
-        for (let nIdx = 0; nIdx < oldRec.nodes.length; nIdx++) {
-          const n = oldRec.nodes[nIdx];
-          if (n && n.parentNode) {
-            n.parentNode.removeChild(n);
-          }
-        }
+        removeRecordNodes(oldRec);
       } else {
         const newIndexInSources = newIndex - s1;
         sources[newIndexInSources] = k;

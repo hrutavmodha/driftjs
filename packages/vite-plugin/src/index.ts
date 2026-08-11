@@ -12,14 +12,29 @@ export type { DriftPluginOptions, DriftModule } from '../types/index.js';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Serialises the constant pool to a JSON literal.
- * Acorn position fields (`start` / `end`) are stripped to keep the bundle lean.
+ * Serializes constant values to JavaScript code literals.
  */
+function serializeValueToJS(val: unknown): string {
+  if (val === null || val === undefined) return String(val);
+  if (typeof val === 'function') return val.toString();
+  if (typeof val === 'object') {
+    if ('__drift_fn__' in (val as any)) {
+      const fnStr = (val as any).__drift_fn__;
+      return `{ __drift_fn__: ${typeof fnStr === 'function' ? fnStr.toString() : fnStr} }`;
+    }
+    if (Array.isArray(val)) {
+      return `[${val.map(serializeValueToJS).join(', ')}]`;
+    }
+    const entries = Object.entries(val as Record<string, any>)
+      .filter(([k]) => k !== 'start' && k !== 'end' && k !== 'loc')
+      .map(([k, v]) => `${JSON.stringify(k)}: ${serializeValueToJS(v)}`);
+    return `{ ${entries.join(', ')} }`;
+  }
+  return JSON.stringify(val);
+}
+
 function serializeConstants(constants: readonly unknown[]): string {
-  return JSON.stringify(constants, (key, value) => {
-    if (key === 'start' || key === 'end' || key === 'loc') return undefined;
-    return value;
-  });
+  return `[\n    ${constants.map(serializeValueToJS).join(',\n    ')}\n  ]`;
 }
 
 function generateESM(mod: CompiledModule, filePath: string): string {

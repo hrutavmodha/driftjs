@@ -17,5 +17,6 @@ export interface LoopFrame {
 export interface ReactiveRegion {
   readonly deps: ReadonlySet<string>;
   readonly reRender: () => void;
+  childRegions?: ReactiveRegion[];
 }
 

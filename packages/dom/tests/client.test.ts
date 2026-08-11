@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { DriftClientVM, mount } from '../src/index.js';
 import { Opcode, CompiledModule } from '../types/index.js';
 import { DriftLexer, DriftParser, DriftTransformer, DriftGenerator } from '../../compiler/src/index.js';
+import { setScopeValue } from '@driftjs/utils';
 
 describe('DriftClientVM', () => {
   const vm = new DriftClientVM();
@@ -1076,5 +1077,281 @@ describe('DriftClientVM', () => {
     expect(root).toBeDefined();
     expect(root.textContent).toBe('Direct Prop Access');
   });
+
+  it('triggers reactive updates when state is mutated from event handlers inside @for loop items', () => {
+    const src = `
+      <script>
+        let count = 0;
+        let items = [1, 2, 3];
+        function inc() {
+          count++;
+        }
+      </script>
+      <div>
+        <span class="total">Total: {count}</span>
+        <ul>
+          @for item in items {
+            <li>
+              <button class="item-btn" onclick={inc}>Item {item}</button>
+            </li>
+          }
+        </ul>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelector('.total')?.textContent).toBe('Total: 0');
+
+    const itemBtns = container.querySelectorAll('.item-btn');
+    expect(itemBtns.length).toBe(3);
+
+    (itemBtns[0] as HTMLButtonElement).click();
+
+    expect(container.querySelector('.total')?.textContent).toBe('Total: 1');
+
+    (itemBtns[1] as HTMLButtonElement).click();
+
+    expect(container.querySelector('.total')?.textContent).toBe('Total: 2');
+
+    document.body.removeChild(container);
+  });
+
+  it('triggers reactivity across parent and child VM scopes when parent state is mutated via setScopeValue', () => {
+    const initialScope: Record<string, any> = { parentCount: 0 };
+    const parentVM = new DriftClientVM();
+    parentVM.execute({ bytecode: new Uint32Array([Opcode.RETURN, 0]), constants: [] }, { scope: initialScope, document });
+
+    const childVM = new DriftClientVM();
+    childVM.execute({ bytecode: new Uint32Array([Opcode.RETURN, 0]), constants: [] }, { scope: parentVM.scope, document });
+
+    const markParentSpy = vi.spyOn(parentVM, 'markDirty');
+    const markChildSpy = vi.spyOn(childVM, 'markDirty');
+
+    // Mutate parent variable from child scope
+    setScopeValue(childVM.scope, 'parentCount', 10);
+
+    expect(parentVM.scope.parentCount).toBe(10);
+    expect(markParentSpy).toHaveBeenCalledWith('parentCount');
+    expect(markChildSpy).toHaveBeenCalledWith('parentCount');
+  });
+
+  it('triggers reactive updates when mutating nested object properties and array elements', () => {
+    const src = `
+      <script>
+        let user = { name: 'Alice', age: 25 };
+        function updateName() {
+          user.name = 'Bob';
+        }
+        function incAge() {
+          user.age++;
+        }
+      </script>
+      <div>
+        <span class="user-info">{user.name} ({user.age})</span>
+        <button class="name-btn" onclick={updateName}>Change Name</button>
+        <button class="age-btn" onclick={incAge}>Inc Age</button>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelector('.user-info')?.textContent).toBe('Alice (25)');
+
+    (container.querySelector('.name-btn') as HTMLButtonElement).click();
+    expect(container.querySelector('.user-info')?.textContent).toBe('Bob (25)');
+
+    (container.querySelector('.age-btn') as HTMLButtonElement).click();
+    expect(container.querySelector('.user-info')?.textContent).toBe('Bob (26)');
+
+    document.body.removeChild(container);
+  });
+
+  it('triggers reactive updates when calling array mutators on nested object properties', () => {
+    const src = `
+      <script>
+        let user = { todos: ['Buy milk'] };
+        function addTodo() {
+          user.todos.push('Walk dog');
+        }
+      </script>
+      <div>
+        <ul class="todos">
+          @for todo in user.todos {
+            <li class="todo-item">{todo}</li>
+          }
+        </ul>
+        <button class="add-btn" onclick={addTodo}>Add Todo</button>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelectorAll('.todo-item').length).toBe(1);
+    expect(container.querySelector('.todo-item')?.textContent).toBe('Buy milk');
+
+    (container.querySelector('.add-btn') as HTMLButtonElement).click();
+
+    expect(container.querySelectorAll('.todo-item').length).toBe(2);
+    expect(container.querySelectorAll('.todo-item')[1]?.textContent).toBe('Walk dog');
+
+    document.body.removeChild(container);
+  });
+
+  it('triggers reactive updates on destructuring assignments', () => {
+    const src = `
+      <script>
+        let first = 'Initial';
+        let second = 'State';
+        function swap() {
+          [first, second] = ['Swapped1', 'Swapped2'];
+        }
+      </script>
+      <div>
+        <span class="destruct-info">{first} - {second}</span>
+        <button class="swap-btn" onclick={swap}>Swap</button>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelector('.destruct-info')?.textContent).toBe('Initial - State');
+
+    (container.querySelector('.swap-btn') as HTMLButtonElement).click();
+
+    expect(container.querySelector('.destruct-info')?.textContent).toBe('Swapped1 - Swapped2');
+
+    document.body.removeChild(container);
+  });
+
+  it('cleans up reactive regions and document event listeners on unmount()', () => {
+    const src = `
+      <script>
+        let count = 0;
+        function inc() { count++; }
+      </script>
+      <div>
+        <span>{count}</span>
+        <button class="inc-btn" onclick={inc}>Inc</button>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelector('span')?.textContent).toBe('0');
+
+    // Unmount VM instance
+    vmInstance.unmount();
+
+    document.body.removeChild(container);
+  });
+
+  it('unregisters child regions recursively when nested @if / @for blocks toggle off', () => {
+    const src = `
+      <script>
+        let show = true;
+        let items = [1, 2, 3];
+      </script>
+      <div>
+        @if show {
+          <ul>
+            @for item in items {
+              <li>{item}</li>
+            }
+          </ul>
+        }
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const root = vmInstance.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelectorAll('li').length).toBe(3);
+
+    // Toggle show off
+    (vmInstance as any).scope.show = false;
+    vmInstance.triggerUpdates(new Set(['show']));
+
+    expect(container.querySelectorAll('li').length).toBe(0);
+
+    // Toggle show back on
+    (vmInstance as any).scope.show = true;
+    vmInstance.triggerUpdates(new Set(['show']));
+
+    expect(container.querySelectorAll('li').length).toBe(3);
+
+    vmInstance.unmount();
+    document.body.removeChild(container);
+  });
 });
+
+
+
+
+
 

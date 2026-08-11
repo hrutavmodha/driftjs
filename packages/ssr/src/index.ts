@@ -50,7 +50,14 @@ export class DriftServerVM {
 
   public execute(rawModule: CompiledModule, options: SSRExecutionOptions = {}): ServerNode | null {
     const module = (resolveComponentModule(rawModule) || rawModule) as CompiledModule;
-    this.scope = { ...module.scope, ...options.scope };
+    this.scope = options.scope ? options.scope : { ...module.scope };
+    if (module.scope) {
+      for (const k of Object.keys(module.scope)) {
+        if (!Object.prototype.hasOwnProperty.call(this.scope, k)) {
+          this.scope[k] = module.scope[k];
+        }
+      }
+    }
     this.declaredVars = new Set(module.declaredVars ?? []);
     this.registers.fill(null as any);
 

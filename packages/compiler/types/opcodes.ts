@@ -1,7 +1,7 @@
 /**
  * Register-based Bytecode Opcodes supported by DriftJS.
  */
-export const enum Opcode {
+export enum Opcode {
   RETURN = 0x00,
   CREATE_ELEMENT = 0x01,
   CREATE_TEXT = 0x02,

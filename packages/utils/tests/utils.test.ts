@@ -60,4 +60,19 @@ describe('@driftjs/utils Shared Evaluator Module', () => {
     executeBlockStatement(statements, scope);
     expect(scope.val).toBe(42);
   });
+
+  it('prevents prototype pollution & scope lookup hijacking for built-in Object properties', () => {
+    const scope = { name: 'Alice' };
+    const exprToString = { type: 'Identifier', name: 'toString' };
+    const exprValueOf = { type: 'Identifier', name: 'valueOf' };
+    const exprConstructor = { type: 'Identifier', name: 'constructor' };
+
+    expect(evaluateExpression(exprToString, scope)).toBeUndefined();
+    expect(evaluateExpression(exprValueOf, scope)).toBeUndefined();
+    expect(evaluateExpression(exprConstructor, scope)).toBeUndefined();
+
+    // User-declared toString override should resolve correctly
+    const customScope = { toString: 'Custom String' };
+    expect(evaluateExpression(exprToString, customScope)).toBe('Custom String');
+  });
 });

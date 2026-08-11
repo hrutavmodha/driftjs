@@ -271,4 +271,32 @@ describe('DriftParser', () => {
     const parser = new DriftParser(new DriftLexer('@switch mode { <div>invalid direct child</div> }'));
     expect(() => parser.parse()).toThrow(DriftParserError);
   });
+
+  it('automatically parses HTML void elements as self-closing without requiring explicit closing tags', () => {
+    const parser = new DriftParser(
+      new DriftLexer('<div><input type="text"><img src="test.jpg"><br><hr></div>')
+    );
+    const ast = parser.parse();
+
+    expect(ast.body).toHaveLength(1);
+    const divNode = ast.body[0] as any;
+    expect(divNode.tagName).toBe('div');
+    expect(divNode.children).toHaveLength(4);
+
+    const inputNode = divNode.children[0];
+    expect(inputNode.tagName).toBe('input');
+    expect(inputNode.isSelfClosing).toBe(true);
+
+    const imgNode = divNode.children[1];
+    expect(imgNode.tagName).toBe('img');
+    expect(imgNode.isSelfClosing).toBe(true);
+
+    const brNode = divNode.children[2];
+    expect(brNode.tagName).toBe('br');
+    expect(brNode.isSelfClosing).toBe(true);
+
+    const hrNode = divNode.children[3];
+    expect(hrNode.tagName).toBe('hr');
+    expect(hrNode.isSelfClosing).toBe(true);
+  });
 });

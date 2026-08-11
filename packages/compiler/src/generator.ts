@@ -522,7 +522,7 @@ export class DriftGenerator {
   private addConstant(value: any): number {
     if (value && typeof value === 'object' && value.type && typeof value.type === 'string') {
       const codeStr = astToJS(value);
-      value = { __drift_fn__: `(scope, declaredVars, setScopeValue) => (${codeStr})` };
+      value = { __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable) => (${codeStr})` };
     }
 
     const existingIndex = this.constants.findIndex((c) => this.isConstantEqual(c, value));
@@ -610,6 +610,33 @@ export class DriftGenerator {
   }
 }
 
+function getRootIdentifier(node: any): string | null {
+  if (!node || typeof node !== 'object') return null;
+  if (node.type === 'Identifier') return node.name;
+  if (node.type === 'MemberExpression') return getRootIdentifier(node.object);
+  return null;
+}
+
+function extractBindingNames(node: any): string[] {
+  const names: string[] = [];
+  function walk(n: any) {
+    if (!n || typeof n !== 'object') return;
+    if (n.type === 'Identifier') names.push(n.name);
+    else if (n.type === 'ObjectPattern' && Array.isArray(n.properties)) {
+      for (const p of n.properties) {
+        if (p.type === 'Property') walk(p.value);
+        else if (p.type === 'RestElement') walk(p.argument);
+      }
+    } else if (n.type === 'ArrayPattern' && Array.isArray(n.elements)) {
+      for (const e of n.elements) if (e) walk(e);
+    } else if (n.type === 'AssignmentPattern') {
+      walk(n.left);
+    }
+  }
+  walk(node);
+  return names;
+}
+
 /**
  * Converts Acorn AST nodes or arrays of statements into valid JavaScript source code strings.
  */
@@ -621,7 +648,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
   switch (node.type) {
     case 'Identifier':
       if (locals && locals.has(node.name)) return node.name;
-      return `('${node.name}' in (scope || {}) ? scope[${JSON.stringify(node.name)}] : (typeof globalThis !== 'undefined' && '${node.name}' in globalThis ? globalThis[${JSON.stringify(node.name)}] : undefined))`;
+      return `((typeof inScopeChain === 'function' ? inScopeChain(scope, ${JSON.stringify(node.name)}) : Object.prototype.hasOwnProperty.call(scope || {}, ${JSON.stringify(node.name)})) ? scope[${JSON.stringify(node.name)}] : (typeof globalThis !== 'undefined' && Object.prototype.hasOwnProperty.call(globalThis, ${JSON.stringify(node.name)}) ? globalThis[${JSON.stringify(node.name)}] : undefined))`;
 
     case 'Literal':
       if (typeof node.raw === 'string') return node.raw;
@@ -648,23 +675,22 @@ export function astToJS(node: any, locals?: Set<string>): string {
       const rawCall = `(${calleeJS}(${argsJS}))`;
       if (
         node.callee?.type === 'MemberExpression' &&
-        node.callee.object?.type === 'Identifier' &&
         node.callee.property?.type === 'Identifier'
       ) {
-        const objName = node.callee.object.name;
+        const rootObjName = getRootIdentifier(node.callee.object);
         const methodName = node.callee.property.name;
         const arrayMutators = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'];
-        if (arrayMutators.includes(methodName) && (!locals || !locals.has(objName))) {
-          return `(() => { const _res = ${rawCall}; if (typeof setScopeValue === 'function') setScopeValue(scope, ${JSON.stringify(objName)}, ('${objName}' in (scope || {}) ? scope[${JSON.stringify(objName)}] : undefined)); return _res; })()`;
+        if (rootObjName && arrayMutators.includes(methodName) && (!locals || !locals.has(rootObjName))) {
+          return `(() => { const _res = ${rawCall}; if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(rootObjName)}, scope[${JSON.stringify(rootObjName)}]); return _res; })()`;
         }
       }
       return rawCall;
     }
 
     case 'AssignmentExpression': {
+      const valJS = astToJS(node.right, locals);
       if (node.left?.type === 'Identifier') {
         const name = node.left.name;
-        const valJS = astToJS(node.right, locals);
         if (locals && locals.has(name)) {
           return `(${name} ${node.operator} ${valJS})`;
         }
@@ -675,7 +701,42 @@ export function astToJS(node: any, locals?: Set<string>): string {
           return `(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, (scope[${JSON.stringify(name)}] ${op} ${valJS})) : ((scope || {})[${JSON.stringify(name)}] ${node.operator} ${valJS}))`;
         }
       }
-      return `(${astToJS(node.left, locals)} ${node.operator} ${astToJS(node.right, locals)})`;
+      if (node.left?.type === 'MemberExpression') {
+        const rootName = getRootIdentifier(node.left);
+        const rawAssign = `(${astToJS(node.left, locals)} ${node.operator} ${valJS})`;
+        if (rootName && (!locals || !locals.has(rootName))) {
+          return `(() => { const _res = ${rawAssign}; if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(rootName)}, scope[${JSON.stringify(rootName)}]); return _res; })()`;
+        }
+      }
+      if (node.left?.type === 'ArrayPattern') {
+        const setCalls: string[] = [];
+        const elems = node.left.elements || [];
+        for (let i = 0; i < elems.length; i++) {
+          const el = elems[i];
+          if (el?.type === 'Identifier') {
+            const varName = el.name;
+            if (!locals || !locals.has(varName)) {
+              setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, _val[${i}]);`);
+            }
+          }
+        }
+        return `(() => { const _val = ${valJS} || []; ${setCalls.join(' ')} return _val; })()`;
+      }
+      if (node.left?.type === 'ObjectPattern') {
+        const setCalls: string[] = [];
+        const props = node.left.properties || [];
+        for (const p of props) {
+          if (p.type === 'Property' && p.value?.type === 'Identifier') {
+            const propKey = p.key?.name || (typeof p.key?.value === 'string' ? p.key.value : String(p.key?.value));
+            const varName = p.value.name;
+            if (!locals || !locals.has(varName)) {
+              setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, _val[${JSON.stringify(propKey)}]);`);
+            }
+          }
+        }
+        return `(() => { const _val = ${valJS} || {}; ${setCalls.join(' ')} return _val; })()`;
+      }
+      return `(${astToJS(node.left, locals)} ${node.operator} ${valJS})`;
     }
 
     case 'UpdateExpression': {
@@ -689,6 +750,15 @@ export function astToJS(node: any, locals?: Set<string>): string {
           return `(typeof setScopeValue === 'function' ? (setScopeValue(scope, ${JSON.stringify(name)}, (Number(scope[${JSON.stringify(name)}]) || 0) ${op} 1), scope[${JSON.stringify(name)}]) : ((scope || {})[${JSON.stringify(name)}] = (Number((scope || {})[${JSON.stringify(name)}]) || 0) ${op} 1))`;
         } else {
           return `(() => { const _v = Number(scope[${JSON.stringify(name)}]) || 0; if (typeof setScopeValue === 'function') setScopeValue(scope, ${JSON.stringify(name)}, _v ${op} 1); else (scope || {})[${JSON.stringify(name)}] = _v ${op} 1; return _v; })()`;
+        }
+      }
+      if (node.argument?.type === 'MemberExpression') {
+        const rootName = getRootIdentifier(node.argument);
+        const rawUpdate = node.prefix
+          ? `(${node.operator}${astToJS(node.argument, locals)})`
+          : `(${astToJS(node.argument, locals)}${node.operator})`;
+        if (rootName && (!locals || !locals.has(rootName))) {
+          return `(() => { const _res = ${rawUpdate}; if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(rootName)}, scope[${JSON.stringify(rootName)}]); return _res; })()`;
         }
       }
       return node.prefix
@@ -793,6 +863,13 @@ export function astToJS(node: any, locals?: Set<string>): string {
 
     case 'DoWhileStatement':
       return `(() => { do ${astToJS(node.body, locals)} while (${astToJS(node.test, locals)}); })()`;
+
+    case 'ArrayPattern': {
+      const elemsJS = node.elements
+        ? node.elements.map((el: any) => el ? (el.type === 'RestElement' ? '...' + astToJS(el.argument, locals) : (el.type === 'AssignmentPattern' ? `${astToJS(el.left, locals)} = ${astToJS(el.right, locals)}` : (el.name || astToJS(el, locals)))) : '').join(', ')
+        : '';
+      return `[ ${elemsJS} ]`;
+    }
 
     case 'ObjectPattern': {
       const propsJS = node.properties ? node.properties.map((p: any) => {

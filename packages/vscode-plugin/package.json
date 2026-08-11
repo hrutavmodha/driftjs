@@ -1,0 +1,63 @@
+{
+  "name": "@driftjs/vscode-plugin",
+  "displayName": "DriftJS Language Support",
+  "description": "Language server, IntelliSense, diagnostics, and syntax highlighting for DriftJS (.drift) Single File Components.",
+  "version": "0.1.0",
+  "publisher": "driftjs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/driftjs/driftjs.git"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "activationEvents": [
+    "onLanguage:drift",
+    "workspaceContains:**/*.drift",
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "drift",
+        "aliases": ["DriftJS", "drift"],
+        "extensions": [".drift"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "drift",
+        "scopeName": "text.html.drift",
+        "path": "./syntaxes/drift.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "drift",
+        "path": "./snippets.json"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "npx --yes esbuild src/server.ts --bundle --platform=node --target=node16 --outfile=dist/server.js --external:vscode && npx --yes esbuild src/extension.ts --bundle --platform=node --target=node16 --outfile=dist/extension.js --external:vscode",
+    "watch": "tsc -w"
+  },
+  "dependencies": {
+    "@driftjs/compiler": "workspace:*",
+    "vscode-languageclient": "^8.1.0",
+    "vscode-languageserver": "^8.1.0",
+    "vscode-languageserver-textdocument": "^1.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.0.0"
+  }
+}

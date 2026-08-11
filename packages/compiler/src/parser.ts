@@ -18,6 +18,11 @@ import {
   DriftParserError,
 } from '../types/index.js';
 
+const VOID_ELEMENTS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+  'link', 'meta', 'param', 'source', 'track', 'wbr'
+]);
+
 class ArrayTokenSource implements TokenSource {
   private readonly tokens: readonly Token[];
   private current = 0;
@@ -164,7 +169,18 @@ export class DriftParser {
       };
     }
 
-    this.consume(TokenType.TagClose, 'Expected closing bracket after attributes');
+    const closeToken = this.consume(TokenType.TagClose, 'Expected closing bracket after attributes');
+
+    if (VOID_ELEMENTS.has(tagName.toLowerCase())) {
+      return {
+        type: ASTNodeType.Element,
+        tagName,
+        attributes,
+        children: [],
+        isSelfClosing: true,
+        loc: { start: startLoc, end: closeToken.loc.end },
+      };
+    }
 
     const children: TemplateChildNode[] = [];
     while (!this.check(TokenType.TagOpenSlash) && !this.isAtEnd()) {

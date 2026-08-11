@@ -255,12 +255,44 @@ export class DriftLexer {
     let parenDepth = 0;
     let inQuote: string | null = null;
     let isEscaped = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+    let inRegex = false;
+    let inRegexCharClass = false;
 
     while (!this.isAtEnd()) {
-      const ch = this.peek();
+      const ch = this.advance();
+
+      if (inLineComment) {
+        headerContent += ch;
+        if (ch === '\n') inLineComment = false;
+        continue;
+      }
+
+      if (inBlockComment) {
+        headerContent += ch;
+        if (ch === '/' && headerContent.endsWith('*/')) inBlockComment = false;
+        continue;
+      }
+
+      if (inRegex) {
+        headerContent += ch;
+        if (isEscaped) {
+          isEscaped = false;
+        } else if (ch === '\\') {
+          isEscaped = true;
+        } else if (ch === '[') {
+          inRegexCharClass = true;
+        } else if (ch === ']' && inRegexCharClass) {
+          inRegexCharClass = false;
+        } else if (ch === '/' && !inRegexCharClass) {
+          inRegex = false;
+        }
+        continue;
+      }
 
       if (inQuote !== null) {
-        headerContent += this.advance();
+        headerContent += ch;
         if (isEscaped) {
           isEscaped = false;
         } else if (ch === '\\') {
@@ -271,31 +303,48 @@ export class DriftLexer {
         continue;
       }
 
+      if (ch === '/' && !isEscaped) {
+        const next = this.peek();
+        if (next === '/') {
+          inLineComment = true;
+          headerContent += ch;
+          continue;
+        } else if (next === '*') {
+          inBlockComment = true;
+          headerContent += ch;
+          continue;
+        } else if (this.isRegexStart(headerContent)) {
+          inRegex = true;
+          inRegexCharClass = false;
+          headerContent += ch;
+          continue;
+        }
+      }
+
       if (ch === '"' || ch === "'" || ch === '`') {
         inQuote = ch;
-        headerContent += this.advance();
+        headerContent += ch;
         continue;
       }
 
       if (ch === '(') {
         parenDepth++;
-        headerContent += this.advance();
+        headerContent += ch;
         continue;
       }
 
       if (ch === ')') {
-        parenDepth--;
-        headerContent += this.advance();
+        if (parenDepth > 0) parenDepth--;
+        headerContent += ch;
         continue;
       }
 
       if (ch === '{' && parenDepth === 0) {
-        this.advance(); // consume '{'
         this.blockDepth++;
         return this.createToken(type, headerContent.trim(), startLoc);
       }
 
-      headerContent += this.advance();
+      headerContent += ch;
     }
 
     throw new DriftLexerError(
@@ -542,6 +591,16 @@ export class DriftLexer {
     );
   }
 
+  private isRegexStart(expr: string): boolean {
+    const trimmed = expr.trimEnd();
+    if (trimmed.length === 0) return true;
+    const lastChar = trimmed[trimmed.length - 1];
+    if ('=(,:;!&|?[{}+-*%<>~^'.includes(lastChar!)) return true;
+    const lastWord = trimmed.split(/\s+/).pop();
+    if (lastWord && ['return', 'yield', 'await', 'case', 'typeof', 'void', 'delete', 'instanceof', 'in', 'do'].includes(lastWord)) return true;
+    return false;
+  }
+
   private readInterpolationToken(
     startLoc: SourceLocation,
     context: 'content' | 'attribute',
@@ -552,6 +611,8 @@ export class DriftLexer {
     let isEscaped = false;
     let inLineComment = false;
     let inBlockComment = false;
+    let inRegex = false;
+    let inRegexCharClass = false;
     let templateStack: number[] = [];
     let expression = '';
 
@@ -570,6 +631,22 @@ export class DriftLexer {
         expression += ch;
         if (ch === '/' && expression.endsWith('*/')) {
           inBlockComment = false;
+        }
+        continue;
+      }
+
+      if (inRegex) {
+        expression += ch;
+        if (isEscaped) {
+          isEscaped = false;
+        } else if (ch === '\\') {
+          isEscaped = true;
+        } else if (ch === '[') {
+          inRegexCharClass = true;
+        } else if (ch === ']' && inRegexCharClass) {
+          inRegexCharClass = false;
+        } else if (ch === '/' && !inRegexCharClass) {
+          inRegex = false;
         }
         continue;
       }
@@ -598,6 +675,11 @@ export class DriftLexer {
           continue;
         } else if (next === '*') {
           inBlockComment = true;
+          expression += ch;
+          continue;
+        } else if (this.isRegexStart(expression)) {
+          inRegex = true;
+          inRegexCharClass = false;
           expression += ch;
           continue;
         }

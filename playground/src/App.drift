@@ -3,5 +3,6 @@
 </script>
 
 <h1>DriftJS Functionality Playground</h1>
-<Header title="Hello," subtitle="World!" />
-<Header title="How are" subtitle="You?" />
+
+<input type="text">
+<Header title="Hello" subtitle="How are you?" />

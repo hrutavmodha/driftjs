@@ -202,4 +202,20 @@ describe('DriftLexer', () => {
     expect(tokens[0]?.type).toBe(TokenType.DirectiveIf);
     expect(tokens[0]?.value).toBe('name === "foo{\\"bar"');
   });
+
+  it('lexes regular expression literals containing braces inside interpolations correctly', () => {
+    const lexer = new DriftLexer('<div>{ text.replace(/{/g, "") }</div>');
+    const tokens = collectTokens(lexer);
+
+    const interpToken = tokens.find((t) => t.type === TokenType.Interpolation);
+    expect(interpToken?.value).toBe(' text.replace(/{/g, "") ');
+  });
+
+  it('lexes regular expression literals containing braces inside directive headers cleanly', () => {
+    const lexer = new DriftLexer('@if (/{/g.test(val)) { <span>Match</span> }');
+    const tokens = collectTokens(lexer);
+
+    expect(tokens[0]?.type).toBe(TokenType.DirectiveIf);
+    expect(tokens[0]?.value).toBe('(/{/g.test(val))');
+  });
 });

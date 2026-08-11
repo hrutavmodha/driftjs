@@ -28,8 +28,10 @@ function clearBetweenAnchors(startAnchor: Node, endAnchor: Node): void {
   if (!parent) return;
   let curr = startAnchor.nextSibling;
   while (curr && curr !== endAnchor) {
-    const next = curr.nextSibling;
-    parent.removeChild(curr);
+    const next = curr ? curr.nextSibling : null;
+    if (curr && curr.parentNode === parent) {
+      parent.removeChild(curr);
+    }
     curr = next;
   }
 }
@@ -40,18 +42,89 @@ function clearBetweenAnchors(startAnchor: Node, endAnchor: Node): void {
  */
 export class DriftClientVM {
   private static readonly MAX_REGISTERS = 256;
+  private static activeVMCount = 0;
+  private static globalDelegatedListeners = new Map<string, (e: Event) => void>();
+
   private readonly registers: (Node | any)[] = new Array(DriftClientVM.MAX_REGISTERS);
   private scope: Record<string, any> = {};
   private module: CompiledModule | null = null;
   private declaredVars: Set<string> = new Set();
   private doc: Document | null = null;
   private reactiveRegions: ReactiveRegion[] = [];
+  private reactiveRegionsIndex = new Map<string, Set<ReactiveRegion>>();
   private delegatedEvents = new Set<string>();
-  private eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
+  private static eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
   private cursor: HydrationCursor | null = null;
   private childVMs = new WeakMap<Node, { vm: DriftClientVM; scope: Record<string, any>; propsSpec: any }>();
   private pendingDirtyVars = new Set<string>();
   private isUpdateScheduled = false;
+
+  constructor() {
+    DriftClientVM.activeVMCount++;
+  }
+
+  public registerRegion(region: ReactiveRegion): void {
+    this.reactiveRegions.push(region);
+    for (const dep of region.deps) {
+      let set = this.reactiveRegionsIndex.get(dep);
+      if (!set) {
+        set = new Set<ReactiveRegion>();
+        this.reactiveRegionsIndex.set(dep, set);
+      }
+      set.add(region);
+    }
+  }
+
+  public removeRegion(region: ReactiveRegion): void {
+    if (region.childRegions) {
+      for (const child of region.childRegions) {
+        this.removeRegion(child);
+      }
+      region.childRegions = [];
+    }
+
+    for (const dep of region.deps) {
+      const set = this.reactiveRegionsIndex.get(dep);
+      if (set) {
+        set.delete(region);
+        if (set.size === 0) this.reactiveRegionsIndex.delete(dep);
+      }
+    }
+
+    const idx = this.reactiveRegions.indexOf(region);
+    if (idx !== -1) {
+      this.reactiveRegions.splice(idx, 1);
+    }
+  }
+
+  public unmount(): void {
+    if (DriftClientVM.activeVMCount > 0) {
+      DriftClientVM.activeVMCount--;
+    }
+
+    for (const region of [...this.reactiveRegions]) {
+      this.removeRegion(region);
+    }
+    this.reactiveRegions = [];
+    this.reactiveRegionsIndex.clear();
+
+    if (DriftClientVM.activeVMCount === 0 && DriftClientVM.globalDelegatedListeners.size > 0) {
+      const root = this.doc || (typeof document !== 'undefined' ? document : null);
+      if (root) {
+        for (const [eventName, listener] of DriftClientVM.globalDelegatedListeners.entries()) {
+          root.removeEventListener(eventName, listener);
+        }
+      }
+      DriftClientVM.globalDelegatedListeners.clear();
+    }
+
+    this.eventHandlersMap = new WeakMap();
+    this.registers.fill(null);
+    this.pendingDirtyVars.clear();
+    this.isUpdateScheduled = false;
+    this.scope = {};
+    this.module = null;
+  }
 
   public markDirty(varName: string): void {
     this.pendingDirtyVars.add(varName);
@@ -100,19 +173,23 @@ export class DriftClientVM {
     const root = this.doc || (typeof document !== 'undefined' ? document : null);
     if (!root) return;
 
-    root.addEventListener(eventName, (e: Event) => {
-      let curr = e.target as Node | null;
-      while (curr && curr !== root) {
-        if (curr.nodeType === 1) {
-          const handlers = this.eventHandlersMap.get(curr);
-          if (handlers && handlers[eventName]) {
-            handlers[eventName](e);
-            break;
+    if (!DriftClientVM.globalDelegatedListeners.has(eventName)) {
+      const listener = (e: Event) => {
+        let curr = e.target as Node | null;
+        while (curr && curr !== root) {
+          if (curr.nodeType === 1) {
+            const handlers = DriftClientVM.eventHandlersMap.get(curr);
+            if (handlers && handlers[eventName]) {
+              handlers[eventName](e);
+              break;
+            }
           }
+          curr = curr.parentNode;
         }
-        curr = curr.parentNode;
-      }
-    });
+      };
+      root.addEventListener(eventName, listener);
+      DriftClientVM.globalDelegatedListeners.set(eventName, listener);
+    }
   }
 
   private checkRegister(index: number): void {
@@ -137,9 +214,8 @@ export class DriftClientVM {
    */
   private runSubModule(
     rawSubMod: { bytecode: readonly number[]; constants: readonly any[] },
-    scope: Record<string, any>,
-    props: Record<string, any> = {}
-  ): Node | null {
+    scope: Record<string, any>
+  ): DocumentFragment | null {
     const subMod = (resolveComponentModule(rawSubMod) || rawSubMod) as CompiledModule;
     const savedRegisters = [...this.registers];
     const savedModule = this.module;
@@ -151,10 +227,7 @@ export class DriftClientVM {
       this.declaredVars = new Set(subMod.declaredVars);
     }
 
-    const subScope = subMod.scope && Object.keys(subMod.scope).length > 0
-      ? Object.assign(Object.create(scope), subMod.scope, { props })
-      : (Object.keys(props).length > 0 ? Object.assign(Object.create(scope), { props }) : scope);
-    const result = this.executeLoop(subMod.bytecode, subMod.constants, subScope);
+    const result = this.executeLoop(subMod.bytecode, subMod.constants, scope) as DocumentFragment | null;
 
     this.registers.fill(undefined);
     for (let i = 0; i < savedRegisters.length; i++) this.registers[i] = savedRegisters[i];
@@ -198,7 +271,8 @@ export class DriftClientVM {
             const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
             const propsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
             const childVM = new DriftClientVM();
-            const compNode = childVM.execute(compMod, { scope: { props: propsObj, ...propsObj, ...scope }, document: doc });
+            const propsScope = Object.assign(Object.create(scope), { props: propsObj }, propsObj);
+            const compNode = childVM.execute(compMod, { scope: propsScope, document: doc });
             this.updateChildComponentProps(childVM.scope, childVM, propsObj);
             if (compNode) {
               this.childVMs.set(compNode, { vm: childVM, scope: childVM.scope, propsSpec });
@@ -270,23 +344,29 @@ export class DriftClientVM {
                   if (vm.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
                 }
                 if (changedVars.size > 0) vm.triggerUpdates(changedVars);
+                if (vm.pendingDirtyVars.size > 0) vm.flushUpdates();
                 return result;
               };
 
-              let handlers = this.eventHandlersMap.get(elem);
+              let handlers = DriftClientVM.eventHandlersMap.get(elem);
               if (!handlers) {
                 handlers = {};
-                this.eventHandlersMap.set(elem, handlers);
+                DriftClientVM.eventHandlersMap.set(elem, handlers);
               }
               handlers[eventName] = wrappedHandler;
               this.ensureEventDelegated(eventName);
-            } else if (typeof elem.setAttribute === 'function') {
-              if (val === true) {
-                elem.setAttribute(attrName, '');
-              } else if (val === false || val == null) {
-                if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
-              } else {
-                elem.setAttribute(attrName, String(val));
+            } else {
+              if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
+                (elem as any)[attrName] = val ?? '';
+              }
+              if (typeof elem.setAttribute === 'function') {
+                if (val === true) {
+                  elem.setAttribute(attrName, '');
+                } else if (val === false || val == null) {
+                  if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
+                } else {
+                  elem.setAttribute(attrName, String(val));
+                }
               }
             }
           }
@@ -410,11 +490,10 @@ export class DriftClientVM {
           let childRegions: ReactiveRegion[] = [];
 
           const renderIf = () => {
-            // Remove previously registered child regions
             for (const r of childRegions) {
-              const idx = vm.reactiveRegions.indexOf(r);
-              if (idx !== -1) vm.reactiveRegions.splice(idx, 1);
+              vm.removeRegion(r);
             }
+            childRegions = [];
             if (actualEndAnchor && startAnchor.parentNode) {
               clearBetweenAnchors(startAnchor, actualEndAnchor);
             }
@@ -442,12 +521,14 @@ export class DriftClientVM {
             }
           }
 
-          this.reactiveRegions.push({
+          const ifRegion: ReactiveRegion = {
             deps,
             reRender: () => {
               renderIf();
             },
-          });
+            childRegions,
+          };
+          this.registerRegion(ifRegion);
 
           pc += 6;
           break;
@@ -483,6 +564,15 @@ export class DriftClientVM {
           }
 
           const vm = this;
+          const removeItem = (record: ItemRecord) => {
+            if (record.childRegions && record.childRegions.length > 0) {
+              for (const r of record.childRegions) {
+                vm.removeRegion(r);
+              }
+              record.childRegions = [];
+            }
+          };
+
           const renderFor = () => {
             const rawIter = evaluateExpression(iterExpr, scope, vm.declaredVars);
             const items = Array.isArray(rawIter)
@@ -510,7 +600,8 @@ export class DriftClientVM {
                 return indexVal;
               },
               (itemVal, indexVal, refNode) => {
-                const childScope = { ...scope, [itemName]: itemVal };
+                const childScope = Object.create(scope);
+                childScope[itemName] = itemVal;
                 if (indexName) childScope[indexName] = indexVal;
 
                 const before = vm.reactiveRegions.length;
@@ -579,8 +670,7 @@ export class DriftClientVM {
 
                 if (record.childRegions) {
                   for (const r of record.childRegions) {
-                    const idx = vm.reactiveRegions.indexOf(r);
-                    if (idx !== -1) vm.reactiveRegions.splice(idx, 1);
+                    vm.removeRegion(r);
                   }
                 }
 
@@ -622,7 +712,8 @@ export class DriftClientVM {
                     record.nodes = newNodes;
                   }
                 }
-              }
+              },
+              removeItem
             );
           };
           renderFor();
@@ -634,12 +725,13 @@ export class DriftClientVM {
             parentElem.appendChild(actualEndAnchor);
           }
 
-          this.reactiveRegions.push({
+          const forRegion: ReactiveRegion = {
             deps,
             reRender: () => {
               renderFor();
             },
-          });
+          };
+          this.registerRegion(forRegion);
 
           pc += 8;
           break;
@@ -735,7 +827,11 @@ export class DriftClientVM {
       this.cursor = null;
     }
 
-    const scope: Record<string, any> = { ...module.scope, ...options.scope };
+    const parentOptionsScope = options.scope || null;
+    const scope: Record<string, any> = Object.assign(
+      Object.create(parentOptionsScope),
+      module.scope
+    );
     Object.defineProperty(scope, '__drift_mark_dirty__', {
       value: (name: string) => this.markDirty(name),
       writable: true,
@@ -786,13 +882,18 @@ export class DriftClientVM {
         const isDynamic = bytecode[pc + 4]!;
         const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
 
-        if (elem && typeof elem.setAttribute === 'function') {
-          if (val === true) {
-            elem.setAttribute(attrName, '');
-          } else if (val === false || val == null) {
-            if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
-          } else {
-            elem.setAttribute(attrName, String(val));
+        if (elem) {
+          if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
+            (elem as any)[attrName] = val ?? '';
+          }
+          if (typeof elem.setAttribute === 'function') {
+            if (val === true) {
+              elem.setAttribute(attrName, '');
+            } else if (val === false || val == null) {
+              if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
+            } else {
+              elem.setAttribute(attrName, String(val));
+            }
           }
         }
         break;
@@ -825,32 +926,38 @@ export class DriftClientVM {
 
     // 1. Patch INTERPOLATE_TEXT / SET_ATTR / CREATE_ELEMENT in-place (existing logic)
     if (this.module?.reactiveBindings) {
+      const updatedPcs = new Set<number>();
       for (const binding of this.module.reactiveBindings) {
         if (!changedVars.has(binding.variable)) continue;
 
         for (const pos of binding.positions) {
           if (
-            pos.opcode === Opcode.INTERPOLATE_TEXT ||
-            pos.opcode === Opcode.SET_ATTR ||
-            pos.opcode === Opcode.CREATE_ELEMENT
+            !updatedPcs.has(pos.pc) &&
+            (pos.opcode === Opcode.INTERPOLATE_TEXT ||
+             pos.opcode === Opcode.SET_ATTR ||
+             pos.opcode === Opcode.CREATE_ELEMENT)
           ) {
+            updatedPcs.add(pos.pc);
             this.updateAt(pos.pc, this.module, { scope: this.scope });
           }
         }
       }
     }
 
-    // 2. Re-render reactive @if / @for regions whose deps intersect changedVars.
-    // Take a snapshot array because region.reRender() may remove stale child regions
-    // from this.reactiveRegions, which would shift array indices during iteration.
-    const regionsSnapshot = [...this.reactiveRegions];
-    for (const region of regionsSnapshot) {
-      if (!this.reactiveRegions.includes(region)) continue;
-      for (const dep of region.deps) {
-        if (changedVars.has(dep)) {
-          region.reRender();
-          break; // don't double-render the same region
+    // 2. Re-render reactive @if / @for regions whose deps intersect changedVars in O(1) time
+    const candidateRegions = new Set<ReactiveRegion>();
+    for (const varName of changedVars) {
+      const indexed = this.reactiveRegionsIndex.get(varName);
+      if (indexed) {
+        for (const region of indexed) {
+          candidateRegions.add(region);
         }
+      }
+    }
+
+    for (const region of candidateRegions) {
+      if (this.reactiveRegions.includes(region)) {
+        region.reRender();
       }
     }
   }
