@@ -1,0 +1,27 @@
+{
+  "name": "@driftjs/cli",
+  "version": "0.1.0",
+  "description": "CLI scaffolding tool for DriftJS register VM applications",
+  "type": "module",
+  "bin": {
+    "create-drift": "./bin/create-drift.js",
+    "drift": "./bin/create-drift.js"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}

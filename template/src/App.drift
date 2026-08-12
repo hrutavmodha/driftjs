@@ -55,6 +55,7 @@
     <div class="logo-badge">Powered by DriftJS</div>
     <p class="subtitle">A Register-based Virtual Machine</p>
     <h1>Basic Counter Application</h1>
+    <p class="hint">🚀 Edit <code>src/App.drift</code> to see live reactive updates!</p>
   </div>
 
   <div class="counter-display">

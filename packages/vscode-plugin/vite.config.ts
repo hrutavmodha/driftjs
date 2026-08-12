@@ -1,0 +1,23 @@
+import { defineConfig } from 'vite';
+import path from 'path';
+
+export default defineConfig({
+  build: {
+    target: 'node16',
+    outDir: 'dist',
+    emptyOutDir: true,
+    lib: {
+      entry: {
+        server: path.resolve(__dirname, 'src/server.ts'),
+        extension: path.resolve(__dirname, 'src/extension.ts'),
+      },
+      formats: ['cjs'],
+    },
+    rollupOptions: {
+      external: ['vscode'],
+      output: {
+        entryFileNames: '[name].js',
+      },
+    },
+  },
+});

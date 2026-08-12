@@ -112,6 +112,13 @@ body {
   font-weight: 400;
 }
 
+.hint {
+  font-size: 13px;
+  color: var(--accent-cyan);
+  font-weight: 500;
+  margin-top: 4px;
+}
+
 /* --- Counter Display --- */
 .counter-display {
   background: rgba(9, 13, 22, 0.65);

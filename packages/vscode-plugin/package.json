@@ -46,7 +46,7 @@
     ]
   },
   "scripts": {
-    "build": "npx --yes esbuild src/server.ts --bundle --platform=node --target=node16 --outfile=dist/server.js --external:vscode && npx --yes esbuild src/extension.ts --bundle --platform=node --target=node16 --outfile=dist/extension.js --external:vscode",
+    "build": "vite build",
     "watch": "tsc -w"
   },
   "dependencies": {
@@ -58,6 +58,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.75.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vite": "^8.1.5"
   }
 }
