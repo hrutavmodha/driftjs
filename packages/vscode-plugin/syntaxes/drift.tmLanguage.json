@@ -5,10 +5,12 @@
   "patterns": [
     { "include": "#script-tag" },
     { "include": "#style-tag" },
-    { "include": "#drift-directives" },
+    { "include": "#drift-directive-headers" },
+    { "include": "#drift-directive-blocks" },
     { "include": "#drift-interpolations" },
     { "include": "#html-comments" },
     { "include": "#html-tags" },
+    { "include": "#html-operators" },
     { "include": "#html-entities" }
   ],
   "repository": {
@@ -65,31 +67,47 @@
         }
       ]
     },
-    "drift-directives": {
+    "drift-directive-headers": {
       "patterns": [
         {
-          "name": "keyword.control.directive.if.drift",
-          "match": "@(if|else\\s+if|else)(?=\\s|\\(|$|\\{)"
+          "begin": "(@if|@else\\s+if|@for|@switch)\\b",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.directive.drift" }
+          },
+          "end": "(?=\\{|$)",
+          "patterns": [
+            { "include": "source.js" }
+          ]
         },
         {
-          "name": "keyword.control.directive.for.drift",
-          "match": "@(for)(?=\\s|\\(|$)"
-        },
-        {
-          "name": "keyword.control.directive.switch.drift",
-          "match": "@(switch|case|default)(?=\\s|\\(|$|\\{)"
+          "name": "keyword.control.directive.drift",
+          "match": "@(else|case|default)\\b"
         }
+      ]
+    },
+    "drift-directive-blocks": {
+      "begin": "(?<=\\}|\\b|@else|@default)\\s*(\\{)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.block.begin.drift" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.drift" }
+      },
+      "patterns": [
+        { "include": "$self" }
       ]
     },
     "drift-interpolations": {
       "begin": "\\{",
       "beginCaptures": {
-        "0": { "name": "punctuation.definition.interpolation.begin.drift" }
+        "0": { "name": "punctuation.section.embedded.begin.js" }
       },
       "end": "\\}",
       "endCaptures": {
-        "0": { "name": "punctuation.definition.interpolation.end.drift" }
+        "0": { "name": "punctuation.section.embedded.end.js" }
       },
+      "name": "meta.embedded.line.js",
       "patterns": [
         { "include": "source.js" }
       ]
@@ -122,7 +140,6 @@
     },
     "tag-attributes": {
       "patterns": [
-        { "include": "#drift-interpolations" },
         {
           "name": "entity.other.attribute-name.html",
           "match": "[a-zA-Z0-9_:-]+"
@@ -132,8 +149,9 @@
           "beginCaptures": {
             "0": { "name": "punctuation.separator.key-value.html" }
           },
-          "end": "(?=\\s|/>|>)",
+          "end": "(?<=\\}|\"|')|(?=\\s|/>|>)",
           "patterns": [
+            { "include": "#drift-interpolations" },
             {
               "begin": "\"",
               "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.html" } },
@@ -153,11 +171,14 @@
               "patterns": [
                 { "include": "#drift-interpolations" }
               ]
-            },
-            { "include": "#drift-interpolations" }
+            }
           ]
         }
       ]
+    },
+    "html-operators": {
+      "match": ">|<",
+      "name": "punctuation.definition.tag.html"
     },
     "html-entities": {
       "match": "&(#?[a-zA-Z0-9]+);",

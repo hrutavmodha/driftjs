@@ -1,13 +1,13 @@
 {
-  "name": "@driftjs/vscode-plugin",
+  "name": "vscode-drift",
   "displayName": "DriftJS Language Support",
   "description": "Language server, IntelliSense, diagnostics, and syntax highlighting for DriftJS (.drift) Single File Components.",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "publisher": "driftjs",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/driftjs/driftjs.git"
+    "url": "https://github.com/hrutavmodha/driftjs.git"
   },
   "engines": {
     "vscode": "^1.75.0"

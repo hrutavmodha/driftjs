@@ -1,8 +1,8 @@
 <script>
   import Header from "./Header.drift";
+  let count = 0;
 </script>
 
 <h1>DriftJS Functionality Playground</h1>
 
-<input type="text">
-<Header title="Hello" subtitle="How are you?" />
+<button onclick={() => count++}></button> 
