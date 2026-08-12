@@ -3,7 +3,7 @@
 > **Ultra-Fast, Register-Based Bytecode Virtual Machine UI Framework**
 > *Zero Virtual DOM Overhead • Expression Engine • Keyed LIS Reconciliation • Built for Speed*
 
-[![Discord](https://img.shields.io/discord/T66TStRvd?label=Discord&logo=discord&logoColor=white)](https://discord.gg/T66TStRvd)
+[![Join Discord](https://img.shields.io/badge/🌈%20Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/T66TStRvd)
 
 ---
 
