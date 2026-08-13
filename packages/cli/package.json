@@ -1,8 +1,13 @@
 {
   "name": "create-drift",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "CLI scaffolding tool for DriftJS register VM applications",
   "type": "module",
+  "files": [
+    "bin",
+    "dist",
+    "template"
+  ],
   "bin": {
     "create-drift": "./bin/create-drift.js",
     "drift": "./bin/create-drift.js"
@@ -11,7 +16,8 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "vite build",
+    "prebuild": "node -e \"const fs = require('fs'); fs.rmSync('./template', { recursive: true, force: true }); fs.cpSync('../../template', './template', { recursive: true, filter: (src) => !src.includes('node_modules') && !src.includes('dist') });\"",
+    "build": "pnpm prebuild && vite build",
     "test": "vitest run",
     "prepublishOnly": "pnpm build && pnpm test"
   },
