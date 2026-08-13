@@ -10,16 +10,17 @@ Total Test Suites: **9** | Total Test Cases: **95** | Pass Rate: **100%**
 
 | Package Name                       | Package Directory        | Test Suites |  Test Cases  |     Pass Status     |
 | :--------------------------------- | :----------------------- | :---------: | :----------: | :-----------------: |
-| **`@driftjs/compiler`**    | `packages/compiler`    |      4      |      52      |       ✅ PASS       |
-| **`@driftjs/utils`**       | `packages/utils`       |      1      |      5      |       ✅ PASS       |
-| **`@driftjs/dom`**         | `packages/dom`         |      3      |      19      |       ✅ PASS       |
-| **`@driftjs/ssr`**         | `packages/ssr`         |      1      |      5      |       ✅ PASS       |
-| **`@driftjs/vite-plugin`** | `packages/vite-plugin` |      1      |      14      |       ✅ PASS       |
-| **Total Workspace**          |                          | **10** | **95** | **100% PASS** |
+| **`driftjs-compiler`**     | `packages/compiler`    |      4      |      52      |       ✅ PASS       |
+| **`driftjs-shared`**       | `packages/utils`       |      1      |      5      |       ✅ PASS       |
+| **`driftjs-dom`**          | `packages/dom`         |      3      |      19      |       ✅ PASS       |
+| **`driftjs-ssr`**          | `packages/ssr`         |      1      |      5      |       ✅ PASS       |
+| **`driftjs-vite-plugin`**  | `packages/vite-plugin` |      1      |      14      |       ✅ PASS       |
+| **`driftjs-cli`**          | `packages/cli`         |      1      |      8       |       ✅ PASS       |
+| **Total Workspace**          |                          | **11** | **103** | **100% PASS** |
 
 ---
 
-## 📦 1. Package: `@driftjs/compiler` (`packages/compiler`)
+## 📦 1. Package: `driftjs-compiler` (`packages/compiler`)
 
 Total Test Suites: **4** | Total Test Cases: **52**
 
@@ -96,7 +97,7 @@ Total Test Suites: **4** | Total Test Cases: **52**
 
 ---
 
-## 📦 2. Package: `@driftjs/utils` (`packages/utils`)
+## 📦 2. Package: `driftjs-shared` (`packages/utils`)
 
 Total Test Suites: **1** | Total Test Cases: **5**
 
@@ -112,7 +113,7 @@ Total Test Suites: **1** | Total Test Cases: **5**
 
 ---
 
-## 📦 3. Package: `@driftjs/dom` (`packages/dom`)
+## 📦 3. Package: `driftjs-dom` (`packages/dom`)
 
 Total Test Suites: **2** | Total Test Cases: **18**
 
@@ -150,7 +151,7 @@ Total Test Suites: **2** | Total Test Cases: **18**
 
 ---
 
-## 📦 4. Package: `@driftjs/ssr` (`packages/ssr`)
+## 📦 4. Package: `driftjs-ssr` (`packages/ssr`)
 
 Total Test Suites: **1** | Total Test Cases: **5**
 
@@ -166,7 +167,7 @@ Total Test Suites: **1** | Total Test Cases: **5**
 
 ---
 
-## 📦 5. Package: `@driftjs/vite-plugin` (`packages/vite-plugin`)
+## 📦 5. Package: `driftjs-vite-plugin` (`packages/vite-plugin`)
 
 Total Test Suites: **1** | Total Test Cases: **14**
 

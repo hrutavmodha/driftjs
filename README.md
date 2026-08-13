@@ -30,28 +30,36 @@ Unlike traditional Virtual DOM frameworks (e.g., React) that re-evaluate large t
 - **🔄 Keyed LIS Reconciliation**: Features a Longest Increasing Subsequence (LIS) list reconciler (`reconcileKeyedList`) that minimizes DOM node movements, insertions, and deletions.
 - **🎯 Fast-Path Attribute Patching**: Re-evaluates element attributes in-place without rebuilding DOM subtrees when data object references remain stable.
 - **📍 Fine-Grained Reactive Regions**: HTML comment anchors (`<!--if-->`, `<!--for-->`) visually bound `@if` and `@for` blocks, allowing surgical re-rendering of targeted regions without disturbing surrounding DOM elements.
-- **⚡ Vite Integration & Instant HMR**: Includes [`@driftjs/vite-plugin`](packages/vite-plugin) for instant template compilation and full-reload HMR on file save.
+- **⚡ Vite Integration & Instant HMR**: Includes [`driftjs-vite-plugin`](packages/vite-plugin) for instant template compilation and full-reload HMR on file save.
 
 ---
 
-## 🏆 Benchmark Results
+## 🚀 Quick Start (CLI Scaffolder)
 
-DriftJS maintains official performance comparisons's local clone using the [`js-framework-benchmark`](https://github.com/krausest/js-framework-benchmark) (`webdriver-ts`) suite.
+Create a new DriftJS app instantly using `driftjs-cli`:
 
-*Detailed benchmark metrics can be viewed in [`docs/RESULTS.md`](docs/RESULTS.md).*
+```bash
+pnpm create drift my-app
+# or using npm / yarn / bun
+npm create drift my-app
+```
 
 ---
 
 ## 📦 Monorepo Packages
 
-DriftJS is organized as a monorepo managed with `pnpm`:
+DriftJS is organized as a monorepo published on npm:
 
-| Package                            | Path                                            | Description                                                                          |
-| :--------------------------------- | :---------------------------------------------- | :----------------------------------------------------------------------------------- |
-| **`@driftjs/compiler`**    | [`packages/compiler`](packages/compiler)       | Lexer, Parser, Transformer, & Bytecode Generator emitting`CompiledModule` bytecode |
-| **`@driftjs/runtime`**     | [`packages/runtime`](packages/runtime)         | 256-Register VM, Expression Engine, Keyed LIS reconciler, &`mount()` API        |
-| **`@driftjs/vite-plugin`** | [`packages/vite-plugin`](packages/vite-plugin) | Vite plugin transforming`.drift` files into synthetic ESM modules with HMR support |
-| **`template`**             | [`template`](template)                         | Starter project template with Vite, TypeScript, and`.drift` counter example        |
+| Package | Path | Description |
+| :--- | :--- | :--- |
+| **`driftjs-cli`** | [`packages/cli`](packages/cli) | Interactive CLI scaffolding tool (`create-drift`) |
+| **`driftjs-compiler`** | [`packages/compiler`](packages/compiler) | Lexer, Parser, Transformer, & Bytecode Generator emitting `CompiledModule` bytecode |
+| **`driftjs-dom`** | [`packages/dom`](packages/dom) | 256-Register Client VM, Expression Engine, Keyed LIS reconciler, & `mount()` API |
+| **`driftjs-ssr`** | [`packages/ssr`](packages/ssr) | Headless Server-Side Rendering VM engine (`renderToString()`) |
+| **`driftjs-shared`** | [`packages/utils`](packages/utils) | Shared Scope & Expression Evaluator engine |
+| **`driftjs-vite-plugin`** | [`packages/vite-plugin`](packages/vite-plugin) | Vite plugin transforming `.drift` SFCs into synthetic ESM modules |
+| **`vscode-drift`** | [`packages/vscode-plugin`](packages/vscode-plugin) | VS Code Extension for `.drift` SFC syntax highlighting & diagnostics |
+| **`template`** | [`template`](template) | Starter project template with Vite, TypeScript, and `.drift` counter example |
 
 ---
 
