@@ -77,6 +77,7 @@ describe('DriftJS CLI Scaffolder', () => {
 
     const pkgData = JSON.parse(fs.readFileSync(targetPkgPath, 'utf8'));
     expect(pkgData.name).toBe('my-custom-app');
+    expect(pkgData.version).toBe('0.0.0');
   });
 
   it('should sanitize workspace:* dependency specifiers for standard package managers', () => {
@@ -87,7 +88,7 @@ describe('DriftJS CLI Scaffolder', () => {
     });
 
     const pkgData = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
-    expect(pkgData.dependencies['driftjs-dom']).toBe('^0.0.2');
+    expect(pkgData.dependencies['driftjs-dom']).toBe('^0.0.3');
     expect(pkgData.dependencies['driftjs-dom']).not.toContain('workspace:');
   });
 

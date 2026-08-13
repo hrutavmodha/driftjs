@@ -32,6 +32,7 @@ export function scaffoldProject(options: ScaffoldOptions): void {
   if (fs.existsSync(targetPkgPath)) {
     const pkgData = JSON.parse(fs.readFileSync(targetPkgPath, 'utf8'));
     pkgData.name = projectName;
+    pkgData.version = '0.0.0';
 
     if (pkgData.dependencies) {
       if (renderMode === 'csr') {
@@ -59,12 +60,13 @@ export function scaffoldProject(options: ScaffoldOptions): void {
   }
 }
 
-function sanitizeDependencies(deps?: Record<string, string>): void {
+export function sanitizeDependencies(deps?: Record<string, string>, targetVersion: string = '^0.0.3'): void {
   if (!deps) return;
+  const specifier = targetVersion.startsWith('^') ? targetVersion : `^${targetVersion}`;
   for (const [key, value] of Object.entries(deps)) {
     if (typeof value === 'string' && value.startsWith('workspace:')) {
       const cleanVersion = value.replace('workspace:', '').trim();
-      deps[key] = cleanVersion === '*' ? '^0.0.2' : cleanVersion;
+      deps[key] = cleanVersion === '*' ? specifier : cleanVersion;
     }
   }
 }
