@@ -3,7 +3,7 @@
 > **Ultra-Fast, Register-Based Bytecode Virtual Machine UI Framework**
 > *Zero Virtual DOM Overhead • Expression Engine • Keyed LIS Reconciliation • Built for Speed*
 
-[![Join Discord](https://img.shields.io/badge/%20Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/T66TStRvd)
+[![Join Discord](<https://img.shields.io/badge/%20Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white>)](https://discord.gg/T66TStRvd)
 
 ---
 
@@ -36,7 +36,7 @@ Unlike traditional Virtual DOM frameworks (e.g., React) that re-evaluate large t
 
 ## 🚀 Quick Start (CLI Scaffolder)
 
-Create a new DriftJS app instantly using `driftjs-cli`:
+Create a new DriftJS app instantly interactively using `driftjs-cli`:
 
 ```bash
 pnpm create drift my-app
@@ -44,22 +44,26 @@ pnpm create drift my-app
 npm create drift my-app
 ```
 
+- The command will prompt you for your choices. Follow up the questions and you will have the basic DriftJS app ready in a minute!
+
 ---
+
+
 
 ## 📦 Monorepo Packages
 
 DriftJS is organized as a monorepo published on npm:
 
-| Package | Path | Description |
-| :--- | :--- | :--- |
-| **`driftjs-cli`** | [`packages/cli`](packages/cli) | Interactive CLI scaffolding tool (`create-drift`) |
-| **`driftjs-compiler`** | [`packages/compiler`](packages/compiler) | Lexer, Parser, Transformer, & Bytecode Generator emitting `CompiledModule` bytecode |
-| **`driftjs-dom`** | [`packages/dom`](packages/dom) | 256-Register Client VM, Expression Engine, Keyed LIS reconciler, & `mount()` API |
-| **`driftjs-ssr`** | [`packages/ssr`](packages/ssr) | Headless Server-Side Rendering VM engine (`renderToString()`) |
-| **`driftjs-shared`** | [`packages/utils`](packages/utils) | Shared Scope & Expression Evaluator engine |
-| **`driftjs-vite-plugin`** | [`packages/vite-plugin`](packages/vite-plugin) | Vite plugin transforming `.drift` SFCs into synthetic ESM modules |
-| **`vscode-drift`** | [`packages/vscode-plugin`](packages/vscode-plugin) | VS Code Extension for `.drift` SFC syntax highlighting & diagnostics |
-| **`template`** | [`template`](template) | Starter project template with Vite, TypeScript, and `.drift` counter example |
+| Package                           | Path                                                | Description                                                                          |
+| :-------------------------------- | :-------------------------------------------------- | :----------------------------------------------------------------------------------- |
+| **`driftjs-cli`**         | [`packages/cli`](packages/cli)                     | Interactive CLI scaffolding tool (`create-drift`)                                  |
+| **`driftjs-compiler`**    | [`packages/compiler`](packages/compiler)           | Lexer, Parser, Transformer, & Bytecode Generator emitting`CompiledModule` bytecode |
+| **`driftjs-dom`**         | [`packages/dom`](packages/dom)                     | 256-Register Client VM, Expression Engine, Keyed LIS reconciler, &`mount()` API    |
+| **`driftjs-ssr`**         | [`packages/ssr`](packages/ssr)                     | Headless Server-Side Rendering VM engine (`renderToString()`)                      |
+| **`driftjs-shared`**      | [`packages/utils`](packages/utils)                 | Shared Scope & Expression Evaluator engine                                           |
+| **`driftjs-vite-plugin`** | [`packages/vite-plugin`](packages/vite-plugin)     | Vite plugin transforming`.drift` SFCs into synthetic ESM modules                   |
+| **`vscode-drift`**        | [`packages/vscode-plugin`](packages/vscode-plugin) | VS Code Extension for`.drift` SFC syntax highlighting & diagnostics                |
+| **`template`**            | [`template`](template)                             | Starter project template with Vite, TypeScript, and`.drift` counter example        |
 
 ---
 
