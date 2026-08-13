@@ -31,9 +31,9 @@ export function scaffoldProject(options: ScaffoldOptions): void {
 
     if (pkgData.dependencies) {
       if (renderMode === 'csr') {
-        delete pkgData.dependencies['@driftjs/ssr'];
+        delete pkgData.dependencies['driftjs-ssr'];
       } else if (renderMode === 'ssr') {
-        delete pkgData.dependencies['@driftjs/dom'];
+        delete pkgData.dependencies['driftjs-dom'];
       }
     }
 

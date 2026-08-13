@@ -24,8 +24,8 @@ describe('DriftJS CLI Scaffolder', () => {
           name: 'starter-template',
           version: '0.0.0',
           dependencies: {
-            '@driftjs/dom': 'workspace:*',
-            '@driftjs/ssr': 'workspace:*',
+            'driftjs-dom': 'workspace:*',
+            'driftjs-ssr': 'workspace:*',
           },
         },
         null,
@@ -87,11 +87,11 @@ describe('DriftJS CLI Scaffolder', () => {
     });
 
     const pkgData = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
-    expect(pkgData.dependencies['@driftjs/dom']).toBe('^0.0.0');
-    expect(pkgData.dependencies['@driftjs/dom']).not.toContain('workspace:');
+    expect(pkgData.dependencies['driftjs-dom']).toBe('^0.0.0');
+    expect(pkgData.dependencies['driftjs-dom']).not.toContain('workspace:');
   });
 
-  it('should remove @driftjs/ssr dependency when CSR mode is selected', () => {
+  it('should remove driftjs-ssr dependency when CSR mode is selected', () => {
     scaffoldProject({
       projectName: 'csr-app',
       targetDir,
@@ -100,11 +100,11 @@ describe('DriftJS CLI Scaffolder', () => {
     });
 
     const pkgData = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
-    expect(pkgData.dependencies['@driftjs/dom']).toBeDefined();
-    expect(pkgData.dependencies['@driftjs/ssr']).toBeUndefined();
+    expect(pkgData.dependencies['driftjs-dom']).toBeDefined();
+    expect(pkgData.dependencies['driftjs-ssr']).toBeUndefined();
   });
 
-  it('should remove @driftjs/dom dependency when SSR mode is selected', () => {
+  it('should remove driftjs-dom dependency when SSR mode is selected', () => {
     scaffoldProject({
       projectName: 'ssr-app',
       targetDir,
@@ -113,8 +113,8 @@ describe('DriftJS CLI Scaffolder', () => {
     });
 
     const pkgData = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
-    expect(pkgData.dependencies['@driftjs/ssr']).toBeDefined();
-    expect(pkgData.dependencies['@driftjs/dom']).toBeUndefined();
+    expect(pkgData.dependencies['driftjs-ssr']).toBeDefined();
+    expect(pkgData.dependencies['driftjs-dom']).toBeUndefined();
   });
 
   it('should skip node_modules and dist directories during copy', () => {

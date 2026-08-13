@@ -1,5 +1,5 @@
 {
-  "name": "@driftjs/ssr",
+  "name": "driftjs-ssr",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index-es.js",
@@ -16,8 +16,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@driftjs/compiler": "workspace:*",
-    "@driftjs/utils": "workspace:*"
+    "driftjs-compiler": "workspace:*",
+    "driftjs-utils": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

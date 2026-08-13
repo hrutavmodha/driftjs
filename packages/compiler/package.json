@@ -1,5 +1,5 @@
 {
-  "name": "@driftjs/compiler",
+  "name": "driftjs-compiler",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index-es.js",

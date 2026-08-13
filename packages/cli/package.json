@@ -1,5 +1,5 @@
 {
-  "name": "@driftjs/cli",
+  "name": "driftjs-cli",
   "version": "0.1.0",
   "description": "CLI scaffolding tool for DriftJS register VM applications",
   "type": "module",

@@ -16,11 +16,11 @@ export interface DriftPluginOptions {
  * Consumers can import these types when working with `.drift` imports in TS.
  *
  * @example
- * import type { DriftModule } from '@driftjs/vite-plugin';
+ * import type { DriftModule } from 'driftjs-vite-plugin';
  * import * as tpl from './hero.drift';
  * const m: DriftModule = tpl;
  */
-export type DriftModule = import('@driftjs/compiler').CompiledModule;
+export type DriftModule = import('driftjs-compiler').CompiledModule;
 
 /** File extension this plugin owns. */
 export const DRIFT_EXT = '.drift' as const;

@@ -2,7 +2,7 @@ import type { Plugin } from 'vite';
 import {
   compile,
   type CompiledModule,
-} from '@driftjs/compiler';
+} from 'driftjs-compiler';
 import { DRIFT_EXT, type DriftPluginOptions } from '../types/index.js';
 
 export type { DriftPluginOptions, DriftModule } from '../types/index.js';
@@ -63,7 +63,7 @@ function generateESM(mod: CompiledModule, filePath: string): string {
   return `\
 // [DriftJS] Auto-generated from: ${filePath}
 // Do not edit — regenerated on every save / build.
-${importsHeader}/** @type {import('@driftjs/compiler').CompiledModule} */
+${importsHeader}/** @type {import('driftjs-compiler').CompiledModule} */
 const compiledModule = {
   bytecode: new Uint32Array(${bytecodeJSON}),
   constants: ${constantsJSON},

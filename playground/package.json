@@ -10,12 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@driftjs/compiler": "workspace:*",
-    "@driftjs/dom": "workspace:*",
-    "@driftjs/ssr": "workspace:*"
+    "driftjs-compiler": "workspace:*",
+    "driftjs-dom": "workspace:*",
+    "driftjs-ssr": "workspace:*"
   },
   "devDependencies": {
-    "@driftjs/vite-plugin": "workspace:*",
+    "driftjs-vite-plugin": "workspace:*",
     "typescript": "^7.0.2",
     "vite": "^8.1.5"
   }

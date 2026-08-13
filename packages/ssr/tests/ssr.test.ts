@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DriftServerVM, renderToString } from '../src/index.js';
-import { Opcode, CompiledModule } from '@driftjs/compiler';
+import { Opcode, CompiledModule } from 'driftjs-compiler';
 
 describe('DriftServerVM (SSR Engine)', () => {
   it('renders static elements with escape protection to HTML string', () => {

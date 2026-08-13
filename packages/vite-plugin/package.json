@@ -1,5 +1,5 @@
 {
-  "name": "@driftjs/vite-plugin",
+  "name": "driftjs-vite-plugin",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index-es.js",
@@ -16,13 +16,13 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@driftjs/compiler": "workspace:*"
+    "driftjs-compiler": "workspace:*"
   },
   "peerDependencies": {
     "vite": "8.1.5"
   },
   "devDependencies": {
-    "@driftjs/dom": "workspace:*",
+    "driftjs-dom": "workspace:*",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"

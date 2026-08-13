@@ -6,7 +6,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "tsc --noEmit",
-    "publish": "pnpm --filter \"./packages/*\" publish --access public"
+    "publish": "pnpm --filter \"./packages/*\" publish"
   },
   "devDependencies": {
     "happy-dom": "^20.11.1",

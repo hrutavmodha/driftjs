@@ -64,7 +64,7 @@ importers:
 
   packages/dom:
     dependencies:
-      '@driftjs/utils':
+      driftjs-utils:
         specifier: workspace:*
         version: link:../utils
     devDependencies:
@@ -80,10 +80,10 @@ importers:
 
   packages/ssr:
     dependencies:
-      '@driftjs/compiler':
+      driftjs-compiler:
         specifier: workspace:*
         version: link:../compiler
-      '@driftjs/utils':
+      driftjs-utils:
         specifier: workspace:*
         version: link:../utils
     devDependencies:
@@ -99,7 +99,7 @@ importers:
 
   packages/utils:
     dependencies:
-      '@driftjs/compiler':
+      driftjs-compiler:
         specifier: workspace:*
         version: link:../compiler
     devDependencies:
@@ -115,11 +115,11 @@ importers:
 
   packages/vite-plugin:
     dependencies:
-      '@driftjs/compiler':
+      driftjs-compiler:
         specifier: workspace:*
         version: link:../compiler
     devDependencies:
-      '@driftjs/dom':
+      driftjs-dom:
         specifier: workspace:*
         version: link:../dom
       typescript:
@@ -134,7 +134,7 @@ importers:
 
   packages/vscode-plugin:
     dependencies:
-      '@driftjs/compiler':
+      driftjs-compiler:
         specifier: workspace:*
         version: link:../compiler
       vscode-languageclient:
@@ -162,17 +162,17 @@ importers:
 
   playground:
     dependencies:
-      '@driftjs/compiler':
+      driftjs-compiler:
         specifier: workspace:*
         version: link:../packages/compiler
-      '@driftjs/dom':
+      driftjs-dom:
         specifier: workspace:*
         version: link:../packages/dom
-      '@driftjs/ssr':
+      driftjs-ssr:
         specifier: workspace:*
         version: link:../packages/ssr
     devDependencies:
-      '@driftjs/vite-plugin':
+      driftjs-vite-plugin:
         specifier: workspace:*
         version: link:../packages/vite-plugin
       typescript:
@@ -184,17 +184,17 @@ importers:
 
   template:
     dependencies:
-      '@driftjs/compiler':
+      driftjs-compiler:
         specifier: workspace:*
         version: link:../packages/compiler
-      '@driftjs/dom':
+      driftjs-dom:
         specifier: workspace:*
         version: link:../packages/dom
-      '@driftjs/ssr':
+      driftjs-ssr:
         specifier: workspace:*
         version: link:../packages/ssr
     devDependencies:
-      '@driftjs/vite-plugin':
+      driftjs-vite-plugin:
         specifier: workspace:*
         version: link:../packages/vite-plugin
       typescript:

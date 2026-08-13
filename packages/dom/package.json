@@ -1,5 +1,5 @@
 {
-  "name": "@driftjs/dom",
+  "name": "driftjs-dom",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index-es.js",
@@ -9,7 +9,7 @@
     "prepublishOnly": "pnpm build && pnpm test"
   },
   "dependencies": {
-    "@driftjs/utils": "workspace:*"
+    "driftjs-utils": "workspace:*"
   },
   "exports": {
     ".": "./dist/index-es.js"

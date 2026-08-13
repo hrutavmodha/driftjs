@@ -1,5 +1,5 @@
 import { setScopeValue, inScopeChain } from './scope.js';
-import { astToJS } from '@driftjs/compiler';
+import { astToJS } from 'driftjs-compiler';
 
 /**
  * Safely resolves an iterable object or array.

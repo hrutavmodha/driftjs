@@ -1,10 +1,10 @@
-import { type CompiledModule, Opcode } from "@driftjs/compiler";
+import { type CompiledModule, Opcode } from "driftjs-compiler";
 import {
   evaluateExpression,
   executeBlockStatement,
   resolveComponentModule,
   evaluatePropsSpec,
-} from "@driftjs/utils";
+} from "driftjs-utils";
 import type { SSRExecutionOptions, ServerNode } from "../types/index.js";
 
 export * from "../types/index.js";

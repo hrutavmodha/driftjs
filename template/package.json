@@ -1,5 +1,5 @@
 {
-  "name": "@driftjs/template",
+  "name": "driftjs-template",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,11 +12,11 @@
   "devDependencies": {
     "typescript": "^7.0.2",
     "vite": "^8.1.5",
-    "@driftjs/vite-plugin": "workspace:*"
+    "driftjs-vite-plugin": "workspace:*"
   },
   "dependencies": {
-    "@driftjs/compiler": "workspace:*",
-    "@driftjs/dom": "workspace:*",
-    "@driftjs/ssr": "workspace:*"
+    "driftjs-compiler": "workspace:*",
+    "driftjs-dom": "workspace:*",
+    "driftjs-ssr": "workspace:*"
   }
 }

@@ -1,4 +1,4 @@
-import type { CompiledModule } from '@driftjs/compiler';
+import type { CompiledModule } from 'driftjs-compiler';
 
 declare module '*.drift' {
   const component: CompiledModule;

@@ -8,7 +8,7 @@ import {
   MAX_REGISTERS,
 } from '../src/index.js';
 
-describe('@driftjs/utils Shared Evaluator Module', () => {
+describe('driftjs-utils Shared Evaluator Module', () => {
   it('exports MAX_REGISTERS constant equal to 256', () => {
     expect(MAX_REGISTERS).toBe(256);
   });

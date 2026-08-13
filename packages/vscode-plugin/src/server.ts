@@ -14,7 +14,7 @@ import {
   Range,
 } from 'vscode-languageserver/node.js';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { compile } from '@driftjs/compiler';
+import { compile } from 'driftjs-compiler';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);

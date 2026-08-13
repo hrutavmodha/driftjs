@@ -1,5 +1,5 @@
 // @ts-ignore
-import { mount, hydrate } from '@driftjs/dom';
+import { mount, hydrate } from 'driftjs-dom';
 // @ts-ignore
 import App from './App.drift';
 
