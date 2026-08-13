@@ -69,7 +69,7 @@ export function scaffoldProject(options: ScaffoldOptions): void {
   }
 }
 
-export function sanitizeDependencies(deps?: Record<string, string>, targetVersion: string = '^0.0.3'): void {
+export function sanitizeDependencies(deps?: Record<string, string>, targetVersion: string = '^0.0.4'): void {
   if (!deps) return;
   const specifier = targetVersion.startsWith('^') ? targetVersion : `^${targetVersion}`;
   for (const [key, value] of Object.entries(deps)) {

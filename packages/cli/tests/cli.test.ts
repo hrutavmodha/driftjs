@@ -88,7 +88,7 @@ describe('DriftJS CLI Scaffolder', () => {
     });
 
     const pkgData = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
-    expect(pkgData.dependencies['driftjs-dom']).toBe('^0.0.3');
+    expect(pkgData.dependencies['driftjs-dom']).toBe('^0.0.4');
     expect(pkgData.dependencies['driftjs-dom']).not.toContain('workspace:');
   });
 
