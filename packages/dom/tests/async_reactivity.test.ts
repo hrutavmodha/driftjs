@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { DriftClientVM } from '../src/index.js';
 import { Opcode } from '../types/index.js';
-import { executeBlockStatement } from 'driftjs-utils';
+import { executeBlockStatement } from 'driftjs-shared';
 
 describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', () => {
   it('updates DOM reactively when state changes inside an async function (async/await)', async () => {

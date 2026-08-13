@@ -60,7 +60,7 @@ function sanitizeDependencies(deps?: Record<string, string>): void {
   for (const [key, value] of Object.entries(deps)) {
     if (typeof value === 'string' && value.startsWith('workspace:')) {
       const cleanVersion = value.replace('workspace:', '').trim();
-      deps[key] = cleanVersion === '*' ? '^0.0.0' : cleanVersion;
+      deps[key] = cleanVersion === '*' ? '^0.0.1' : cleanVersion;
     }
   }
 }

@@ -17,7 +17,7 @@ import {
   resolveIterable,
   resolveComponentModule,
   evaluatePropsSpec,
-} from "driftjs-utils";
+} from "driftjs-shared";
 
 
 /**

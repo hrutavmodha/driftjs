@@ -64,7 +64,7 @@ importers:
 
   packages/dom:
     dependencies:
-      driftjs-utils:
+      driftjs-shared:
         specifier: workspace:*
         version: link:../utils
     devDependencies:
@@ -83,7 +83,7 @@ importers:
       driftjs-compiler:
         specifier: workspace:*
         version: link:../compiler
-      driftjs-utils:
+      driftjs-shared:
         specifier: workspace:*
         version: link:../utils
     devDependencies:

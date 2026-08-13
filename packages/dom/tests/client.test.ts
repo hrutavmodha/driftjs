@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { DriftClientVM, mount } from '../src/index.js';
 import { Opcode, CompiledModule } from '../types/index.js';
 import { DriftLexer, DriftParser, DriftTransformer, DriftGenerator } from '../../compiler/src/index.js';
-import { setScopeValue } from 'driftjs-utils';
+import { setScopeValue } from 'driftjs-shared';
 
 describe('DriftClientVM', () => {
   const vm = new DriftClientVM();

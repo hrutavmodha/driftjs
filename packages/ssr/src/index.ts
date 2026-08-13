@@ -4,7 +4,7 @@ import {
   executeBlockStatement,
   resolveComponentModule,
   evaluatePropsSpec,
-} from "driftjs-utils";
+} from "driftjs-shared";
 import type { SSRExecutionOptions, ServerNode } from "../types/index.js";
 
 export * from "../types/index.js";
