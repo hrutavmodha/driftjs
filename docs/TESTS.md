@@ -15,7 +15,7 @@ Total Test Suites: **9** | Total Test Cases: **95** | Pass Rate: **100%**
 | **`driftjs-dom`**          | `packages/dom`         |      3      |      19      |       ✅ PASS       |
 | **`driftjs-ssr`**          | `packages/ssr`         |      1      |      5      |       ✅ PASS       |
 | **`driftjs-vite-plugin`**  | `packages/vite-plugin` |      1      |      14      |       ✅ PASS       |
-| **`driftjs-cli`**          | `packages/cli`         |      1      |      8       |       ✅ PASS       |
+| **`create-drift`**         | `packages/cli`         |      1      |      8       |       ✅ PASS       |
 | **Total Workspace**          |                          | **11** | **103** | **100% PASS** |
 
 ---

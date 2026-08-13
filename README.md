@@ -36,7 +36,7 @@ Unlike traditional Virtual DOM frameworks (e.g., React) that re-evaluate large t
 
 ## 🚀 Quick Start (CLI Scaffolder)
 
-Create a new DriftJS app instantly interactively using `driftjs-cli`:
+Create a new DriftJS app instantly using `create-drift`:
 
 ```bash
 pnpm create drift my-app
@@ -44,19 +44,17 @@ pnpm create drift my-app
 npm create drift my-app
 ```
 
-- The command will prompt you for your choices. Follow up the questions and you will have the basic DriftJS app ready in a minute!
+- The command will prompt you interactively for your choices to set up your DriftJS app in seconds!
 
 ---
-
-
 
 ## 📦 Monorepo Packages
 
 DriftJS is organized as a monorepo published on npm:
 
-| Package                           | Path                                                | Description                                                                          |
-| :-------------------------------- | :-------------------------------------------------- | :----------------------------------------------------------------------------------- |
-| **`driftjs-cli`**         | [`packages/cli`](packages/cli)                     | Interactive CLI scaffolding tool (`create-drift`)                                  |
+| Package | Path | Description |
+| :--- | :--- | :--- |
+| **`create-drift`** | [`packages/cli`](packages/cli) | Interactive CLI scaffolding tool (`npm create drift`) |
 | **`driftjs-compiler`**    | [`packages/compiler`](packages/compiler)           | Lexer, Parser, Transformer, & Bytecode Generator emitting`CompiledModule` bytecode |
 | **`driftjs-dom`**         | [`packages/dom`](packages/dom)                     | 256-Register Client VM, Expression Engine, Keyed LIS reconciler, &`mount()` API    |
 | **`driftjs-ssr`**         | [`packages/ssr`](packages/ssr)                     | Headless Server-Side Rendering VM engine (`renderToString()`)                      |
