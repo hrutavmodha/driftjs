@@ -92,7 +92,9 @@ describe('DriftJS CLI Scaffolder', () => {
     expect(pkgData.dependencies['driftjs-dom']).not.toContain('workspace:');
   });
 
-  it('should remove driftjs-ssr dependency when CSR mode is selected', () => {
+  it('should remove driftjs-ssr dependency, server.js, and scripts.serve when CSR mode is selected', () => {
+    fs.writeFileSync(path.join(templateDir, 'server.js'), '// SSR server');
+
     scaffoldProject({
       projectName: 'csr-app',
       targetDir,
@@ -103,6 +105,7 @@ describe('DriftJS CLI Scaffolder', () => {
     const pkgData = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
     expect(pkgData.dependencies['driftjs-dom']).toBeDefined();
     expect(pkgData.dependencies['driftjs-ssr']).toBeUndefined();
+    expect(fs.existsSync(path.join(targetDir, 'server.js'))).toBe(false);
   });
 
   it('should remove driftjs-dom dependency when SSR mode is selected', () => {

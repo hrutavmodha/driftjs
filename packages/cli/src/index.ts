@@ -34,10 +34,19 @@ export function scaffoldProject(options: ScaffoldOptions): void {
     pkgData.name = projectName;
     pkgData.version = '0.0.0';
 
-    if (pkgData.dependencies) {
-      if (renderMode === 'csr') {
+    if (renderMode === 'csr') {
+      if (pkgData.dependencies) {
         delete pkgData.dependencies['driftjs-ssr'];
-      } else if (renderMode === 'ssr') {
+      }
+      if (pkgData.scripts) {
+        delete pkgData.scripts['serve'];
+      }
+      const serverJsPath = path.join(targetDir, 'server.js');
+      if (fs.existsSync(serverJsPath)) {
+        fs.rmSync(serverJsPath, { force: true });
+      }
+    } else if (renderMode === 'ssr') {
+      if (pkgData.dependencies) {
         delete pkgData.dependencies['driftjs-dom'];
       }
     }
