@@ -1,11 +1,12 @@
 {
   "name": "driftjs-monorepo",
-  "private": true,
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "publish": "pnpm --filter \"./packages/*\" publish --access public"
   },
   "devDependencies": {
     "happy-dom": "^20.11.1",

@@ -12,7 +12,8 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build && pnpm test"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0",

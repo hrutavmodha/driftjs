@@ -47,7 +47,9 @@
   },
   "scripts": {
     "build": "vite build",
-    "watch": "tsc -w"
+    "watch": "tsc -w",
+    "test": "vitest run --passWithNoTests",
+    "prepublishOnly": "pnpm build && pnpm test"
   },
   "dependencies": {
     "@driftjs/compiler": "workspace:*",

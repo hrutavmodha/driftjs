@@ -29,7 +29,7 @@
     history = ['▶ Auto-increment started', ...history];
     _intervalId = setInterval(() => {
       count++;
-      history = [`Auto → ${count}`, ...history];
+      history = [`Auto-incremented to ${count}`, ...history];
     }, 1000);
   }
 
@@ -64,13 +64,13 @@
     
     <div class="badge-container">
       @if count === 0 {
-        <span class="badge badge-zero">Zero State</span>
+        <span class="badge badge-zero">Zero</span>
       }
       @else if count > 0 {
-        <span class="badge badge-positive">Positive (+{count})</span>
+        <span class="badge badge-positive">Positive</span>
       }
       @else {
-        <span class="badge badge-negative">Negative ({count})</span>
+        <span class="badge badge-negative">Negative</span>
       }
 
       @if count % 2 === 0 {
@@ -83,21 +83,21 @@
   </div>
 
   <div class="button-group">
-    <button class="btn btn-dec" onclick={decrement}>− Decrement</button>
+    <button class="btn btn-dec" onclick={decrement}>Decrement</button>
     <button class="btn btn-reset" onclick={reset}>Reset</button>
+    <button class="btn btn-inc" onclick={increment}>Increment</button>
     @if autoRunning {
-      <button class="btn btn-auto btn-auto-stop" onclick={stopAutoIncrement}>■ Stop Auto</button>
+      <button class="btn btn-auto btn-auto-stop" onclick={stopAutoIncrement}>Stop Auto Increment</button>
     }
     @else {
-      <button class="btn btn-auto" onclick={startAutoIncrement}>▶ Auto</button>
+      <button class="btn btn-auto" onclick={startAutoIncrement}>Auto Increment</button>
     }
-    <button class="btn btn-inc" onclick={increment}>+ Increment</button>
   </div>
 
   <div class="history-section">
     <div class="history-header">
       <h2>Activity History Log</h2>
-      <button class="btn-clear" onclick={clearHistory}>Clear Log</button>
+      <button class="btn-clear" onclick={clearHistory}>Clear</button>
     </div>
     <ul class="history-list">
       @for log in history {

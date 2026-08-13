@@ -9,3 +9,5 @@ examples/
 js-framework-benchmark/
 temp/
 *.vsix
+scratch/
+my-app/

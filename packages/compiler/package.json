@@ -5,7 +5,8 @@
   "main": "./dist/index-es.js",
   "scripts": {
     "build": "vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build && pnpm test"
   },
   "types": "./src/index.ts",
   "exports": {
