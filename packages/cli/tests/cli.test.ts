@@ -87,7 +87,7 @@ describe('DriftJS CLI Scaffolder', () => {
     });
 
     const pkgData = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
-    expect(pkgData.dependencies['driftjs-dom']).toBe('^0.0.1');
+    expect(pkgData.dependencies['driftjs-dom']).toBe('^0.0.2');
     expect(pkgData.dependencies['driftjs-dom']).not.toContain('workspace:');
   });
 
@@ -154,5 +154,35 @@ describe('DriftJS CLI Scaffolder', () => {
     expect(detectPackageManager()).toBe('npm');
 
     process.env.npm_config_user_agent = origUserAgent;
+  });
+
+  it('should clear existing directory when overwriteMode is empty', () => {
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.writeFileSync(path.join(targetDir, 'old-file.txt'), 'old content');
+
+    scaffoldProject({
+      projectName: 'cleared-app',
+      targetDir,
+      templateDir,
+      overwriteMode: 'empty',
+    });
+
+    expect(fs.existsSync(path.join(targetDir, 'old-file.txt'))).toBe(false);
+    expect(fs.existsSync(path.join(targetDir, 'index.html'))).toBe(true);
+  });
+
+  it('should preserve existing files when overwriteMode is ignore', () => {
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.writeFileSync(path.join(targetDir, 'custom-config.json'), '{}');
+
+    scaffoldProject({
+      projectName: 'merged-app',
+      targetDir,
+      templateDir,
+      overwriteMode: 'ignore',
+    });
+
+    expect(fs.existsSync(path.join(targetDir, 'custom-config.json'))).toBe(true);
+    expect(fs.existsSync(path.join(targetDir, 'index.html'))).toBe(true);
   });
 });

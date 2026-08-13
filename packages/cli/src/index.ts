@@ -9,10 +9,14 @@ export * from '../types/index.js';
  * Scaffolds a new DriftJS project by copying the starter template.
  */
 export function scaffoldProject(options: ScaffoldOptions): void {
-  const { projectName, targetDir, templateDir, renderMode } = options;
+  const { projectName, targetDir, templateDir, renderMode, overwriteMode } = options;
 
   if (!fs.existsSync(templateDir)) {
     throw new Error(`Template directory not found at: ${templateDir}`);
+  }
+
+  if (overwriteMode === 'empty' && fs.existsSync(targetDir)) {
+    emptyDirectory(targetDir);
   }
 
   // Create target directory if it doesn't exist
@@ -60,7 +64,7 @@ function sanitizeDependencies(deps?: Record<string, string>): void {
   for (const [key, value] of Object.entries(deps)) {
     if (typeof value === 'string' && value.startsWith('workspace:')) {
       const cleanVersion = value.replace('workspace:', '').trim();
-      deps[key] = cleanVersion === '*' ? '^0.0.1' : cleanVersion;
+      deps[key] = cleanVersion === '*' ? '^0.0.2' : cleanVersion;
     }
   }
 }
@@ -89,6 +93,20 @@ export function startDevServer(targetDir: string, pm: string): void {
     cwd: targetDir,
     stdio: 'inherit',
   });
+}
+
+export function emptyDirectory(dirPath: string): void {
+  if (!fs.existsSync(dirPath)) return;
+  for (const file of fs.readdirSync(dirPath)) {
+    if (file === '.git') continue;
+    fs.rmSync(path.join(dirPath, file), { recursive: true, force: true });
+  }
+}
+
+export function isDirectoryNotEmpty(dirPath: string): boolean {
+  if (!fs.existsSync(dirPath)) return false;
+  const files = fs.readdirSync(dirPath);
+  return files.length > 0 && !(files.length === 1 && files[0] === '.git');
 }
 
 function copyDirectory(src: string, dest: string): void {
