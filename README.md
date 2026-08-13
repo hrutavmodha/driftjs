@@ -60,7 +60,7 @@ DriftJS is organized as a monorepo published on npm:
 | **`driftjs-ssr`**         | [`packages/ssr`](packages/ssr)                     | Headless Server-Side Rendering VM engine (`renderToString()`)                      |
 | **`driftjs-shared`**      | [`packages/utils`](packages/utils)                 | Shared Scope & Expression Evaluator engine                                           |
 | **`driftjs-vite-plugin`** | [`packages/vite-plugin`](packages/vite-plugin)     | Vite plugin transforming`.drift` SFCs into synthetic ESM modules                   |
-| **`vscode-drift`**        | [`packages/vscode-plugin`](packages/vscode-plugin) | VS Code Extension for`.drift` SFC syntax highlighting & diagnostics                |
+| **`drift-vscode`**        | [`packages/vscode-plugin`](packages/vscode-plugin) | VS Code Extension for`.drift` SFC syntax highlighting & diagnostics                |
 | **`template`**            | [`template`](template)                             | Starter project template with Vite, TypeScript, and`.drift` counter example        |
 
 ---

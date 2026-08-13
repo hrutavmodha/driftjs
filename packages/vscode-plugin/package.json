@@ -1,5 +1,5 @@
 {
-  "name": "vscode-drift",
+  "name": "drift-vscode",
   "displayName": "DriftJS Language Support",
   "description": "Language server, IntelliSense, diagnostics, and syntax highlighting for DriftJS (.drift) Single File Components.",
   "version": "0.0.4",

@@ -6,10 +6,10 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-drift"
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-plugin"
       ],
       "outFiles": [
-        "${workspaceFolder}/packages/vscode-drift/dist/**/*.js"
+        "${workspaceFolder}/packages/vscode-plugin/dist/**/*.js"
       ],
       "preLaunchTask": "npm: build"
     }
