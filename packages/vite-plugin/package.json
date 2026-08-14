@@ -1,6 +1,6 @@
 {
   "name": "driftjs-vite-plugin",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "files": [
     "dist",
@@ -32,4 +32,3 @@
     "vitest": "^4.1.10"
   }
 }
-

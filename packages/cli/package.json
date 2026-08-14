@@ -1,6 +1,6 @@
 {
   "name": "create-drift",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "CLI scaffolding tool for DriftJS register VM applications",
   "type": "module",
   "files": [
@@ -17,12 +17,12 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "prebuild": "node ../../scripts/copy-template.js",
+    "prebuild": "node ../../scripts/template/copy.js",
     "build": "pnpm prebuild && vite build",
     "test": "vitest run",
     "prepublishOnly": "pnpm build && pnpm test",
-    "postpack": "node ../../scripts/clean-template.js",
-    "postpublish": "node ../../scripts/clean-template.js"
+    "postpack": "node ../../scripts/template/clean.js",
+    "postpublish": "node ../../scripts/template/clean.js"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0",

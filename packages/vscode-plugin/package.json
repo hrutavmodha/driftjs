@@ -2,7 +2,7 @@
   "name": "drift-vscode",
   "displayName": "DriftJS Language Support",
   "description": "Language server, IntelliSense, diagnostics, and syntax highlighting for DriftJS (.drift) Single File Components.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "driftjs",
   "license": "MIT",
   "repository": {
@@ -26,8 +26,13 @@
     "languages": [
       {
         "id": "drift",
-        "aliases": ["DriftJS", "drift"],
-        "extensions": [".drift"],
+        "aliases": [
+          "DriftJS",
+          "drift"
+        ],
+        "extensions": [
+          ".drift"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
