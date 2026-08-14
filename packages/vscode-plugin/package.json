@@ -49,6 +49,7 @@
     "build": "vite build",
     "watch": "tsc -w",
     "test": "vitest run --passWithNoTests",
+    "package": "vsce package",
     "prepublishOnly": "pnpm build && pnpm test"
   },
   "dependencies": {
@@ -60,6 +61,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^3.2.1",
     "typescript": "^5.0.0",
     "vite": "^8.1.5"
   }

@@ -6,7 +6,8 @@
   "files": [
     "bin",
     "dist",
-    "template"
+    "template",
+    "README.md"
   ],
   "bin": {
     "create-drift": "./bin/create-drift.js",
@@ -16,10 +17,12 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "prebuild": "node -e \"const fs = require('fs'); fs.rmSync('./template', { recursive: true, force: true }); fs.cpSync('../../template', './template', { recursive: true, filter: (src) => !src.includes('node_modules') && !src.includes('dist') });\"",
+    "prebuild": "node ../../scripts/copy-template.js",
     "build": "pnpm prebuild && vite build",
     "test": "vitest run",
-    "prepublishOnly": "pnpm build && pnpm test"
+    "prepublishOnly": "pnpm build && pnpm test",
+    "postpack": "node ../../scripts/clean-template.js",
+    "postpublish": "node ../../scripts/clean-template.js"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0",

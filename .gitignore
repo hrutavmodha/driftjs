@@ -4,10 +4,12 @@ dist
 *.log
 examples/
 .trae/
-*.js
+server.js
 .agents/
 js-framework-benchmark/
 temp/
 *.vsix
 scratch/
 my-app/
+packages/cli/template/
+*.tgz
