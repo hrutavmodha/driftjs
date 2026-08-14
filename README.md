@@ -1,9 +1,12 @@
-# ⚡ DriftJS
-
-> **Ultra-Fast, Register-Based Bytecode Virtual Machine UI Framework**
-> *Zero Virtual DOM Overhead • Expression Engine • Keyed LIS Reconciliation • Built for Speed*
-
-[![Join Discord](<https://img.shields.io/badge/%20Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white>)](https://discord.gg/T66TStRvd)
+<div align="center">
+  <h1>⚡ DriftJS</h1>
+  <p>
+    <strong>Ultra-Fast, Register-Based Bytecode Virtual Machine UI Framework</strong><br />
+    <em>Zero Virtual DOM Overhead • Expression Engine • Keyed LIS Reconciliation • Built for Speed</em>
+  </p>
+  <br />
+  <img src="assets/logo.png" alt="DriftJS Logo" width="180" />
+</div>
 
 ---
 
@@ -372,6 +375,16 @@ We welcome contributions of all kinds! Whether you want to fix bugs, optimize VM
 4. Open a Pull Request detailing your changes.
 
 Together, let's make DriftJS a production-grade, ultra-fast UI framework!
+
+---
+
+## 💬 Community & Discussion
+
+Have questions, feature ideas, or want to discuss compiler optimizations and register VM architecture?
+
+[![Join Discord](https://img.shields.io/badge/%20Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/T66TStRvd)
+
+Connect with core developers, ask questions, share feedback, and help shape the future of DriftJS.
 
 ---
 
