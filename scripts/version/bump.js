@@ -61,5 +61,16 @@ export function bumpVersion(releaseType) {
     fs.writeFileSync(cliIndexPath, content, 'utf8');
   }
 
+  // Update expected version assertion in packages/cli/tests/cli.test.ts if present
+  const cliTestPath = path.join(packagesDir, 'cli', 'tests', 'cli.test.ts');
+  if (fs.existsSync(cliTestPath)) {
+    let testContent = fs.readFileSync(cliTestPath, 'utf8');
+    testContent = testContent.replace(
+      /expect\(pkgData\.dependencies\['driftjs-dom'\]\)\.toBe\('\^\d+\.\d+\.\d+'\)/,
+      `expect(pkgData.dependencies['driftjs-dom']).toBe('^${newVersion}')`
+    );
+    fs.writeFileSync(cliTestPath, testContent, 'utf8');
+  }
+
   console.log(`🚀 Bumped all packages (${releaseType}): ${oldVersion} ──► ${newVersion}`);
 }

@@ -6,7 +6,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "tsc --noEmit",
-    "publish": "pnpm --filter \"./packages/*\" publish",
+    "publish": "pnpm -r publish --no-git-checks --access public",
     "patch": "node scripts/version/patch.js",
     "minor": "node scripts/version/minor.js",
     "major": "node scripts/version/major.js"
