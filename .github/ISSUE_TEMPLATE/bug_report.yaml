@@ -1,0 +1,90 @@
+name: "🐛 Bug Report"
+description: File a bug report for DriftJS compiler, runtime VM, or tooling.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve DriftJS! Please ensure you have searched existing issues before submitting a new report.
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Affected Area / Package
+      description: Which part of DriftJS is causing the issue?
+      options:
+        - "Runtime VM (@driftjs/core / VM)"
+        - "Compiler / Parser (@driftjs/compiler)"
+        - "AST Interpreter (@driftjs/utils)"
+        - "Bundler / Tooling (@driftjs/vite-plugin)"
+        - "List Reconciler / LIS"
+        - "Other"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: DriftJS Version
+      description: What version of DriftJS are you using? (e.g., 0.0.4)
+      placeholder: "0.0.4"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what happened and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal Reproduction
+      description: |
+        Please provide a link to a minimal reproduction repository, StackBlitz, or a minimal code snippet reproducing the problem.
+      placeholder: "https://github.com/..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce the issue step by step?
+      placeholder: |
+        1. Run '...'
+        2. Click on '....'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs / Output
+      description: Paste any stack traces, compiler output, or browser console errors.
+      render: shell
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment Info
+      description: Node.js version, OS, and Browser (e.g., Node 22.x, macOS Sequoia, Chrome 128).
+      placeholder: "Node v22.12.0, macOS / Chrome 128"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I have verified this issue is not already reported in existing open issues.
+          required: true
+        - label: I have provided a minimal reproduction of the problem.
+          required: true
