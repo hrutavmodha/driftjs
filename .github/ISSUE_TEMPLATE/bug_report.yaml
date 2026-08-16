@@ -1,25 +1,29 @@
-name: "🐛 Bug Report"
-description: File a bug report for DriftJS compiler, runtime VM, or tooling.
-title: "[Bug]: "
+name: "Bug Report"
+description: Report an issue in the DriftJS compiler, register VM runtime, Vite plugin, CLI, or VSCode extension.
+title: "[BUG]: "
 labels: ["bug", "triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve DriftJS! Please ensure you have searched existing issues before submitting a new report.
+        Thanks for helping improve **DriftJS**!
+        Before submitting, please search [existing open issues](https://github.com/hrutavmodha/driftjs/issues) to ensure your problem hasn't already been reported.
 
   - type: dropdown
-    id: package
+    id: area
     attributes:
-      label: Affected Area / Package
-      description: Which part of DriftJS is causing the issue?
+      label: Affected Area
+      description: Select the area or subsystem where the issue occurs.
       options:
-        - "Runtime VM (@driftjs/core / VM)"
-        - "Compiler / Parser (@driftjs/compiler)"
-        - "AST Interpreter (@driftjs/utils)"
-        - "Bundler / Tooling (@driftjs/vite-plugin)"
-        - "List Reconciler / LIS"
-        - "Other"
+        - "Template Compiler & Bytecode Generator"
+        - "Browser VM & DOM Runtime"
+        - "Server-Side Rendering (SSR)"
+        - "Vite Plugin & Build Integration"
+        - "CLI Scaffolding Tool"
+        - "VS Code Extension & Language Server"
+        - "Starter Project Template"
+        - "Documentation & Examples"
+        - "Other / General"
     validations:
       required: true
 
@@ -27,8 +31,8 @@ body:
     id: version
     attributes:
       label: DriftJS Version
-      description: What version of DriftJS are you using? (e.g., 0.0.4)
-      placeholder: "0.0.4"
+      description: Version of DriftJS packages in use.
+      placeholder: "0.0.0"
     validations:
       required: true
 
@@ -36,46 +40,66 @@ body:
     id: description
     attributes:
       label: Bug Description
-      description: A clear and concise description of what the bug is.
-      placeholder: Describe what happened and what you expected instead.
+      description: A clear and concise description of what the bug is, what happened, and what you expected to happen instead.
+      placeholder: "Describe what happened and what you expected instead."
     validations:
       required: true
 
   - type: textarea
-    id: reproduction
+    id: code-snippet
     attributes:
-      label: Minimal Reproduction
-      description: |
-        Please provide a link to a minimal reproduction repository, StackBlitz, or a minimal code snippet reproducing the problem.
-      placeholder: "https://github.com/..."
+      label: Minimal .drift Component or Code Snippet
+      description: Provide a minimal `.drift` Single File Component or JS snippet that reproduces the issue.
+      placeholder: |
+        <script>
+          let count = 0;
+          function increment() {
+            count++;
+          }
+        </script>
+
+        <div>
+          <button onclick={increment}>Count: {count}</button>
+        </div>
+      render: html
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: steps
     attributes:
       label: Steps to Reproduce
-      description: How can we reproduce the issue step by step?
+      description: Step-by-step instructions to reproduce the issue.
       placeholder: |
-        1. Run '...'
-        2. Click on '....'
-        3. See error
+        1. Create a component with ...
+        2. Run `pnpm dev` or `pnpm build`
+        3. See compiler error / runtime panic ...
     validations:
       required: true
 
   - type: textarea
     id: logs
     attributes:
-      label: Relevant Logs / Output
-      description: Paste any stack traces, compiler output, or browser console errors.
+      label: Relevant Logs / Stack Trace
+      description: Paste any compiler error output, Vitest failure trace, or browser console errors.
       render: shell
+    validations:
+      required: false
 
   - type: input
     id: environment
     attributes:
       label: Environment Info
-      description: Node.js version, OS, and Browser (e.g., Node 22.x, macOS Sequoia, Chrome 128).
-      placeholder: "Node v22.12.0, macOS / Chrome 128"
+      description: Node.js version, package manager, OS, and browser (if applicable).
+      placeholder: "Node v20.11.0, pnpm v10.18.2, Linux x64, Chrome 128"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any extra details, suspected ISA opcode issues, VM register behavior, or potential fixes.
     validations:
       required: false
 
@@ -86,5 +110,5 @@ body:
       options:
         - label: I have verified this issue is not already reported in existing open issues.
           required: true
-        - label: I have provided a minimal reproduction of the problem.
+        - label: I have provided clear steps and minimal code to reproduce the issue.
           required: true
