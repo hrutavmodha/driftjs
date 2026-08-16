@@ -19,7 +19,7 @@ jobs:
         with:
           version: 10
 
-      - name: Setup Node.js
+      - name: Setup Node.js (Node 22)
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
@@ -35,12 +35,15 @@ jobs:
       - name: Run Tests
         run: pnpm test
 
-      - name: Configure NPM Authentication
-        run: echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+      - name: Configure NPM Auth
+        run: |
+          pnpm config set '//registry.npmjs.org/:_authToken' "${NODE_AUTH_TOKEN}"
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish Packages
-        run: pnpm run publish
+        run: pnpm publish -r --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
