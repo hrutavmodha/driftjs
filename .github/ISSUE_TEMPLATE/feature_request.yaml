@@ -1,5 +1,5 @@
 name: "Feature Request"
-description: Propose a new feature for DriftJS
+description: Propose a new feature, RFC, directive, opcode, or improvement for DriftJS.
 title: "[FEAT]: "
 labels: ["enhancement", "triage"]
 body:
@@ -7,63 +7,76 @@ body:
     attributes:
       value: |
         Thanks for helping shape the future of **DriftJS**!
-        Before submitting, please search [existing open feature requests](https://github.com/hrutavmodha/driftjs/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement) to see if a similar proposal already exists.
+        Before proposing a feature, please search [existing open feature requests](https://github.com/hrutavmodha/driftjs/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement) and [discussions](https://github.com/hrutavmodha/driftjs/discussions) to see if a similar RFC or feature proposal already exists.
 
   - type: dropdown
-    id: area
+    id: package
     attributes:
-      label: Target Subsystem
-      description: Select the area of DriftJS this feature request applies to.
+      label: Target Package / Subsystem
+      description: Select the DriftJS package or subsystem this feature proposal applies to.
       options:
-        - "Template Compiler & Bytecode Generator"
-        - "Browser VM & DOM Runtime"
-        - "Server-Side Rendering (SSR)"
-        - "Vite Plugin & Build Integration"
-        - "CLI Scaffolding Tool"
-        - "VS Code Extension & Language Server"
-        - "Instruction Set Architecture (ISA)"
-        - "Documentation & Examples"
-        - "Other / General Proposal"
+        - "driftjs-compiler (Compiler Pipeline: Lexer, Parser, Transformer, Bytecode Generator)"
+        - "driftjs-dom (Client VM, Reconciler, Keyed Lists, Hydration, Event System)"
+        - "driftjs-ssr (DriftServerVM, Server-Side Rendering, HTML Streaming)"
+        - "driftjs-shared (Scope Engine, Expression Evaluation, AST Execution)"
+        - "driftjs-vite-plugin (Vite Plugin, AOT Build Optimizations, HMR)"
+        - "create-drift (CLI Scaffolding Tool, Templates & Presets)"
+        - "drift-vscode (Language Server Protocol, Syntax Highlighting, Formatting, Tooling)"
+        - "Instruction Set Architecture (ISA Opcodes & Bytecode Format)"
+        - "Documentation, Benchmarks & Examples"
+        - "Other / General Architecture"
     validations:
       required: true
 
   - type: textarea
     id: summary
     attributes:
-      label: Feature Summary
-      description: A clear and concise description of the proposed feature or improvement.
-      placeholder: "Summarize the proposed feature or behavior."
+      label: Feature Summary & Motivation
+      description: What problem does this feature solve? Provide a clear and concise summary of the proposed enhancement.
+      placeholder: "Describe the use case, why this is needed, and how it benefits DriftJS developers."
     validations:
       required: true
 
   - type: textarea
-    id: problem
+    id: proposed-api
     attributes:
-      label: Problem or Use Case
-      description: What problem does this feature solve? Describe the scenario or friction you are trying to overcome.
-      placeholder: "I'm trying to ..., but currently DriftJS does not support ..."
-    validations:
-      required: true
-
-  - type: textarea
-    id: proposed-solution
-    attributes:
-      label: Proposed Solution & Syntax
-      description: Describe how you envision this feature working. Include code examples, proposed `.drift` syntax, API signatures, or ISA opcode changes.
+      label: Proposed Syntax / API / Architecture Design
+      description: Provide concrete examples of proposed `.drift` syntax, compiler output, or runtime API changes.
       placeholder: |
-        // Example proposed syntax or API usage
+        <!-- Example .drift SFC syntax or API usage -->
         <script>
-          // Proposed script logic
+          let { title, items = [] } = props;
+          let activeIndex = 0;
         </script>
+
+        <div class="list-container">
+          <h2>{title}</h2>
+          <ul>
+            @for (item, index) in items {
+              <li class={index === activeIndex ? "active" : ""}>
+                {item.name}
+              </li>
+            }
+          </ul>
+        </div>
       render: html
     validations:
       required: true
 
   - type: textarea
+    id: compiler-runtime-impact
+    attributes:
+      label: Compiler & Runtime Impact
+      description: Does this require new AST nodes, new bytecode opcodes (in Opcode enum), modifications to the Transformer, or Reconciler updates?
+      placeholder: "Describe any required changes to Opcode definitions, AST nodes, DriftTransformer, or DriftClientVM execution."
+    validations:
+      required: false
+
+  - type: textarea
     id: alternatives
     attributes:
       label: Alternative Solutions Considered
-      description: Describe any alternative solutions or workarounds you have considered.
+      description: Describe any alternative approaches, APIs, or workarounds you considered and why they were not chosen.
     validations:
       required: false
 
@@ -71,16 +84,18 @@ body:
     id: additional-context
     attributes:
       label: Additional Context
-      description: Add any other context, diagrams, references to other frameworks, or design notes.
+      description: Add any other context, benchmarks, comparisons to other frameworks, or design mockups.
     validations:
       required: false
 
   - type: checkboxes
-    id: checks
+    id: checklist
     attributes:
       label: Checklist
       options:
-        - label: I have searched existing issues to ensure this feature request is not a duplicate.
+        - label: I have searched existing issues and discussions to ensure this feature request is not a duplicate.
           required: true
-        - label: I have provided a clear description and concrete code/syntax examples.
+        - label: I have provided concrete code/syntax examples and detailed the rationale.
           required: true
+        - label: I have considered the performance implications and alignment with DriftJS zero-proxy / VM design philosophy.
+          required: false
