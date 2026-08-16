@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { DriftLexer } from '../src/lexer.js';
 import {
-  Token,
+  type Token,
   TokenType,
   DriftLexerError,
   LexerStateKind,

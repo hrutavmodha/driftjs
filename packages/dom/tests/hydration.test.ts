@@ -54,7 +54,7 @@ describe('SSR & Hydration End-to-End Integration', () => {
     btnAfter.click();
 
     // 5. Verify reactive DOM updates work after hydration!
-    expect(pAfter.textContent).toBe('1');
+    expect(pAfter!.textContent).toBe('1');
 
     document.body.removeChild(container);
   });
@@ -99,25 +99,25 @@ describe('SSR & Hydration End-to-End Integration', () => {
     // 3. Verify exactly 1 status span and 2 list items exist (no duplicate nodes created!)
     const statusSpans = container.querySelectorAll('.status span');
     expect(statusSpans.length).toBe(1);
-    expect(statusSpans[0].textContent).toBe('Even');
+    expect(statusSpans[0]!.textContent).toBe('Even');
 
     const listItems = container.querySelectorAll('.list li');
     expect(listItems.length).toBe(2);
-    expect(listItems[0].textContent).toBe('A');
-    expect(listItems[1].textContent).toBe('B');
+    expect(listItems[0]!.textContent).toBe('A');
+    expect(listItems[1]!.textContent).toBe('B');
 
     // 4. Post-hydration state transitions
     (vm as any).scope.count = 1;
     vm.triggerUpdates(new Set(['count']));
     const spansAfterInc = container.querySelectorAll('.status span');
     expect(spansAfterInc.length).toBe(1);
-    expect(spansAfterInc[0].textContent).toBe('Odd');
+    expect(spansAfterInc[0]!.textContent).toBe('Odd');
 
     (vm as any).scope.count = 0;
     vm.triggerUpdates(new Set(['count']));
     const spansAfterReset = container.querySelectorAll('.status span');
     expect(spansAfterReset.length).toBe(1);
-    expect(spansAfterReset[0].textContent).toBe('Even');
+    expect(spansAfterReset[0]!.textContent).toBe('Even');
 
     document.body.removeChild(container);
   });

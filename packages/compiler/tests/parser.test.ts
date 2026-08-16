@@ -3,12 +3,12 @@ import { DriftLexer } from '../src/lexer.js';
 import { DriftParser } from '../src/parser.js';
 import {
   ASTNodeType,
-  ElementNode,
+  type ElementNode,
   DriftParserError,
   DriftLexerError,
   TokenType,
-  Token,
-  TextNode,
+  type Token,
+  type TextNode,
 } from '../types/index.js';
 
 describe('DriftParser', () => {

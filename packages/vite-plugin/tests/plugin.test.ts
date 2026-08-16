@@ -128,7 +128,7 @@ describe('driftPlugin – HMR', () => {
       },
     };
 
-    const hook = plugin.handleHotUpdate as (ctx: typeof ctx) => void;
+    const hook = plugin.handleHotUpdate as (arg: any) => void;
     hook(ctx as any);
 
     expect(invalidateModule).toHaveBeenCalledWith(fakeModule);
@@ -144,7 +144,7 @@ describe('driftPlugin – HMR', () => {
       server: { moduleGraph: { getModuleById: vi.fn() }, ws: { send } },
     };
 
-    const hook = plugin.handleHotUpdate as (ctx: typeof ctx) => void;
+    const hook = plugin.handleHotUpdate as (arg: any) => void;
     hook(ctx as any);
     expect(send).not.toHaveBeenCalled();
   });

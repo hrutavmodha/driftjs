@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { DriftLexer } from '../src/lexer.js';
 import { DriftParser } from '../src/parser.js';
 import { DriftTransformer } from '../src/transformer.js';
-import { ASTNodeType, ElementNode, TextNode, InterpolationNode } from '../types/index.js';
+import { ASTNodeType, type ElementNode, type TextNode, type InterpolationNode } from '../types/index.js';
 
 describe('DriftTransformer', () => {
   it('should strip redundant whitespace and newline text nodes between elements', () => {

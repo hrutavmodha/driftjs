@@ -46,7 +46,7 @@ export class DriftClientVM {
   private static globalDelegatedListeners = new Map<string, (e: Event) => void>();
 
   private readonly registers: (Node | any)[] = new Array(DriftClientVM.MAX_REGISTERS);
-  private scope: Record<string, any> = {};
+  public scope: Record<string, any> = {};
   private module: CompiledModule | null = null;
   private declaredVars: Set<string> = new Set();
   private doc: Document | null = null;
@@ -118,7 +118,7 @@ export class DriftClientVM {
       DriftClientVM.globalDelegatedListeners.clear();
     }
 
-    this.eventHandlersMap = new WeakMap();
+    DriftClientVM.eventHandlersMap = new WeakMap();
     this.registers.fill(null);
     this.pendingDirtyVars.clear();
     this.isUpdateScheduled = false;
@@ -213,7 +213,7 @@ export class DriftClientVM {
    * declaredVars, doc, and reactiveRegions. Used by REACTIVE_IF / REACTIVE_FOR handlers.
    */
   private runSubModule(
-    rawSubMod: { bytecode: readonly number[]; constants: readonly any[] },
+    rawSubMod: { bytecode: readonly number[] | Uint32Array; constants: readonly any[] },
     scope: Record<string, any>
   ): DocumentFragment | null {
     const subMod = (resolveComponentModule(rawSubMod) || rawSubMod) as CompiledModule;
@@ -240,7 +240,7 @@ export class DriftClientVM {
    * Core execution loop — shared between the top-level execute() and runSubModule().
    */
   private executeLoop(
-    bytecode: readonly number[],
+    bytecode: readonly number[] | Uint32Array,
     constants: readonly any[],
     scope: Record<string, any>
   ): Node | null {

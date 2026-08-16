@@ -42,7 +42,7 @@ export interface ImportSpec {
  * Output module emitted by DriftGenerator.
  */
 export interface CompiledModule {
-  readonly bytecode: readonly number[];
+  readonly bytecode: readonly number[] | Uint32Array;
   readonly constants: readonly any[];
   readonly reactiveBindings?: readonly ReactiveBinding[];
   /** All variable names declared in the component's <script> block. Used by the runtime for change-detection. */

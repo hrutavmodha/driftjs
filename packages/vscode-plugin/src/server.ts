@@ -334,7 +334,7 @@ connection.onCompletion((params): CompletionItem[] => {
 
   let replaceRange: Range | undefined = undefined;
 
-  if (matchBefore) {
+  if (matchBefore && matchBefore[1] !== undefined) {
     const typedWordLen = matchBefore[1].length;
     const startChar = params.position.character - typedWordLen;
     const endChar = hasTrailingGt

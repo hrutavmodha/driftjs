@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DriftClientVM } from '../src/index.js';
-import { Opcode, CompiledModule } from '../types/index.js';
+import { Opcode, type CompiledModule } from '../types/index.js';
 
 describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
   const doc = document;
@@ -230,9 +230,9 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
     }) as Element;
 
     const rowsBefore = Array.from(parentElem.querySelectorAll('tr'));
-    const firstRowNode = rowsBefore[0];
-    const secondRowNode = rowsBefore[1];
-    const thirdRowNode = rowsBefore[2];
+    const firstRowNode = rowsBefore[0]!;
+    const secondRowNode = rowsBefore[1]!;
+    const thirdRowNode = rowsBefore[2]!;
 
     expect(firstRowNode.textContent).toBe('1');
     expect(secondRowNode.textContent).toBe('2');
@@ -244,9 +244,9 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
 
     const rowsAfter = Array.from(parentElem.querySelectorAll('tr'));
     expect(rowsAfter.length).toBe(3);
-    expect(rowsAfter[0].textContent).toBe('2');
-    expect(rowsAfter[1].textContent).toBe('1');
-    expect(rowsAfter[2].textContent).toBe('3');
+    expect(rowsAfter[0]!.textContent).toBe('2');
+    expect(rowsAfter[1]!.textContent).toBe('1');
+    expect(rowsAfter[2]!.textContent).toBe('3');
 
     // TR nodes must be physically swapped in DOM, NOT recreated!
     expect(rowsAfter[0]).toBe(secondRowNode);
@@ -309,7 +309,7 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
 
     const rowsBefore = Array.from(parentElem.querySelectorAll('tr'));
     expect(rowsBefore.length).toBe(1000);
-    expect(rowsBefore[4].getAttribute('class')).toBe('');
+    expect(rowsBefore[4]!.getAttribute('class')).toBe('');
 
     // Trigger row selection (select row id 5)
     vm.scope['selected'] = 5;
@@ -318,8 +318,8 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
     const elapsed = performance.now() - start;
 
     const rowsAfter = Array.from(parentElem.querySelectorAll('tr'));
-    expect(rowsAfter[4].getAttribute('class')).toBe('danger');
-    expect(rowsAfter[0].getAttribute('class')).toBe('');
+    expect(rowsAfter[4]!.getAttribute('class')).toBe('danger');
+    expect(rowsAfter[0]!.getAttribute('class')).toBe('');
 
     // Verify all 1,000 TR elements maintain exact DOM node identity (zero node recreations)
     for (let i = 0; i < 1000; i++) {

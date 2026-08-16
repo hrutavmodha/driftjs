@@ -106,7 +106,7 @@ describe('Only @if (no else branch)', () => {
     const mod = compile('@if show { <p>{message}</p> }');
     expect(mod.bytecode).toContain(Opcode.REACTIVE_IF);
     // The consequent sub-module will include INTERPOLATE_TEXT
-    const consModIdx = mod.bytecode[mod.bytecode.indexOf(Opcode.REACTIVE_IF) + 3];
+    const consModIdx = mod.bytecode[mod.bytecode.indexOf(Opcode.REACTIVE_IF) + 3]!;
     const consMod = mod.constants[consModIdx] as any;
     expect(consMod.bytecode).toContain(Opcode.INTERPOLATE_TEXT);
   });
@@ -149,7 +149,7 @@ describe('@if / @else (simple two-branch)', () => {
     const mod = compile('@if on { <p>on</p> } @else { <p>off</p> }');
     const ifPos = mod.bytecode.indexOf(Opcode.REACTIVE_IF);
     expect(ifPos).toBeGreaterThan(-1);
-    const altIdx = mod.bytecode[ifPos + 4];
+    const altIdx = mod.bytecode[ifPos + 4]!;
     expect(altIdx).not.toBe(0xFF);
     // altIdx must point to a valid constant
     expect(mod.constants[altIdx]).toBeDefined();
@@ -158,8 +158,8 @@ describe('@if / @else (simple two-branch)', () => {
   it('generator packages consequent and alternate as separate sub-modules', () => {
     const mod = compile('@if flag { <i>A</i> } @else { <b>B</b> }');
     const ifPos = mod.bytecode.indexOf(Opcode.REACTIVE_IF);
-    const consIdx = mod.bytecode[ifPos + 3];
-    const altIdx = mod.bytecode[ifPos + 4];
+    const consIdx = mod.bytecode[ifPos + 3]!;
+    const altIdx = mod.bytecode[ifPos + 4]!;
     const consMod = mod.constants[consIdx] as any;
     const altMod = mod.constants[altIdx] as any;
     // Both sub-modules should have their own bytecode arrays
@@ -251,7 +251,7 @@ describe('@else if ladder (chained conditions)', () => {
   it('generator packs @else if inside the alternate sub-module', () => {
     const mod = compile('@if a { <p>A</p> } @else if b { <p>B</p> } @else { <p>C</p> }');
     const ifPos = mod.bytecode.indexOf(Opcode.REACTIVE_IF);
-    const altIdx = mod.bytecode[ifPos + 4];
+    const altIdx = mod.bytecode[ifPos + 4]!;
     const altMod = mod.constants[altIdx] as any;
     // The alternate sub-module must itself contain a REACTIVE_IF for the @else if branch
     expect(altMod.bytecode).toContain(Opcode.REACTIVE_IF);
@@ -302,7 +302,7 @@ describe('Nested @if / @else (if inside if)', () => {
 
     // The consequent sub-module should itself contain a REACTIVE_IF for the inner @if
     const ifPos = mod.bytecode.indexOf(Opcode.REACTIVE_IF);
-    const consIdx = mod.bytecode[ifPos + 3];
+    const consIdx = mod.bytecode[ifPos + 3]!;
     const consMod = mod.constants[consIdx] as any;
     expect(consMod.bytecode).toContain(Opcode.REACTIVE_IF);
   });
@@ -333,13 +333,13 @@ describe('Nested @if / @else (if inside if)', () => {
 
     // Consequent of top contains 1 REACTIVE_IF (for @if b)
     const ifPos = mod.bytecode.indexOf(Opcode.REACTIVE_IF);
-    const consIdx1 = mod.bytecode[ifPos + 3];
+    const consIdx1 = mod.bytecode[ifPos + 3]!;
     const consMod1 = mod.constants[consIdx1] as any;
     expect(consMod1.bytecode).toContain(Opcode.REACTIVE_IF);
 
     // Consequent of second level contains 1 REACTIVE_IF (for @if c)
     const innerIfPos = consMod1.bytecode.indexOf(Opcode.REACTIVE_IF);
-    const consIdx2 = consMod1.bytecode[innerIfPos + 3];
+    const consIdx2 = consMod1.bytecode[innerIfPos + 3]!;
     const consMod2 = consMod1.constants[consIdx2] as any;
     expect(consMod2.bytecode).toContain(Opcode.REACTIVE_IF);
   });

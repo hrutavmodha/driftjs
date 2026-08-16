@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DriftClientVM, mount } from '../src/index.js';
-import { Opcode, CompiledModule } from '../types/index.js';
+import { Opcode, type CompiledModule } from '../types/index.js';
 import { DriftLexer, DriftParser, DriftTransformer, DriftGenerator } from '../../compiler/src/index.js';
 import { setScopeValue } from 'driftjs-shared';
 
@@ -639,7 +639,7 @@ describe('DriftClientVM', () => {
       (vmInstance as any).scope.items = ['Delta', 'Epsilon'];
       vmInstance.triggerUpdates(new Set(['items']));
       expect(container.querySelectorAll('.item').length).toBe(2);
-      expect(container.querySelectorAll('.item')[0].textContent).toBe('Delta');
+      expect(container.querySelectorAll('.item')[0]!.textContent).toBe('Delta');
 
       // Toggle outer @if to false
       (vmInstance as any).scope.showList = false;
@@ -651,7 +651,7 @@ describe('DriftClientVM', () => {
       (vmInstance as any).scope.showList = true;
       vmInstance.triggerUpdates(new Set(['showList']));
       expect(container.querySelectorAll('.item').length).toBe(2);
-      expect(container.querySelectorAll('.item')[0].textContent).toBe('Delta');
+      expect(container.querySelectorAll('.item')[0]!.textContent).toBe('Delta');
     });
 
     it('handles @if nested inside @for loop and re-evaluates conditionals per row on item/condition updates', () => {
