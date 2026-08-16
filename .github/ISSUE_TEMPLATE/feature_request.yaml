@@ -1,0 +1,86 @@
+name: "Feature Request"
+description: Propose a new feature for DriftJS
+title: "[FEAT]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping shape the future of **DriftJS**!
+        Before submitting, please search [existing open feature requests](https://github.com/hrutavmodha/driftjs/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement) to see if a similar proposal already exists.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Target Subsystem
+      description: Select the area of DriftJS this feature request applies to.
+      options:
+        - "Template Compiler & Bytecode Generator"
+        - "Browser VM & DOM Runtime"
+        - "Server-Side Rendering (SSR)"
+        - "Vite Plugin & Build Integration"
+        - "CLI Scaffolding Tool"
+        - "VS Code Extension & Language Server"
+        - "Instruction Set Architecture (ISA)"
+        - "Documentation & Examples"
+        - "Other / General Proposal"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature Summary
+      description: A clear and concise description of the proposed feature or improvement.
+      placeholder: "Summarize the proposed feature or behavior."
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this feature solve? Describe the scenario or friction you are trying to overcome.
+      placeholder: "I'm trying to ..., but currently DriftJS does not support ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution & Syntax
+      description: Describe how you envision this feature working. Include code examples, proposed `.drift` syntax, API signatures, or ISA opcode changes.
+      placeholder: |
+        // Example proposed syntax or API usage
+        <script>
+          // Proposed script logic
+        </script>
+      render: html
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions Considered
+      description: Describe any alternative solutions or workarounds you have considered.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, diagrams, references to other frameworks, or design notes.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues to ensure this feature request is not a duplicate.
+          required: true
+        - label: I have provided a clear description and concrete code/syntax examples.
+          required: true
