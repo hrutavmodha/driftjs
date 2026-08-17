@@ -12,6 +12,7 @@
   "dependencies": {
     "driftjs-compiler": "workspace:*",
     "driftjs-dom": "workspace:*",
+    "driftjs-shared": "workspace:*",
     "driftjs-ssr": "workspace:*"
   },
   "devDependencies": {

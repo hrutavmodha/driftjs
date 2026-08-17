@@ -165,4 +165,50 @@ describe('DriftServerVM (SSR Engine)', () => {
     expect(html).toContain('<li>Zero-VDOM</li>');
     expect(html).toContain('<li>Bytecode</li>');
   });
+
+  it('evaluates precompiled expressions in CREATE_TEXT correctly during SSR', () => {
+    const module: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0, // p
+        Opcode.CREATE_TEXT, 1, 1,    // expression in CREATE_TEXT
+        Opcode.APPEND_CHILD, 0, 1,
+        Opcode.RETURN, 0,
+      ],
+      constants: [
+        'p',
+        { __drift_fn__: (scope: any) => `User: ${scope.name}` },
+      ],
+    };
+
+    const html = renderToString(module, { scope: { name: 'Alice' } });
+    expect(html).toBe('<p>User: Alice</p>');
+  });
+
+  it('correctly serializes full set of HTML5 void elements without closing tags', () => {
+    const src = `
+      <div>
+        <source src="audio.mp3" type="audio/mpeg" />
+        <track kind="subtitles" src="sub.vtt" />
+        <wbr />
+        <col />
+        <embed src="flash.swf" />
+        <param name="autoplay" value="true" />
+        <area shape="rect" coords="0,0,10,10" />
+        <base href="https://example.com" />
+      </div>
+    `;
+    const compiled = compile(src);
+    const html = renderToString(compiled);
+
+    expect(html).toContain('<source src="audio.mp3" type="audio/mpeg" />');
+    expect(html).toContain('<track kind="subtitles" src="sub.vtt" />');
+    expect(html).toContain('<wbr />');
+    expect(html).toContain('<col />');
+    expect(html).toContain('<embed src="flash.swf" />');
+    expect(html).toContain('<param name="autoplay" value="true" />');
+    expect(html).toContain('<area shape="rect" coords="0,0,10,10" />');
+    expect(html).toContain('<base href="https://example.com" />');
+    expect(html).not.toContain('</source>');
+    expect(html).not.toContain('</wbr>');
+  });
 });

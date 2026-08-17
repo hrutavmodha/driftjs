@@ -107,4 +107,29 @@ describe('DriftTransformer', () => {
     const transformer = new DriftTransformer(rawAst);
     expect(() => transformer.transform()).toThrow();
   });
+
+  it('preserves all sibling elements in @default case of @switch', () => {
+    const input = `
+      @switch role {
+        @default {
+          <p>Line 1</p>
+          <p>Line 2</p>
+          <p>Line 3</p>
+        }
+      }
+    `;
+    const lexer = new DriftLexer(input);
+    const parser = new DriftParser(lexer);
+    const rawAst = parser.parse();
+
+    const transformer = new DriftTransformer(rawAst);
+    const transformedAst = transformer.transform();
+
+    const ifNode = transformedAst.body[0] as any;
+    expect(ifNode.type).toBe(ASTNodeType.If);
+    expect(ifNode.consequent).toHaveLength(3);
+    expect(ifNode.consequent[0].tagName).toBe('p');
+    expect(ifNode.consequent[1].tagName).toBe('p');
+    expect(ifNode.consequent[2].tagName).toBe('p');
+  });
 });

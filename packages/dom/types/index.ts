@@ -7,11 +7,7 @@ export interface VMExecutionOptions {
   readonly hydrate?: boolean;
 }
 
-export interface LoopFrame {
-  readonly pc: number;
-  index: number;
-  readonly items: any[];
-}
+
 
 /** A self-contained reactive region that re-renders its DOM subtree when deps change. */
 export interface ReactiveRegion {

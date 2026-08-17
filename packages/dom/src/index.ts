@@ -3,7 +3,6 @@ import type {
   ReactiveBinding,
   ItemRecord,
   VMExecutionOptions,
-  LoopFrame,
   ReactiveRegion,
 } from "../types/index.js";
 import { Opcode } from "../types/index.js";
@@ -13,7 +12,6 @@ import {
   MAX_REGISTERS,
   setScopeValue,
   evaluateExpression,
-  executeBlockStatement,
   resolveIterable,
   resolveComponentModule,
   evaluatePropsSpec,
@@ -259,7 +257,6 @@ export class DriftClientVM {
   ): Node | null {
     const doc = this.doc!;
     let pc = 0;
-    const loopStack: LoopFrame[] = [];
 
     while (pc < bytecode.length) {
       const opcode = bytecode[pc];
@@ -399,66 +396,7 @@ export class DriftClientVM {
           break;
         }
 
-        case Opcode.EVAL_EXPR: {
-          const dstReg = bytecode[pc + 1]!;
-          const expr = constants[bytecode[pc + 2]!];
-          this.setRegister(dstReg, evaluateExpression(expr, scope, this.declaredVars));
-          pc += 3;
-          break;
-        }
 
-        case Opcode.JUMP: {
-          pc = (bytecode[pc + 1]! << 8) | bytecode[pc + 2]!;
-          break;
-        }
-
-        case Opcode.JUMP_IF_FALSE: {
-          const cond = this.getRegister(bytecode[pc + 1]!);
-          if (!cond) {
-            pc = (bytecode[pc + 2]! << 8) | bytecode[pc + 3]!;
-          } else {
-            pc += 4;
-          }
-          break;
-        }
-
-        case Opcode.LOOP_ITER: {
-          const arrayReg = bytecode[pc + 1]!;
-          const itemReg = bytecode[pc + 2]!;
-          const indexReg = bytecode[pc + 3]!;
-          const itemVar = constants[(bytecode[pc + 4]! << 8) | bytecode[pc + 5]!];
-          const indexVarIdx = (bytecode[pc + 6]! << 8) | bytecode[pc + 7]!;
-          const indexVar = indexVarIdx !== 0xffff ? constants[indexVarIdx] : null;
-          const jumpTarget = (bytecode[pc + 8]! << 8) | bytecode[pc + 9]!;
-
-          let frame = loopStack[loopStack.length - 1];
-          if (!frame || frame.pc !== pc) {
-            const rawIterable = this.getRegister(arrayReg);
-            const items = Array.isArray(rawIterable)
-              ? rawIterable
-              : rawIterable && typeof rawIterable[Symbol.iterator] === 'function'
-              ? Array.from(rawIterable)
-              : [];
-            frame = { pc, index: 0, items };
-            loopStack.push(frame);
-          }
-
-          if (frame.index < frame.items.length) {
-            const itemVal = frame.items[frame.index];
-            this.setRegister(itemReg, itemVal);
-            if (typeof itemVar === 'string') scope[itemVar] = itemVal;
-
-            if (indexReg !== 0xff) this.setRegister(indexReg, frame.index);
-            if (typeof indexVar === 'string') scope[indexVar] = frame.index;
-
-            frame.index++;
-            pc += 10;
-          } else {
-            loopStack.pop();
-            pc = jumpTarget;
-          }
-          break;
-        }
 
         case Opcode.EXEC_SCRIPT: {
           const scriptBody = constants[bytecode[pc + 1]!];
@@ -607,10 +545,6 @@ export class DriftClientVM {
                   if (indexName) itemScope[indexName] = indexVal;
                   return evaluateExpression(keyExpr, itemScope, vm.declaredVars);
                 }
-                if (itemVal && typeof itemVal === 'object') {
-                  if ('key' in itemVal) return (itemVal as any).key;
-                  if ('id' in itemVal) return (itemVal as any).id;
-                }
                 return indexVal;
               },
               (itemVal, indexVal, refNode) => {
@@ -637,12 +571,6 @@ export class DriftClientVM {
 
                 const itemKey = keyExpr
                   ? evaluateExpression(keyExpr, childScope, vm.declaredVars)
-                  : itemVal && typeof itemVal === 'object'
-                  ? 'key' in itemVal
-                    ? (itemVal as any).key
-                    : 'id' in itemVal
-                    ? (itemVal as any).id
-                    : indexVal
                   : indexVal;
 
                 return {
@@ -775,12 +703,17 @@ export class DriftClientVM {
       switch (opcode) {
         case Opcode.RETURN:
           return;
-        case Opcode.CREATE_ELEMENT:
+        case Opcode.CREATE_ELEMENT: {
+          const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xff;
+          const propsCandidate = (maybePropsIdx !== 0xff && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
+          const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
+          pc += isPropsSpec ? 4 : 3;
+          break;
+        }
         case Opcode.CREATE_TEXT:
         case Opcode.CREATE_COMMENT:
         case Opcode.APPEND_CHILD:
-        case Opcode.JUMP_IF_FALSE:
-        case Opcode.EVAL_EXPR:
+        case Opcode.INTERPOLATE_TEXT:
           pc += 3;
           break;
         case Opcode.SET_ATTR: {
@@ -803,15 +736,8 @@ export class DriftClientVM {
           break;
         }
         case Opcode.CREATE_FRAGMENT:
-        case Opcode.JUMP:
         case Opcode.EXEC_SCRIPT:
           pc += 2;
-          break;
-        case Opcode.INTERPOLATE_TEXT:
-          pc += 3;
-          break;
-        case Opcode.LOOP_ITER:
-          pc += 5;
           break;
         case Opcode.REACTIVE_IF:
           pc += 6;

@@ -1,36 +1,38 @@
 import type { Context } from '../types/index.js';
 
-let activeVM: any = null;
-const vmStack: any[] = [];
+const VM_STACK_KEY = Symbol.for('__drift_vm_stack__');
+
+function getVMStack(): any[] {
+  const g = globalThis as any;
+  if (!g[VM_STACK_KEY]) {
+    g[VM_STACK_KEY] = [];
+  }
+  return g[VM_STACK_KEY];
+}
 
 /**
  * Sets or pushes the currently active VM instance executing component logic.
  */
 export function pushActiveVM(vm: any): void {
-  vmStack.push(activeVM);
-  activeVM = vm;
+  getVMStack().push(vm);
 }
 
 /**
  * Pops the active VM instance after component execution completes.
  */
 export function popActiveVM(): void {
-  activeVM = vmStack.pop() ?? null;
+  getVMStack().pop();
 }
 
 /**
  * Returns the currently active VM instance.
  */
 export function getActiveVM(): any | null {
-  return activeVM;
+  const stack = getVMStack();
+  return stack.length > 0 ? stack[stack.length - 1] : null;
 }
 
-/**
- * Explicitly sets the active VM instance (convenience for runners).
- */
-export function setActiveVM(vm: any | null): void {
-  activeVM = vm;
-}
+
 
 /**
  * Creates a unique, type-safe Context token.

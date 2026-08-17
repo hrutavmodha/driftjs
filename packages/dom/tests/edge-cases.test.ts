@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { DriftClientVM } from '../src/index.js';
 import { Opcode, type CompiledModule } from '../types/index.js';
+import { compile } from '../../compiler/src/index.js';
 
 describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
   const doc = document;
@@ -87,13 +88,14 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // r0 = tbody
-        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 0xFF, 3, 4, // parent=r0, iter=data, itemName='row', bodyMod, deps=['data']
+        Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 3, 4, 5, // parent=r0, iter=data, itemName='row', idxName=none, key=row.id, bodyMod, deps=['data']
         Opcode.RETURN, 0,
       ],
       constants: [
         'tbody',
         { __drift_fn__: '(scope) => scope.data' },
         'row',
+        { __drift_fn__: '(scope) => scope.row.id' },
         itemMod,
         ['data'],
       ],
@@ -185,5 +187,176 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
     for (let i = 0; i < 1000; i++) {
       expect(rowsAfter[i]).toBe(rowsBefore[i]);
     }
+  });
+
+  it('correctly advances PC over CREATE_ELEMENT with props spec in patchItemAttributes without desynchronization', () => {
+    const vm = new DriftClientVM();
+    const elem = doc.createElement('div');
+    elem.setAttribute('data-test', 'initial');
+
+    const bodyMod: CompiledModule = {
+      bytecode: [
+        // CREATE_ELEMENT with propsSpec (4 bytes: opcode + 3 operand bytes)
+        Opcode.CREATE_ELEMENT, 0, 0, 1,
+        // Followed by SET_ATTR (5 bytes)
+        Opcode.SET_ATTR, 0, 2, 3, 1,
+        Opcode.RETURN, 0,
+      ],
+      constants: [
+        'div',
+        { __drift_props__: true, foo: 'bar' },
+        'data-test',
+        { __drift_fn__: '(scope) => scope.updatedValue' },
+      ],
+      declaredVars: ['updatedValue'],
+    };
+
+    vm.patchItemAttributes(bodyMod, { updatedValue: 'patched' }, elem);
+    expect(elem.getAttribute('data-test')).toBe('patched');
+  });
+
+  it('correctly unpacks array pattern destructuring in script block', () => {
+    const vm = new DriftClientVM();
+    const mod = compile(`
+      <script>
+        const [a, b, c = 'default_c', ...rest] = ['first', 'second', undefined, 'fourth', 'fifth'];
+      </script>
+      <div>{a}-{b}-{c}-{rest.join(',')}</div>
+    `);
+
+    const node = vm.execute(mod, { document: doc });
+    expect(node).toBeDefined();
+    expect(node!.textContent).toBe('first-second-default_c-fourth,fifth');
+    expect(vm.scope['a']).toBe('first');
+    expect(vm.scope['b']).toBe('second');
+    expect(vm.scope['c']).toBe('default_c');
+    expect(vm.scope['rest']).toEqual(['fourth', 'fifth']);
+  });
+
+  it('correctly executes functions with destructured params and rest arguments at runtime', () => {
+    const vm = new DriftClientVM();
+    const mod = compile(`
+      <script>
+        function formatUser({ name, role = 'admin' }, ...tags) {
+          return name + ' (' + role + ') [' + tags.join(', ') + ']';
+        }
+        const calcSum = ([x, y = 10], ...more) => x + y + more.reduce((a, b) => a + b, 0);
+
+        let userString = formatUser({ name: 'Alice' }, 'staff', 'core');
+        let sumResult = calcSum([5], 20, 30);
+      </script>
+      <div>{userString} - {sumResult}</div>
+    `);
+
+    const node = vm.execute(mod, { document: doc });
+    expect(node).toBeDefined();
+    expect(node!.textContent).toBe('Alice (admin) [staff, core] - 65');
+    expect(vm.scope['userString']).toBe('Alice (admin) [staff, core]');
+    expect(vm.scope['sumResult']).toBe(65);
+  });
+
+  it('correctly executes try/catch/finally, throw, switch/case, and class declarations in script blocks', () => {
+    const vm = new DriftClientVM();
+    const mod = compile(`
+      <script>
+        class Evaluator {
+          multiplier = 2;
+          constructor(mult) {
+            if (mult) this.multiplier = mult;
+          }
+          calc(type, val) {
+            try {
+              switch (type) {
+                case 'double':
+                  return val * this.multiplier;
+                case 'triple':
+                  return val * 3;
+                default:
+                  throw new Error('unknown type');
+              }
+            } catch (e) {
+              return 'err: ' + e.message;
+            }
+          }
+        }
+
+        const ev = new Evaluator(4);
+        let res1 = ev.calc('double', 5);
+        let res2 = ev.calc('unknown', 0);
+      </script>
+      <div>{res1} - {res2}</div>
+    `);
+
+    const node = vm.execute(mod, { document: doc });
+    expect(node).toBeDefined();
+    expect(node!.textContent).toBe('20 - err: unknown type');
+    expect(vm.scope['res1']).toBe(20);
+    expect(vm.scope['res2']).toBe('err: unknown type');
+  });
+
+  it('renders all sibling elements in @default case of @switch when @default is the only case', () => {
+    const vm = new DriftClientVM();
+    const mod = compile(`
+      <script>
+        let role = "guest";
+      </script>
+      <div>
+        @switch role {
+          @default {
+            <span>First</span>
+            <span>Second</span>
+            <span>Third</span>
+          }
+        }
+      </div>
+    `);
+
+    const node = vm.execute(mod, { document: doc });
+    expect(node).toBeDefined();
+    const spans = (node as HTMLElement).querySelectorAll('span');
+    expect(spans).toHaveLength(3);
+    expect(spans[0]?.textContent).toBe('First');
+    expect(spans[1]?.textContent).toBe('Second');
+    expect(spans[2]?.textContent).toBe('Third');
+  });
+
+  it('handles keyed reconciliation when items produce 0 DOM nodes without TypeError', async () => {
+    const vm = new DriftClientVM();
+    const mod = compile(`
+      <script>
+        let items = [
+          { id: 1, visible: true, text: 'Item 1' },
+          { id: 2, visible: false, text: 'Item 2' },
+          { id: 3, visible: true, text: 'Item 3' },
+        ];
+      </script>
+      <ul>
+        @for item in items key item.id {
+          @if item.visible {
+            <li>{item.text}</li>
+          }
+        }
+      </ul>
+    `);
+
+    const node = vm.execute(mod, { document: doc }) as HTMLElement;
+    expect(node).toBeDefined();
+    expect(node.querySelectorAll('li')).toHaveLength(2);
+
+    // Mutate items: add item 4 at front and reorder
+    vm.scope['items'] = [
+      { id: 4, visible: true, text: 'Item 4' },
+      { id: 2, visible: false, text: 'Item 2' },
+      { id: 1, visible: true, text: 'Item 1' },
+      { id: 3, visible: true, text: 'Item 3' },
+    ];
+    vm.markDirty('items');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const lis = node.querySelectorAll('li');
+    expect(lis).toHaveLength(3);
+    expect(lis[0]?.textContent).toBe('Item 4');
+    expect(lis[1]?.textContent).toBe('Item 1');
+    expect(lis[2]?.textContent).toBe('Item 3');
   });
 });

@@ -90,6 +90,25 @@ describe('driftPlugin – compilation correctness', () => {
     // Unclosed tag — should throw via this.error()
     expect(() => transform(plugin, '<div>')).toThrow(/DriftJS.*Compilation failed/i);
   });
+
+  it('correctly handles namespace imports and side-effect imports', () => {
+    const plugin = makePlugin();
+    const src = `
+      <script>
+        import * as utils from "./utils";
+        import "./style.css";
+        import Button from "./Button.drift";
+      </script>
+      <div><Button /></div>
+    `;
+    const code = transform(plugin, src)!;
+
+    expect(code).toContain('import * as utils from "./utils";');
+    expect(code).toContain('import "./style.css";');
+    expect(code).toContain('import Button from "./Button.drift";');
+    expect(code).toContain('utils,');
+    expect(code).toContain('Button');
+  });
 });
 
 describe('driftPlugin – debug option', () => {

@@ -8,16 +8,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { DriftClientVM } from '../src/index.js';
-import { DriftLexer, DriftParser, DriftTransformer, DriftGenerator } from '../../compiler/src/index.js';
+import { compile } from '../../compiler/src/index.js';
 
 describe('App.drift @else if ladder – onclick dec() regression', () => {
-  function compile(src: string) {
-    const lexer = new DriftLexer(src);
-    const parser = new DriftParser(lexer);
-    const ast = parser.parse();
-    const transformer = new DriftTransformer(ast);
-    return new DriftGenerator(transformer.transform()).generate();
-  }
 
   /**
    * Exact replica of the counter section from App.drift

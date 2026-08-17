@@ -42,6 +42,19 @@ function getSequence(arr: Int32Array): number[] {
   return result;
 }
 
+function findNextNode(startIndex: number, cache: ItemRecord[], len: number, anchor: Node): Node {
+  for (let idx = startIndex; idx < len; idx++) {
+    const rec = cache[idx];
+    if (rec && rec.nodes && rec.nodes.length > 0) {
+      for (let nIdx = 0; nIdx < rec.nodes.length; nIdx++) {
+        const n = rec.nodes[nIdx];
+        if (n) return n;
+      }
+    }
+  }
+  return anchor;
+}
+
 /**
  * Keyed list LIS reconciler for DriftJS sub-modules.
  * Minimises DOM insertions, deletions, and moves across array mutations.
@@ -121,7 +134,7 @@ export function reconcileKeyedList(
   // 3. Pure additions
   if (i > oldEnd) {
     if (i <= newEnd) {
-      const refNode = newEnd + 1 < newLen ? newCache[newEnd + 1]!.nodes[0]! : anchor;
+      const refNode = findNextNode(newEnd + 1, newCache, newLen, anchor);
       for (let k = i; k <= newEnd; k++) {
         const newItem = newCache[k]!;
         const itemRecord = createItem(newItem.itemVal, newItem.indexVal, refNode);
@@ -182,7 +195,7 @@ export function reconcileKeyedList(
     for (let j = unhandledNewCount - 1; j >= 0; j--) {
       const newIndex = s1 + j;
       const newItem = newCache[newIndex]!;
-      const refNode = newIndex + 1 < newLen ? newCache[newIndex + 1]!.nodes[0]! : anchor;
+      const refNode = findNextNode(newIndex + 1, newCache, newLen, anchor);
 
       if (sources[j] === -1) {
         const itemRecord = createItem(newItem.itemVal, newItem.indexVal, refNode);
@@ -193,7 +206,7 @@ export function reconcileKeyedList(
           const itemRecord = newCache[newIndex]!;
           for (let nIdx = 0; nIdx < itemRecord.nodes.length; nIdx++) {
             const n = itemRecord.nodes[nIdx];
-            if (n && refNode.parentNode) refNode.parentNode.insertBefore(n, refNode);
+            if (n && refNode && refNode.parentNode) refNode.parentNode.insertBefore(n, refNode);
           }
         } else {
           lisIdx--;

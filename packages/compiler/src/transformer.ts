@@ -145,7 +145,35 @@ export class DriftTransformer {
       const c = node.cases[index];
       if (!c) return null;
       if (c.expression === null) {
-        return this.transformChildren(c.body);
+        const consequent = this.transformChildren(c.body);
+        const nextAlt = buildIfChain(index + 1);
+
+        let alternate: TemplateChildNode[] | IfNode | null = null;
+        if (Array.isArray(nextAlt)) {
+          alternate = nextAlt;
+        } else if (nextAlt !== null && (nextAlt as TemplateChildNode).type === ASTNodeType.If) {
+          alternate = nextAlt as IfNode;
+        }
+
+        if (index > 0 && alternate === null) {
+          return consequent;
+        }
+
+        const trueAst: acorn.Node = {
+          type: 'Literal',
+          value: true,
+          raw: 'true',
+          start: 0,
+          end: 0,
+        } as any;
+
+        return {
+          type: ASTNodeType.If,
+          test: trueAst,
+          consequent,
+          alternate,
+          loc: c.loc,
+        };
       }
 
       const caseAst = typeof c.expression === 'string' && c.expression.trim().length > 0
@@ -189,7 +217,27 @@ export class DriftTransformer {
       };
     }
     if (Array.isArray(res)) {
-      return res[0] || { type: ASTNodeType.Comment, content: 'empty switch', loc: node.loc };
+      if (res.length === 0) {
+        return {
+          type: ASTNodeType.Comment,
+          content: 'empty switch',
+          loc: node.loc,
+        };
+      }
+      const trueAst: acorn.Node = {
+        type: 'Literal',
+        value: true,
+        raw: 'true',
+        start: 0,
+        end: 0,
+      } as any;
+      return {
+        type: ASTNodeType.If,
+        test: trueAst,
+        consequent: res,
+        alternate: null,
+        loc: node.loc,
+      };
     }
     return res;
   }

@@ -5,9 +5,18 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import { playwright } from '@vitest/browser-playwright';
+
 export default defineConfig({
   test: {
-    environment: 'happy-dom'
+    browser: {
+      enabled: true,
+      provider: playwright(),
+      instances: [
+        { browser: 'chromium' },
+      ],
+      headless: true,
+    },
   },
   build: {
     lib: {
@@ -17,7 +26,7 @@ export default defineConfig({
       fileName: (format: string) => `index-${format}.js`,
     },
     rollupOptions: {
-      external: [],
+      external: ['driftjs-shared'],
     },
   },
 });

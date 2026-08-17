@@ -48,12 +48,18 @@ function generateESM(mod: CompiledModule, filePath: string): string {
 
   if (mod.imports && mod.imports.length > 0) {
     for (const imp of mod.imports) {
-      if (imp.isDefault) {
+      if (imp.isSideEffect || (!imp.localName && !imp.isDefault && !imp.isNamespace)) {
+        importStatements.push(`import ${JSON.stringify(imp.source)};`);
+      } else if (imp.isNamespace) {
+        importStatements.push(`import * as ${imp.localName} from ${JSON.stringify(imp.source)};`);
+        scopeEntries.push(imp.localName);
+      } else if (imp.isDefault) {
         importStatements.push(`import ${imp.localName} from ${JSON.stringify(imp.source)};`);
+        scopeEntries.push(imp.localName);
       } else if (imp.importedName) {
         importStatements.push(`import { ${imp.importedName} as ${imp.localName} } from ${JSON.stringify(imp.source)};`);
+        scopeEntries.push(imp.localName);
       }
-      scopeEntries.push(imp.localName);
     }
   }
 

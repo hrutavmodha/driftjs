@@ -1,0 +1,26 @@
+<script>
+  import { UserContext, ThemeContext } from './context';
+
+  const user = UserContext.inject();
+  const theme = ThemeContext.inject();
+
+  let name = user.name;
+  let role = user.role;
+  let avatar = user.avatar;
+  let mode = theme.mode;
+  let accent = theme.accentColor;
+</script>
+
+<div class="user-card" style={"border-left: 4px solid " + accent}>
+  <div class="user-header">
+    <span class="user-avatar">{avatar}</span>
+    <div>
+      <h3 class="user-name">{name}</h3>
+      <span class="user-badge">{role}</span>
+    </div>
+  </div>
+  <div class="user-meta">
+    <p>Theme Mode: <strong>{mode}</strong></p>
+    <p>Accent: <span style={"color: " + accent}>{accent}</span></p>
+  </div>
+</div>

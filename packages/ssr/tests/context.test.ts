@@ -159,4 +159,129 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
     const html = renderToString(root);
     expect(html).toBe('<main><section><p>Drift_Admin_99</p></section></main>');
   });
+
+  it('resolves context inside child components rendered within @if blocks during SSR', () => {
+    const ColorContext = createContext('blue');
+
+    const badgeComponent: CompiledModule = {
+      bytecode: new Uint32Array([
+        Opcode.EXEC_SCRIPT, 0,
+        Opcode.CREATE_ELEMENT, 1, 1,
+        Opcode.INTERPOLATE_TEXT, 2, 2,
+        Opcode.APPEND_CHILD, 1, 2,
+        Opcode.RETURN, 1,
+      ]),
+      constants: [
+        {
+          __drift_fn__: (scope: any) => {
+            scope.color = ColorContext.inject();
+          },
+        },
+        'span',
+        { __drift_fn__: (scope: any) => scope.color },
+      ],
+      declaredVars: ['color'],
+      scope: {},
+    };
+
+    const rootComponent: CompiledModule = {
+      bytecode: new Uint32Array([
+        Opcode.EXEC_SCRIPT, 0,
+        Opcode.CREATE_ELEMENT, 0, 1, // div
+        Opcode.REACTIVE_IF, 0, 2, 3, 0xFF, 4,
+        Opcode.RETURN, 0,
+      ]),
+      constants: [
+        {
+          __drift_fn__: () => {
+            ColorContext.provide('crimson');
+          },
+        },
+        'div',
+        { __drift_fn__: () => true }, // condition
+        {
+          // Consequent sub-module containing <Badge />
+          bytecode: new Uint32Array([
+            Opcode.CREATE_FRAGMENT, 0,
+            Opcode.CREATE_ELEMENT, 1, 0, // Badge
+            Opcode.APPEND_CHILD, 0, 1,
+            Opcode.RETURN, 0,
+          ]),
+          constants: ['Badge'],
+          reactiveBindings: [],
+        },
+        [],
+      ],
+      declaredVars: ['Badge'],
+      scope: {
+        Badge: badgeComponent,
+      },
+    };
+
+    const html = renderToString(rootComponent);
+    expect(html).toBe('<div><!--if--><span>crimson</span><!--/if--></div>');
+  });
+
+  it('resolves context inside child components rendered within @for loops during SSR', () => {
+    const AppContext = createContext({ env: 'production' });
+
+    const itemComponent: CompiledModule = {
+      bytecode: new Uint32Array([
+        Opcode.EXEC_SCRIPT, 0,
+        Opcode.CREATE_ELEMENT, 1, 1,
+        Opcode.INTERPOLATE_TEXT, 2, 2,
+        Opcode.APPEND_CHILD, 1, 2,
+        Opcode.RETURN, 1,
+      ]),
+      constants: [
+        {
+          __drift_fn__: (scope: any) => {
+            scope.env = AppContext.inject().env;
+          },
+        },
+        'li',
+        { __drift_fn__: (scope: any) => `${scope.name}: ${scope.env}` },
+      ],
+      declaredVars: ['name', 'env'],
+      scope: {},
+    };
+
+    const rootComponent: CompiledModule = {
+      bytecode: new Uint32Array([
+        Opcode.EXEC_SCRIPT, 0,
+        Opcode.CREATE_ELEMENT, 0, 1, // ul
+        Opcode.REACTIVE_FOR, 0, 2, 3, 0xFF, 0xFF, 4, 5,
+        Opcode.RETURN, 0,
+      ]),
+      constants: [
+        {
+          __drift_fn__: () => {
+            AppContext.provide({ env: 'staging' });
+          },
+        },
+        'ul',
+        { __drift_fn__: () => ['Alpha', 'Beta'] }, // iterable
+        'name',
+        {
+          // Loop body sub-module containing <Item />
+          bytecode: new Uint32Array([
+            Opcode.CREATE_FRAGMENT, 0,
+            Opcode.CREATE_ELEMENT, 1, 0,
+            Opcode.APPEND_CHILD, 0, 1,
+            Opcode.RETURN, 0,
+          ]),
+          constants: ['Item'],
+          reactiveBindings: [],
+        },
+        [],
+      ],
+      declaredVars: ['Item'],
+      scope: {
+        Item: itemComponent,
+      },
+    };
+
+    const html = renderToString(rootComponent);
+    expect(html).toBe('<ul><!--for--><li>Alpha: staging</li><li>Beta: staging</li><!--/for--></ul>');
+  });
 });

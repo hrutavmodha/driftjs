@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { DriftClientVM } from '../src/index.js';
 import { Opcode } from '../types/index.js';
 import { setScopeValue } from 'driftjs-shared';
+import { compile } from '../../compiler/src/index.js';
 
 describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', () => {
   it('updates DOM reactively when state changes inside an async function (async/await)', async () => {
@@ -161,5 +162,29 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
     await Promise.resolve();
 
     expect(root.textContent).toBe('3');
+  });
+
+  it('handles async functions and await inside compiled .drift SFC scripts', async () => {
+    const src = `
+      <script>
+        let data = "initial";
+        async function fetchAsyncData() {
+          const res = await Promise.resolve("loaded async");
+          data = res;
+        }
+      </script>
+      <div>{data}</div>
+    `;
+
+    const mod = compile(src);
+    const vm = new DriftClientVM();
+    const root = vm.execute(mod, { document }) as HTMLElement;
+
+    expect(root.textContent).toBe('initial');
+
+    await vm.scope.fetchAsyncData();
+    await Promise.resolve();
+
+    expect(root.textContent).toBe('loaded async');
   });
 });

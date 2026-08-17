@@ -2,6 +2,7 @@
 import { mount, hydrate } from 'driftjs-dom';
 // @ts-ignore
 import App from './App.drift';
+import './style.css';
 
 const root = document.getElementById('app');
 

@@ -1,8 +1,52 @@
 <script>
-  import Header from "./Header.drift";
-  let count = 0;
+  import { UserContext, ThemeContext, NotificationContext } from './context';
+  import Header from './Header.drift';
+  import UserProfile from './UserProfile.drift';
+  import SubtreeOverride from './SubtreeOverride.drift';
+  import NestedChild from './NestedChild.drift';
+
+  // Provide root contexts for the entire VM component tree
+  UserContext.provide({
+    name: 'Ada Lovelace',
+    role: 'Lead Architect',
+    avatar: '👩‍💻'
+  });
+
+  ThemeContext.provide({
+    mode: 'light',
+    accentColor: '#3b82f6',
+    fontFamily: 'Inter, system-ui, sans-serif'
+  });
+
+  NotificationContext.provide({
+    unreadCount: 4,
+    latestNotice: 'Context API initialized successfully'
+  });
 </script>
 
-<h1>DriftJS Functionality Playground</h1>
+<div class="playground-layout">
+  <Header 
+    title="DriftJS Context API Playground" 
+    subtitle="Hierarchical VM Scope & Reactive Dependency Injection" 
+  />
 
-<button onclick={() => count++}></button> 
+  <main class="playground-body">
+    <section class="panel">
+      <h2>1. Direct Context Consumer (No Props Drilling)</h2>
+      <p class="description">This component injects <code>UserContext</code> and <code>ThemeContext</code> directly from the root VM.</p>
+      <UserProfile />
+    </section>
+
+    <section class="panel">
+      <h2>2. Context Inheritance (Grandparent ➔ DeepChild)</h2>
+      <p class="description">This child directly inherits the root <code>ThemeContext</code> and <code>UserContext</code>.</p>
+      <NestedChild />
+    </section>
+
+    <section class="panel">
+      <h2>3. Subtree Context Shadowing / Override</h2>
+      <p class="description">This subtree re-provides <code>ThemeContext</code> with dark mode and pink accent, overriding only its own descendants.</p>
+      <SubtreeOverride />
+    </section>
+  </main>
+</div>

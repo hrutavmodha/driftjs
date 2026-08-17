@@ -416,6 +416,25 @@ export class DriftLexer {
       return this.createToken(TokenType.TagClose, '>', startLoc);
     }
 
+    if (this.peek() === '/') {
+      let offset = 1;
+      while (
+        this.peek(offset) === ' ' ||
+        this.peek(offset) === '\t' ||
+        this.peek(offset) === '\n' ||
+        this.peek(offset) === '\r'
+      ) {
+        offset++;
+      }
+      if (this.peek(offset) === '>') {
+        for (let i = 0; i <= offset; i++) {
+          this.advance();
+        }
+        this.transitionTo({ kind: LexerStateKind.Data });
+        return this.createToken(TokenType.TagSelfClose, '/>', startLoc);
+      }
+    }
+
     if (this.peek() === '>') {
       this.advance();
       if (state.entersRawText && isRawTextTagName(state.tagName)) {
@@ -427,13 +446,6 @@ export class DriftLexer {
         this.transitionTo({ kind: LexerStateKind.Data });
       }
       return this.createToken(TokenType.TagClose, '>', startLoc);
-    }
-
-    if (this.peek() === '/' && this.peek(1) === '>') {
-      this.advance();
-      this.advance();
-      this.transitionTo({ kind: LexerStateKind.Data });
-      return this.createToken(TokenType.TagSelfClose, '/>', startLoc);
     }
 
     if (!this.isIdentifierStart(this.peek())) {
@@ -927,7 +939,9 @@ export class DriftLexer {
     const code = ch.charCodeAt(0);
     return (
       (code >= 65 && code <= 90) ||
-      (code >= 97 && code <= 122)
+      (code >= 97 && code <= 122) ||
+      code === 95 ||
+      code === 36
     );
   }
 
@@ -939,6 +953,7 @@ export class DriftLexer {
       (code >= 97 && code <= 122) ||
       (code >= 48 && code <= 57) ||
       code === 95 ||
+      code === 36 ||
       code === 45
     );
   }

@@ -19,20 +19,16 @@ DriftJS compiles `.drift` template ASTs into a compact, binary-serializable byte
 | Opcode Name | Hex | Dec | Length (Bytes) | Operands | Category | Summary |
 | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
 | **`RETURN`** | `0x00` | `0` | 2 | `reg` | Control Flow | Returns DOM node/fragment from register as execution output |
-| **`CREATE_ELEMENT`** | `0x01` | `1` | 3 | `dstReg, tagIdx` | DOM Node Creation | Instantiates DOM Element for tag `constants[tagIdx]` into `dstReg` |
-| **`CREATE_TEXT`** | `0x02` | `2` | 3 | `dstReg, textIdx` | DOM Node Creation | Creates static DOM TextNode with content `constants[textIdx]` |
+| **`CREATE_ELEMENT`** | `0x01` | `1` | 3/4 | `dstReg, tagIdx, [propsSpecIdx]` | DOM Node Creation | Instantiates DOM Element / mounts component sub-module into `dstReg` |
+| **`CREATE_TEXT`** | `0x02` | `2` | 3 | `dstReg, textIdx` | DOM Node Creation | Creates static or evaluated DOM TextNode with content `constants[textIdx]` |
 | **`CREATE_COMMENT`** | `0x03` | `3` | 3 | `dstReg, commentIdx` | DOM Node Creation | Creates DOM Comment node with content `constants[commentIdx]` |
 | **`APPEND_CHILD`** | `0x04` | `4` | 3 | `parentReg, childReg` | DOM Manipulation | Appends node `childReg` to parent element `parentReg` |
 | **`SET_ATTR`** | `0x05` | `5` | 5 | `elemReg, nameIdx, valIdx, isDynamic` | Attribute Patching | Sets attribute `constants[nameIdx]` on element in `elemReg` |
 | **`CREATE_FRAGMENT`** | `0x06` | `6` | 2 | `dstReg` | DOM Node Creation | Creates a `DocumentFragment` into register `dstReg` |
 | **`INTERPOLATE_TEXT`** | `0x07` | `7` | 3 | `dstReg, exprIdx` | Dynamic Binding | Evaluates expression `constants[exprIdx]` to create/patch TextNode |
-| **`JUMP`** | `0x08` | `8` | 2 | `targetPc` | Control Flow | Unconditional jump to bytecode position `PC = targetPc` |
-| **`JUMP_IF_FALSE`** | `0x09` | `9` | 3 | `condReg, targetPc` | Control Flow | Jumps to `PC = targetPc` if `condReg` evaluates to falsy |
-| **`EVAL_EXPR`** | `0x0A` | `10` | 3 | `dstReg, exprIdx` | Expression Eval | Evaluates AST `constants[exprIdx]` into register `dstReg` |
-| **`LOOP_ITER`** | `0x0B` | `11` | 5 | `arrReg, itemReg, indexReg, bodyPc` | Loop Control | Low-level loop iteration over array register |
 | **`EXEC_SCRIPT`** | `0x0C` | `12` | 2 | `scriptIdx` | Scope Initialisation | Executes `<script>` AST `constants[scriptIdx]` into component scope |
 | **`REACTIVE_IF`** | `0x0D` | `13` | 6 | `parentReg, condIdx, consIdx, altIdx, depsIdx` | Reactive Block | Binds dynamic conditional `@if` block between comment anchors |
-| **`REACTIVE_FOR`** | `0x0E` | `14` | 7 | `parentReg, iterIdx, itemIdx, idxIdx, bodyIdx, depsIdx` | Reactive Block | Binds dynamic `@for` loop with LIS reconciliation & fast-path patching |
+| **`REACTIVE_FOR`** | `0x0E` | `14` | 8 | `parentReg, iterIdx, itemNameIdx, idxNameIdx, keyIdx, bodyIdx, depsIdx` | Reactive Block | Binds dynamic `@for` loop with LIS reconciliation & fast-path patching |
 
 ---
 
@@ -44,9 +40,9 @@ DriftJS compiles `.drift` template ASTs into a compact, binary-serializable byte
 - **Description**: Stops execution of the current module and returns the DOM Node or DocumentFragment stored in register `reg`.
 
 ### `CREATE_ELEMENT` (`0x01`)
-- **Bytecode**: `0x01 <dstReg> <tagIdx>`
-- **Length**: 3 bytes
-- **Description**: Instantiates a DOM element using the HTML tag name string stored at `constants[tagIdx]` (e.g. `'tr'`, `'div'`, `'button'`) and places the element reference in `dstReg`.
+- **Bytecode**: `0x01 <dstReg> <tagIdx> [propsSpecIdx]`
+- **Length**: 3 or 4 bytes
+- **Description**: Instantiates a DOM element using the HTML tag name string stored at `constants[tagIdx]` (e.g. `'tr'`, `'div'`, `'button'`) and places the element reference in `dstReg`. If `propsSpecIdx` is present, passes evaluated props to component sub-module.
 
 ### `CREATE_TEXT` (`0x02`)
 - **Bytecode**: `0x02 <dstReg> <textIdx>`
@@ -80,26 +76,6 @@ DriftJS compiles `.drift` template ASTs into a compact, binary-serializable byte
 - **Length**: 3 bytes
 - **Description**: Evaluates AST expression `constants[exprIdx]` against current scope, creates a text node with the string result, and stores it in `dstReg`. Registered in `reactiveBindings` for in-place text updates when bound scope variables change.
 
-### `JUMP` (`0x08`)
-- **Bytecode**: `0x08 <targetPc>`
-- **Length**: 2 bytes
-- **Description**: Unconditionally branches execution by setting `PC = targetPc`.
-
-### `JUMP_IF_FALSE` (`0x09`)
-- **Bytecode**: `0x09 <condReg> <targetPc>`
-- **Length**: 3 bytes
-- **Description**: Inspects register `condReg`. If the value is falsy (`false`, `null`, `undefined`, `0`, `""`), sets `PC = targetPc`.
-
-### `EVAL_EXPR` (`0x0A`)
-- **Bytecode**: `0x0A <dstReg> <exprIdx>`
-- **Length**: 3 bytes
-- **Description**: Evaluates AST expression node `constants[exprIdx]` in component scope and stores the primitive result in register `dstReg`.
-
-### `LOOP_ITER` (`0x0B`)
-- **Bytecode**: `0x0B <arrReg> <itemReg> <indexReg> <bodyPc>`
-- **Length**: 5 bytes
-- **Description**: Low-level instruction for iterating over array `arrReg`.
-
 ### `EXEC_SCRIPT` (`0x0C`)
 - **Bytecode**: `0x0C <scriptIdx>`
 - **Length**: 2 bytes
@@ -111,8 +87,8 @@ DriftJS compiles `.drift` template ASTs into a compact, binary-serializable byte
 - **Description**: Registers a dynamic `@if` conditional block bounded by comment anchors (`<!--if-->` / `<!--/if-->`). Re-evaluates test condition `constants[condIdx]` and mounts consequent sub-module `constants[consIdx]` or alternate sub-module `constants[altIdx]` when variables in `constants[depsIdx]` change.
 
 ### `REACTIVE_FOR` (`0x0E`)
-- **Bytecode**: `0x0E <parentReg> <iterIdx> <itemNameIdx> <idxNameIdx> <bodyIdx> <depsIdx>`
-- **Length**: 7 bytes
+- **Bytecode**: `0x0E <parentReg> <iterIdx> <itemNameIdx> <idxNameIdx> <keyIdx> <bodyIdx> <depsIdx>`
+- **Length**: 8 bytes
 - **Description**: Registers a dynamic `@for` loop bounded by comment anchors (`<!--for-->` / `<!--/for-->`). Iterates over array `constants[iterIdx]` using sub-module template `constants[bodyIdx]`.
 - **Features**:
   - Uses Longest Increasing Subsequence (LIS) keyed reconciliation (`reconcileKeyedList`).

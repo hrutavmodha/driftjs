@@ -60,10 +60,8 @@ describe('DriftGenerator', () => {
     const src = `@if isLoggedIn { <span>Welcome</span> } @else if isGuest { <span>Guest</span> } @else { <span>Login</span> }`;
     const module = compile(src);
 
-    // New reactive encoding: no flat jumps for @if
+    // Reactive encoding: emits REACTIVE_IF with sub-modules
     expect(module.bytecode).toContain(Opcode.REACTIVE_IF);
-    expect(module.bytecode).not.toContain(Opcode.JUMP_IF_FALSE);
-    expect(module.bytecode).not.toContain(Opcode.EVAL_EXPR);
 
     // The condition AST, consequent sub-module, and deps array must all be in the constant pool
     const reactiveIfIdx = module.bytecode.indexOf(Opcode.REACTIVE_IF);
@@ -77,10 +75,8 @@ describe('DriftGenerator', () => {
     const src = `@for (item, index) in list { <li>{item}</li> }`;
     const module = compile(src);
 
-    // New reactive encoding: no flat LOOP_ITER for @for
+    // Reactive encoding: emits REACTIVE_FOR with body sub-module
     expect(module.bytecode).toContain(Opcode.REACTIVE_FOR);
-    expect(module.bytecode).not.toContain(Opcode.LOOP_ITER);
-    expect(module.bytecode).not.toContain(Opcode.EVAL_EXPR);
 
     const reactiveForIdx = module.bytecode.indexOf(Opcode.REACTIVE_FOR);
     expect(reactiveForIdx).toBeGreaterThan(-1);
@@ -120,9 +116,38 @@ describe('DriftGenerator', () => {
       localName: 'Header',
       source: './Header.drift',
       isDefault: true,
+      isNamespace: false,
       importedName: undefined,
     });
     expect(module.declaredVars).toContain('Header');
+  });
+
+  it('extracts namespace and side-effect imports metadata from script block', () => {
+    const src = `
+      <script>
+        import * as helpers from "./helpers";
+        import "./theme.css";
+      </script>
+      <div>Test</div>
+    `;
+    const module = compile(src);
+
+    expect(module.imports).toBeDefined();
+    expect(module.imports).toHaveLength(2);
+    expect(module.imports![0]).toEqual({
+      localName: 'helpers',
+      source: './helpers',
+      isDefault: false,
+      isNamespace: true,
+      importedName: undefined,
+    });
+    expect(module.imports![1]).toEqual({
+      localName: '',
+      source: './theme.css',
+      isDefault: false,
+      isSideEffect: true,
+    });
+    expect(module.declaredVars).toContain('helpers');
   });
 
   it('generates propsSpec for component elements with static and dynamic attributes', () => {
@@ -165,6 +190,139 @@ describe('DriftGenerator', () => {
     const consIdx = mod.bytecode[ifPos + 3]!;
     const consMod = mod.constants[consIdx] as any;
     expect(consMod.bytecode).toContain(Opcode.REACTIVE_IF);
+  });
+
+  it('correctly handles ArrayPattern in VariableDeclaration inside script block', () => {
+    const src = `<script>const [a, b, c = 10, ...rest] = items;</script><div>{a}-{b}-{c}</div>`;
+    const module = compile(src);
+
+    expect(module.declaredVars).toContain('a');
+    expect(module.declaredVars).toContain('b');
+    expect(module.declaredVars).toContain('c');
+    expect(module.declaredVars).toContain('rest');
+
+    const scriptConst = module.constants.find((c) => typeof c === 'object' && c !== null && '__drift_fn__' in c);
+    expect(scriptConst).toBeDefined();
+    const fnStr = (scriptConst as any).__drift_fn__;
+    expect(fnStr).not.toContain('"[ a, b, c = 10, ...rest ]"');
+    expect(fnStr).toContain('"a"');
+    expect(fnStr).toContain('"b"');
+    expect(fnStr).toContain('"c"');
+    expect(fnStr).toContain('"rest"');
+  });
+
+  it('correctly handles destructured object and rest parameters in functions and arrow functions', () => {
+    const src = `
+      <script>
+        function formatUser({ name, role = "guest" }, ...extra) {
+          return name + ":" + role + ":" + extra.join(",");
+        }
+        const calc = ([a, b = 2], ...rest) => a + b + rest.length;
+      </script>
+      <div>Test</div>
+    `;
+    const module = compile(src);
+
+    const scriptConst = module.constants.find((c) => typeof c === 'object' && c !== null && '__drift_fn__' in c);
+    expect(scriptConst).toBeDefined();
+    const fnStr = (scriptConst as any).__drift_fn__;
+
+    // Parameter names and rest arguments preserved
+    expect(fnStr).toContain('...extra');
+    expect(fnStr).toContain('...rest');
+    // Function body should use local variable references for parameters
+    expect(fnStr).not.toContain('scope["name"]');
+    expect(fnStr).not.toContain('scope["extra"]');
+    expect(fnStr).not.toContain('scope["rest"]');
+  });
+
+  it('correctly emits async modifier and await expressions in functions and arrow functions', () => {
+    const src = `
+      <script>
+        async function fetchUser(id) {
+          const res = await Promise.resolve({ id, name: "User" + id });
+          return res;
+        }
+        const load = async (url) => {
+          return await Promise.resolve(url);
+        };
+      </script>
+      <div>Test</div>
+    `;
+    const module = compile(src);
+
+    const scriptConst = module.constants.find((c) => typeof c === 'object' && c !== null && '__drift_fn__' in c);
+    expect(scriptConst).toBeDefined();
+    const fnStr = (scriptConst as any).__drift_fn__;
+
+    expect(fnStr).toContain('async function fetchUser(id)');
+    expect(fnStr).toContain('async (url) =>');
+    expect(fnStr).toContain('await');
+  });
+
+  it('correctly generates code for try/catch/finally, throw, and switch/case statements', () => {
+    const src = `
+      <script>
+        function runSafe(val) {
+          try {
+            switch (val) {
+              case 1:
+                return "one";
+              case 2:
+                return "two";
+              default:
+                throw new Error("unsupported");
+            }
+          } catch (err) {
+            return "caught: " + err.message;
+          } finally {
+            let done = true;
+          }
+        }
+      </script>
+      <div>Test</div>
+    `;
+    const module = compile(src);
+
+    const scriptConst = module.constants.find((c) => typeof c === 'object' && c !== null && '__drift_fn__' in c);
+    expect(scriptConst).toBeDefined();
+    const fnStr = (scriptConst as any).__drift_fn__;
+
+    expect(fnStr).toContain('try {');
+    expect(fnStr).toContain('switch (');
+    expect(fnStr).toContain('case 1:');
+    expect(fnStr).toContain('default:');
+    expect(fnStr).toContain('throw new');
+    expect(fnStr).toContain('catch (err)');
+    expect(fnStr).toContain('finally {');
+  });
+
+  it('correctly generates code for class declarations with methods and properties', () => {
+    const src = `
+      <script>
+        class Counter {
+          count = 0;
+          constructor(init = 0) {
+            this.count = init;
+          }
+          inc() {
+            this.count++;
+          }
+        }
+      </script>
+      <div>Test</div>
+    `;
+    const module = compile(src);
+
+    expect(module.declaredVars).toContain('Counter');
+
+    const scriptConst = module.constants.find((c) => typeof c === 'object' && c !== null && '__drift_fn__' in c);
+    expect(scriptConst).toBeDefined();
+    const fnStr = (scriptConst as any).__drift_fn__;
+
+    expect(fnStr).toContain('class Counter');
+    expect(fnStr).toContain('constructor(');
+    expect(fnStr).toContain('inc()');
   });
 });
 

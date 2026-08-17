@@ -241,5 +241,35 @@ describe('DriftLexer', () => {
       expect(elseIfTok?.value).toBe('b > 10');
     });
   });
+
+  it('correctly lexes self-closing tags with whitespace before and inside slash-gt', () => {
+    const lexer = new DriftLexer('<input type="text" / ><span>after</span>');
+    const tokens = collectTokens(lexer);
+    const types = tokens.map((t) => t.type);
+    expect(types).toEqual([
+      TokenType.TagOpen,
+      TokenType.Identifier,
+      TokenType.Identifier,
+      TokenType.Equals,
+      TokenType.StringLiteral,
+      TokenType.TagSelfClose,
+      TokenType.TagOpen,
+      TokenType.Identifier,
+      TokenType.TagClose,
+      TokenType.Text,
+      TokenType.TagOpenSlash,
+      TokenType.Identifier,
+      TokenType.TagClose,
+      TokenType.EOF,
+    ]);
+  });
+
+  it('correctly lexes identifiers starting with _ and $ in tags and attributes', () => {
+    const lexer = new DriftLexer('<_MyComponent _custom="1" $ref="target" $count={5} />');
+    const tokens = collectTokens(lexer);
+    const idents = tokens.filter((t) => t.type === TokenType.Identifier).map((t) => t.value);
+
+    expect(idents).toEqual(['_MyComponent', '_custom', '$ref', '$count']);
+  });
 });
 

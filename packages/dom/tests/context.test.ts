@@ -7,6 +7,7 @@ import {
   mount,
 } from '../src/index.js';
 import { Opcode, type CompiledModule } from '../types/index.js';
+import { compile } from '../../compiler/src/index.js';
 
 describe('DriftJS Global Context Mechanism (Client VM)', () => {
   const doc = document;
@@ -258,5 +259,52 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     vm.unmount();
     expect(vm.contextMap.size).toBe(0);
     expect(vm.parentVM).toBeNull();
+  });
+
+  it('provides and injects context end-to-end across compiled SFC components', () => {
+    const ThemeCtx = createContext({ mode: 'light', color: 'blue' });
+    const UserCtx = createContext({ name: 'Guest' });
+
+    // Child SFC
+    const childSrc = `
+      <script>
+        const theme = ThemeCtx.inject();
+        const user = UserCtx.inject();
+        let mode = theme.mode;
+        let name = user.name;
+      </script>
+      <div class="child-box">
+        <span class="user-name">{name}</span>
+        <span class="theme-mode">{mode}</span>
+      </div>
+    `;
+
+    // Parent SFC providing context
+    const parentSrc = `
+      <script>
+        ThemeCtx.provide({ mode: 'dark', color: 'pink' });
+        UserCtx.provide({ name: 'Ada Lovelace' });
+      </script>
+      <div class="parent-box">
+        <Child />
+      </div>
+    `;
+
+    const childMod = compile(childSrc);
+    childMod.scope = { ThemeCtx, UserCtx };
+
+    const parentMod = compile(parentSrc);
+    parentMod.scope = { ThemeCtx, UserCtx, Child: childMod };
+
+    const vm = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = vm.execute(parentMod, { document });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelector('.user-name')?.textContent).toBe('Ada Lovelace');
+    expect(container.querySelector('.theme-mode')?.textContent).toBe('dark');
+
+    document.body.removeChild(container);
   });
 });

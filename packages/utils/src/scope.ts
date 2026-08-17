@@ -46,17 +46,7 @@ export function setScopeValue(targetScope: Record<string, any>, name: string, va
   }
 }
 
-/**
- * Writes back declared variables from function scope to enclosing target scope.
- */
-export function syncDeclaredVars(fromScope: Record<string, any>, toScope: Record<string, any>, declaredVars?: Set<string>): void {
-  if (!declaredVars) return;
-  for (const name of declaredVars) {
-    if (Object.prototype.hasOwnProperty.call(fromScope, name)) {
-      setScopeValue(toScope, name, fromScope[name]);
-    }
-  }
-}
+
 
 /**
  * Safely checks if a property exists on scope or any of its parent scopes,

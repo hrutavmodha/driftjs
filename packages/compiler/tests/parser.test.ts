@@ -209,6 +209,18 @@ describe('DriftParser', () => {
     expect(forNode.index).toBeNull();
   });
 
+  it('parses @for directive with canonical key expression', () => {
+    const parser = new DriftParser(
+      new DriftLexer('@for (item, idx) in items key item.id { <li>{item.name}</li> }')
+    );
+    const ast = parser.parse();
+    const forNode = ast.body[0] as any;
+    expect(forNode.item).toBe('item');
+    expect(forNode.index).toBe('idx');
+    expect(forNode.iterable).toBe('items');
+    expect(forNode.key).toBe('item.id');
+  });
+
   it('parses @switch, @case, and @default directives cleanly', () => {
     const parser = new DriftParser(
       new DriftLexer('@switch userRole { @case "admin" { <p>Admin</p> } @case "user" { <p>User</p> } @default { <p>Unknown</p> } }')
@@ -331,6 +343,21 @@ describe('DriftParser', () => {
       expect(n2.test).toBe('b');
       expect(n3.test).toBe('c');
     });
+  });
+
+  it('parses self-closing void elements with attributes and following sibling elements correctly', () => {
+    const src = '<input type="text" value="hello" / ><p>Sibling</p>';
+    const ast = new DriftParser(new DriftLexer(src)).parse();
+    expect(ast.body).toHaveLength(2);
+    const inputNode = ast.body[0] as ElementNode;
+    expect(inputNode.type).toBe(ASTNodeType.Element);
+    expect(inputNode.tagName).toBe('input');
+    expect(inputNode.isSelfClosing).toBe(true);
+    expect(inputNode.children).toHaveLength(0);
+
+    const pNode = ast.body[1] as ElementNode;
+    expect(pNode.type).toBe(ASTNodeType.Element);
+    expect(pNode.tagName).toBe('p');
   });
 });
 

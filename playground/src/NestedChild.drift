@@ -1,0 +1,17 @@
+<script>
+  import { ThemeContext, UserContext } from './context';
+
+  const theme = ThemeContext.inject();
+  const user = UserContext.inject();
+
+  let mode = theme.mode;
+  let accent = theme.accentColor;
+  let userName = user.name;
+</script>
+
+<div class="nested-box">
+  <h4>Deep Child Component</h4>
+  <p>Inherited User: <strong>{userName}</strong></p>
+  <p>Active Theme Mode: <strong>{mode}</strong></p>
+  <p>Subtree Accent: <span style={"color: " + accent}>{accent}</span></p>
+</div>

@@ -55,17 +55,7 @@ export function evaluateExpression(node: any, scope: Record<string, any>, declar
   return node;
 }
 
-/**
- * Resolves constant or variable values against scope.
- */
-export function resolveValue(val: any, scope: Record<string, any>, declaredVars?: Set<string>): any {
-  if (val === null || val === undefined) return val;
-  if (typeof val === 'string') return inScopeChain(scope, val) ? scope[val] : val;
-  if (typeof val === 'object' && ('__drift_fn__' in val || typeof val._executableFn === 'function' || typeof val === 'function')) {
-    return evaluateExpression(val, scope, declaredVars);
-  }
-  return val;
-}
+
 
 /**
  * Safely unwraps an imported component module (handling ESM default exports,

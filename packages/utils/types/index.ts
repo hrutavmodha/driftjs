@@ -7,8 +7,8 @@ export interface BaseVMExecutionOptions {
  */
 export interface Context<T> {
   readonly id: symbol;
-  readonly name?: string;
-  readonly defaultValue?: T;
+  readonly name?: string | undefined;
+  readonly defaultValue?: T | undefined;
   provide(value: T | (() => T)): void;
   inject(fallback?: T): T;
 }

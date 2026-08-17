@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   evaluateExpression,
-  executeBlockStatement,
   setScopeValue,
-  syncDeclaredVars,
   inScopeChain,
   resolveIterable,
   resolveComponentModule,
@@ -45,11 +43,11 @@ describe('driftjs-shared Module', () => {
     expect(resolveIterable(null)).toEqual([]);
   });
 
-  it('executes precompiled block statements and updates scope', () => {
+  it('executes precompiled script thunks and updates scope', () => {
     const scope = { val: 10 };
     const statements = { __drift_fn__: '(scope) => { scope.val = 42; }' };
 
-    executeBlockStatement(statements, scope);
+    evaluateExpression(statements, scope);
     expect(scope.val).toBe(42);
   });
 

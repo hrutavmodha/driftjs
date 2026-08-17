@@ -1,7 +1,6 @@
 import { type CompiledModule, Opcode } from "driftjs-compiler";
 import {
   evaluateExpression,
-  executeBlockStatement,
   resolveComponentModule,
   evaluatePropsSpec,
   pushActiveVM,
@@ -36,6 +35,11 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+const VOID_ELEMENTS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+  'link', 'meta', 'param', 'source', 'track', 'wbr'
+]);
 
 /**
  * Register-based Virtual Machine for Server-Side Rendering (SSR) in DriftJS.
@@ -127,7 +131,9 @@ export class DriftServerVM {
         case Opcode.CREATE_TEXT: {
           const dstReg = bytecode[pc + 1]!;
           const textIdx = bytecode[pc + 2]!;
-          const content = String(constants[textIdx]);
+          const textConst = constants[textIdx];
+          const val = evaluateExpression(textConst, this.scope, this.declaredVars);
+          const content = val != null ? String(val) : '';
           this.setRegister(dstReg, {
             type: 'text',
             content,
@@ -207,29 +213,7 @@ export class DriftServerVM {
           break;
         }
 
-        case Opcode.EVAL_EXPR: {
-          const dstReg = bytecode[pc + 1]!;
-          const exprIdx = bytecode[pc + 2]!;
-          const expr = constants[exprIdx];
-          this.setRegister(dstReg, evaluateExpression(expr, this.scope, this.declaredVars));
-          pc += 3;
-          break;
-        }
 
-        case Opcode.JUMP: {
-          pc = (bytecode[pc + 1]! << 8) | bytecode[pc + 2]!;
-          break;
-        }
-
-        case Opcode.JUMP_IF_FALSE: {
-          const cond = this.getRegister(bytecode[pc + 1]!);
-          if (!cond) {
-            pc = (bytecode[pc + 2]! << 8) | bytecode[pc + 3]!;
-          } else {
-            pc += 4;
-          }
-          break;
-        }
 
         case Opcode.EXEC_SCRIPT: {
           const scriptIdx = bytecode[pc + 1]!;
@@ -262,6 +246,7 @@ export class DriftServerVM {
           parentNode.children.push({ type: 'comment', content: 'if', children: [] });
           if (subMod) {
             const subVm = new DriftServerVM();
+            subVm.parentVM = this;
             const subResult = subVm.execute(subMod, { scope: this.scope });
             if (subResult) parentNode.children.push(subResult);
           }
@@ -298,6 +283,7 @@ export class DriftServerVM {
             if (indexName) childScope[indexName] = i;
 
             const subVm = new DriftServerVM();
+            subVm.parentVM = this;
             const subResult = subVm.execute(bodyMod, { scope: childScope });
             if (subResult) parentNode.children.push(subResult);
           }
@@ -341,7 +327,7 @@ export function serializeNode(node: ServerNode | string): string {
         }
       }
     }
-    const selfClosing = ['input', 'img', 'br', 'hr', 'meta', 'link'].includes(tag.toLowerCase());
+    const selfClosing = VOID_ELEMENTS.has(tag.toLowerCase());
     if (selfClosing) {
       return `<${tag}${attrsStr} />`;
     }

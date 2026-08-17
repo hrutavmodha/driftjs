@@ -374,19 +374,24 @@ export class DriftGenerator {
       for (const decl of node.declarations) {
         this.extractBindingIdentifiers(decl.id);
       }
-    } else if (node.type === 'FunctionDeclaration' && node.id?.type === 'Identifier') {
+    } else if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id?.type === 'Identifier') {
       this.declaredVars.add(node.id.name);
     } else if (node.type === 'ImportDeclaration' && Array.isArray(node.specifiers)) {
       const source = typeof node.source?.value === 'string' ? node.source.value : '';
-      for (const spec of node.specifiers) {
-        if (spec.local?.type === 'Identifier') {
-          const localName = spec.local.name;
-          this.declaredVars.add(localName);
-          const isDefault = spec.type === 'ImportDefaultSpecifier';
-          const importedName = spec.type === 'ImportSpecifier' && spec.imported?.type === 'Identifier'
-            ? spec.imported.name
-            : undefined;
-          this.imports.push({ localName, source, isDefault, importedName });
+      if (node.specifiers.length === 0) {
+        this.imports.push({ localName: '', source, isDefault: false, isSideEffect: true });
+      } else {
+        for (const spec of node.specifiers) {
+          if (spec.local?.type === 'Identifier') {
+            const localName = spec.local.name;
+            this.declaredVars.add(localName);
+            const isDefault = spec.type === 'ImportDefaultSpecifier';
+            const isNamespace = spec.type === 'ImportNamespaceSpecifier';
+            const importedName = spec.type === 'ImportSpecifier' && spec.imported?.type === 'Identifier'
+              ? spec.imported.name
+              : undefined;
+            this.imports.push({ localName, source, isDefault, isNamespace, importedName });
+          }
         }
       }
     }
@@ -410,6 +415,8 @@ export class DriftGenerator {
       }
     } else if (idNode.type === 'AssignmentPattern') {
       this.extractBindingIdentifiers(idNode.left);
+    } else if (idNode.type === 'RestElement') {
+      this.extractBindingIdentifiers(idNode.argument);
     }
   }
 
@@ -490,6 +497,35 @@ export class DriftGenerator {
         if (node.test) for (const id of this.extractIdentifiers(node.test)) ids.add(id);
         if (node.body) for (const id of this.extractIdentifiers(node.body)) ids.add(id);
         break;
+      case 'AwaitExpression':
+      case 'YieldExpression':
+      case 'ThrowStatement':
+        if (node.argument) for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
+        break;
+      case 'TryStatement':
+        if (node.block) for (const id of this.extractIdentifiers(node.block)) ids.add(id);
+        if (node.handler) for (const id of this.extractIdentifiers(node.handler)) ids.add(id);
+        if (node.finalizer) for (const id of this.extractIdentifiers(node.finalizer)) ids.add(id);
+        break;
+      case 'CatchClause':
+        if (node.body) for (const id of this.extractIdentifiers(node.body)) ids.add(id);
+        break;
+      case 'SwitchStatement':
+        if (node.discriminant) for (const id of this.extractIdentifiers(node.discriminant)) ids.add(id);
+        if (node.cases) {
+          for (const c of node.cases) {
+            for (const id of this.extractIdentifiers(c)) ids.add(id);
+          }
+        }
+        break;
+      case 'SwitchCase':
+        if (node.test) for (const id of this.extractIdentifiers(node.test)) ids.add(id);
+        if (node.consequent) {
+          for (const s of node.consequent) {
+            for (const id of this.extractIdentifiers(s)) ids.add(id);
+          }
+        }
+        break;
     }
     return ids;
   }
@@ -548,69 +584,6 @@ export class DriftGenerator {
   private emit(opcode: Opcode, ...operands: number[]): void {
     this.bytecode.push(opcode, ...operands);
   }
-
-  private emitJumpIfFalsePlaceholder(condReg: number): number {
-    const pos = this.bytecode.length;
-    this.bytecode.push(Opcode.JUMP_IF_FALSE, condReg, 0, 0);
-    return pos;
-  }
-
-  private emitJumpPlaceholder(): number {
-    const pos = this.bytecode.length;
-    this.bytecode.push(Opcode.JUMP, 0, 0);
-    return pos;
-  }
-
-  private emitJump(targetByte: number): void {
-    const high = (targetByte >> 8) & 0xff;
-    const low = targetByte & 0xff;
-    this.bytecode.push(Opcode.JUMP, high, low);
-  }
-
-  private emitLoopIterPlaceholder(
-    arrayReg: number,
-    itemReg: number,
-    indexReg: number,
-    itemConstIdx: number,
-    indexConstIdx: number
-  ): number {
-    const pos = this.bytecode.length;
-    const itemHigh = (itemConstIdx >> 8) & 0xff;
-    const itemLow = itemConstIdx & 0xff;
-    const idxHigh = (indexConstIdx >> 8) & 0xff;
-    const idxLow = indexConstIdx & 0xff;
-
-    this.bytecode.push(
-      Opcode.LOOP_ITER,
-      arrayReg,
-      itemReg,
-      indexReg,
-      itemHigh,
-      itemLow,
-      idxHigh,
-      idxLow,
-      0,
-      0
-    );
-    return pos;
-  }
-
-  private patchJump(pos: number, targetByte: number): void {
-    const high = (targetByte >> 8) & 0xff;
-    const low = targetByte & 0xff;
-
-    const op = this.bytecode[pos];
-    if (op === Opcode.JUMP_IF_FALSE) {
-      this.bytecode[pos + 2] = high;
-      this.bytecode[pos + 3] = low;
-    } else if (op === Opcode.JUMP) {
-      this.bytecode[pos + 1] = high;
-      this.bytecode[pos + 2] = low;
-    } else if (op === Opcode.LOOP_ITER) {
-      this.bytecode[pos + 8] = high;
-      this.bytecode[pos + 9] = low;
-    }
-  }
 }
 
 function getRootIdentifier(node: any): string | null {
@@ -634,10 +607,51 @@ function extractBindingNames(node: any): string[] {
       for (const e of n.elements) if (e) walk(e);
     } else if (n.type === 'AssignmentPattern') {
       walk(n.left);
+    } else if (n.type === 'RestElement') {
+      walk(n.argument);
     }
   }
   walk(node);
   return names;
+}
+
+function paramToJS(node: any, outerLocals?: Set<string>): string {
+  if (!node) return '';
+  switch (node.type) {
+    case 'Identifier':
+      return node.name;
+    case 'AssignmentPattern':
+      return `${paramToJS(node.left, outerLocals)} = ${astToJS(node.right, outerLocals)}`;
+    case 'RestElement':
+      return `...${paramToJS(node.argument, outerLocals)}`;
+    case 'ArrayPattern':
+      return `[${(node.elements || []).map((el: any) => (el ? paramToJS(el, outerLocals) : '')).join(', ')}]`;
+    case 'ObjectPattern': {
+      const props = (node.properties || [])
+        .map((p: any) => {
+          if (p.type === 'Property') {
+            const k = p.key?.name || (typeof p.key?.value === 'string' ? JSON.stringify(p.key.value) : p.key?.value ? String(p.key.value) : astToJS(p.key, outerLocals));
+            if (p.value?.type === 'AssignmentPattern') {
+              const leftName = p.value.left?.name || paramToJS(p.value.left, outerLocals);
+              const rightJS = astToJS(p.value.right, outerLocals);
+              return (k === leftName || p.shorthand) ? `${k} = ${rightJS}` : `${k}: ${leftName} = ${rightJS}`;
+            } else if (p.value?.type === 'Identifier' && p.value.name === k) {
+              return k;
+            } else {
+              return `${k}: ${paramToJS(p.value, outerLocals)}`;
+            }
+          } else if (p.type === 'RestElement') {
+            return `...${paramToJS(p.argument, outerLocals)}`;
+          }
+          return '';
+        })
+        .filter(Boolean)
+        .join(', ');
+      return `{ ${props} }`;
+    }
+    default:
+      return node.name || astToJS(node, outerLocals);
+  }
 }
 
 /**
@@ -663,6 +677,14 @@ export function astToJS(node: any, locals?: Set<string>): string {
 
     case 'UnaryExpression':
       return `(${node.operator} ${astToJS(node.argument, locals)})`;
+
+    case 'AwaitExpression':
+      return `(await ${astToJS(node.argument, locals)})`;
+
+    case 'YieldExpression':
+      return node.delegate
+        ? `(yield* ${node.argument ? astToJS(node.argument, locals) : ''})`
+        : `(yield ${node.argument ? astToJS(node.argument, locals) : ''})`;
 
     case 'ConditionalExpression':
       return `(${astToJS(node.test, locals)} ? ${astToJS(node.consequent, locals)} : ${astToJS(node.alternate, locals)})`;
@@ -778,8 +800,12 @@ export function astToJS(node: any, locals?: Set<string>): string {
     case 'ObjectExpression':
       return `{${node.properties ? node.properties.map((prop: any) => prop.type === 'SpreadElement' ? '...' + astToJS(prop.argument, locals) : `${prop.computed ? '[' + astToJS(prop.key, locals) + ']' : prop.key.name}: ${astToJS(prop.value, locals)}`).join(', ') : ''}}`;
 
+    case 'RestElement':
     case 'SpreadElement':
       return `...${astToJS(node.argument, locals)}`;
+
+    case 'AssignmentPattern':
+      return `${astToJS(node.left, locals)} = ${astToJS(node.right, locals)}`;
 
     case 'TemplateLiteral':
       return `\`${node.quasis ? node.quasis.map((q: any, i: number) => (q.value?.raw ?? '') + (node.expressions && node.expressions[i] ? '\${' + astToJS(node.expressions[i], locals) + '}' : '')).join('') : ''}\``;
@@ -792,6 +818,9 @@ export function astToJS(node: any, locals?: Set<string>): string {
 
     case 'ThisExpression':
       return 'scope';
+
+    case 'Super':
+      return 'super';
 
     case 'BlockStatement': {
       const newLocals = new Set(locals);
@@ -806,11 +835,49 @@ export function astToJS(node: any, locals?: Set<string>): string {
     case 'ReturnStatement':
       return `return ${node.argument ? astToJS(node.argument, locals) : ''}`;
 
+    case 'ThrowStatement':
+      return `throw ${node.argument ? astToJS(node.argument, locals) : ''}`;
+
     case 'BreakStatement':
       return node.label ? `break ${node.label.name}` : 'break';
 
     case 'ContinueStatement':
       return node.label ? `continue ${node.label.name}` : 'continue';
+
+    case 'LabeledStatement':
+      return `${node.label.name}: ${astToJS(node.body, locals)}`;
+
+    case 'TryStatement': {
+      const blockJS = astToJS(node.block, locals);
+      const handlerJS = node.handler ? astToJS(node.handler, locals) : '';
+      const finalizerJS = node.finalizer ? `finally ${astToJS(node.finalizer, locals)}` : '';
+      return `try ${blockJS} ${handlerJS} ${finalizerJS}`.trim();
+    }
+
+    case 'CatchClause': {
+      const newLocals = new Set(locals);
+      let paramJS = '';
+      if (node.param) {
+        for (const name of extractBindingNames(node.param)) {
+          newLocals.add(name);
+        }
+        paramJS = paramToJS(node.param, locals);
+      }
+      const bodyJS = astToJS(node.body, newLocals);
+      return paramJS ? `catch (${paramJS}) ${bodyJS}` : `catch ${bodyJS}`;
+    }
+
+    case 'SwitchStatement': {
+      const discJS = astToJS(node.discriminant, locals);
+      const casesJS = node.cases ? node.cases.map((c: any) => astToJS(c, locals)).join(' ') : '';
+      return `switch (${discJS}) { ${casesJS} }`;
+    }
+
+    case 'SwitchCase': {
+      const testJS = node.test ? `case ${astToJS(node.test, locals)}:` : 'default:';
+      const stmtsJS = node.consequent ? node.consequent.map((s: any) => astToJS(s, locals)).filter(Boolean).join('; ') : '';
+      return `${testJS} ${stmtsJS ? stmtsJS + ';' : ''}`;
+    }
 
     case 'IfStatement': {
       // Emit a real if/else statement (not a ternary) so that `return`, `break`,
@@ -910,7 +977,51 @@ export function astToJS(node: any, locals?: Set<string>): string {
                 if (varName) {
                   newLocals.add(varName);
                   const expr = `((${valJS} && (${JSON.stringify(propKey)} in ${valJS})) ? ${valJS}[${JSON.stringify(propKey)}] : ${defaultValJS ?? 'undefined'})`;
+                  if (locals && locals.has(varName)) {
+                    declsArr.push(`${varName} = ${expr}`);
+                  } else {
+                    declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`);
+                  }
+                }
+              }
+            }
+          } else if (d.id?.type === 'ArrayPattern') {
+            const valJS = d.init ? astToJS(d.init, locals) : 'undefined';
+            const elems = d.id.elements || [];
+            for (let i = 0; i < elems.length; i++) {
+              const el = elems[i];
+              if (!el) continue;
+              if (el.type === 'Identifier') {
+                const varName = el.name;
+                newLocals.add(varName);
+                const expr = `(${valJS} ? ${valJS}[${i}] : undefined)`;
+                if (locals && locals.has(varName)) {
+                  declsArr.push(`${varName} = ${expr}`);
+                } else {
                   declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`);
+                }
+              } else if (el.type === 'AssignmentPattern') {
+                const varName = el.left?.name || astToJS(el.left, locals);
+                const defaultValJS = astToJS(el.right, locals);
+                if (varName) {
+                  newLocals.add(varName);
+                  const expr = `((${valJS} && ${valJS}[${i}] !== undefined) ? ${valJS}[${i}] : ${defaultValJS})`;
+                  if (locals && locals.has(varName)) {
+                    declsArr.push(`${varName} = ${expr}`);
+                  } else {
+                    declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`);
+                  }
+                }
+              } else if (el.type === 'RestElement') {
+                const varName = el.argument?.name || astToJS(el.argument, locals);
+                if (varName) {
+                  newLocals.add(varName);
+                  const expr = `((${valJS} && typeof ${valJS}.slice === 'function') ? ${valJS}.slice(${i}) : [])`;
+                  if (locals && locals.has(varName)) {
+                    declsArr.push(`${varName} = ${expr}`);
+                  } else {
+                    declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`);
+                  }
                 }
               }
             }
@@ -936,25 +1047,19 @@ export function astToJS(node: any, locals?: Set<string>): string {
       const paramNames: string[] = [];
       if (node.params) {
         for (const p of node.params) {
-          if (p.type === 'AssignmentPattern') {
-            const pName = p.left?.name || astToJS(p.left, locals);
-            const defaultVal = astToJS(p.right, locals);
-            if (p.left?.name) newLocals.add(p.left.name);
-            paramNames.push(`${pName} = ${defaultVal}`);
-          } else {
-            const pName = p.name || p.id?.name || (p.left && p.left.name) || astToJS(p, locals);
-            if (pName) {
-              paramNames.push(pName);
-              newLocals.add(pName);
-            }
+          for (const pName of extractBindingNames(p)) {
+            newLocals.add(pName);
           }
+          paramNames.push(paramToJS(p, locals));
         }
       }
       if (node.body?.type === 'BlockStatement' && Array.isArray(node.body.body)) {
         for (const stmt of node.body.body) {
-          if (stmt.type === 'VariableDeclaration' && stmt.declarations) {
+          if (stmt.type === 'VariableDeclaration' && Array.isArray(stmt.declarations)) {
             for (const d of stmt.declarations) {
-              if (d.id?.name) newLocals.add(d.id.name);
+              for (const varName of extractBindingNames(d.id)) {
+                newLocals.add(varName);
+              }
             }
           } else if (stmt.type === 'FunctionDeclaration' && stmt.id?.name) {
             newLocals.add(stmt.id.name);
@@ -965,7 +1070,9 @@ export function astToJS(node: any, locals?: Set<string>): string {
       const bodyCode = node.body?.type === 'BlockStatement'
         ? `{ ${node.body.body.map((s: any) => astToJS(s, newLocals)).filter(Boolean).join('; ')}; }`
         : `{ ${astToJS(node.body, newLocals)}; }`;
-      const fnCode = `function ${name || ''}(${paramsJS}) ${bodyCode}`;
+      const asyncPrefix = node.async ? 'async ' : '';
+      const generatorStar = node.generator ? '*' : '';
+      const fnCode = `${asyncPrefix}function${generatorStar} ${name || ''}(${paramsJS}) ${bodyCode}`;
       if (name) {
         return `(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${fnCode}) : ((scope || {})[${JSON.stringify(name)}] = ${fnCode}))`;
       }
@@ -975,28 +1082,23 @@ export function astToJS(node: any, locals?: Set<string>): string {
     case 'ArrowFunctionExpression':
     case 'FunctionExpression': {
       const newLocals = new Set(locals);
+      if (node.id?.name) newLocals.add(node.id.name);
       const paramNames: string[] = [];
       if (node.params) {
         for (const p of node.params) {
-          if (p.type === 'AssignmentPattern') {
-            const pName = p.left?.name || astToJS(p.left, locals);
-            const defaultVal = astToJS(p.right, locals);
-            if (p.left?.name) newLocals.add(p.left.name);
-            paramNames.push(`${pName} = ${defaultVal}`);
-          } else {
-            const pName = p.name || p.id?.name || (p.left && p.left.name) || astToJS(p, locals);
-            if (pName) {
-              paramNames.push(pName);
-              newLocals.add(pName);
-            }
+          for (const pName of extractBindingNames(p)) {
+            newLocals.add(pName);
           }
+          paramNames.push(paramToJS(p, locals));
         }
       }
       if (node.body?.type === 'BlockStatement' && Array.isArray(node.body.body)) {
         for (const stmt of node.body.body) {
-          if (stmt.type === 'VariableDeclaration' && stmt.declarations) {
+          if (stmt.type === 'VariableDeclaration' && Array.isArray(stmt.declarations)) {
             for (const d of stmt.declarations) {
-              if (d.id?.name) newLocals.add(d.id.name);
+              for (const varName of extractBindingNames(d.id)) {
+                newLocals.add(varName);
+              }
             }
           } else if (stmt.type === 'FunctionDeclaration' && stmt.id?.name) {
             newLocals.add(stmt.id.name);
@@ -1004,12 +1106,81 @@ export function astToJS(node: any, locals?: Set<string>): string {
         }
       }
       const paramsJS = paramNames.join(', ');
-      if (node.body?.type === 'BlockStatement') {
-        const bodyCode = `{ ${node.body.body.map((s: any) => astToJS(s, newLocals)).filter(Boolean).join('; ')}; }`;
-        return `((${paramsJS}) => ${bodyCode})`;
+      const asyncPrefix = node.async ? 'async ' : '';
+      if (node.type === 'ArrowFunctionExpression') {
+        if (node.body?.type === 'BlockStatement') {
+          const bodyCode = `{ ${node.body.body.map((s: any) => astToJS(s, newLocals)).filter(Boolean).join('; ')}; }`;
+          return `(${asyncPrefix}(${paramsJS}) => ${bodyCode})`;
+        }
+        const bodyJS = astToJS(node.body, newLocals);
+        return `(${asyncPrefix}(${paramsJS}) => ${bodyJS})`;
+      } else {
+        const generatorStar = node.generator ? '*' : '';
+        const bodyCode = node.body?.type === 'BlockStatement'
+          ? `{ ${node.body.body.map((s: any) => astToJS(s, newLocals)).filter(Boolean).join('; ')}; }`
+          : `{ ${astToJS(node.body, newLocals)}; }`;
+        return `(${asyncPrefix}function${generatorStar} ${node.id?.name || ''}(${paramsJS}) ${bodyCode})`;
       }
+    }
+
+    case 'ClassDeclaration':
+    case 'ClassExpression': {
+      const name = node.id?.name;
+      const newLocals = new Set(locals);
+      if (name) newLocals.add(name);
+      const superJS = node.superClass ? ` extends ${astToJS(node.superClass, locals)}` : '';
       const bodyJS = astToJS(node.body, newLocals);
-      return `((${paramsJS}) => ${bodyJS})`;
+      const classCode = `class ${name || ''}${superJS} ${bodyJS}`;
+      if (node.type === 'ClassDeclaration' && name) {
+        return `(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${classCode}) : ((scope || {})[${JSON.stringify(name)}] = ${classCode}))`;
+      }
+      return `(${classCode})`;
+    }
+
+    case 'ClassBody': {
+      const elements = node.body ? node.body.map((el: any) => astToJS(el, locals)).filter(Boolean) : [];
+      return `{ ${elements.join('; ')} }`;
+    }
+
+    case 'MethodDefinition': {
+      const staticPrefix = node.static ? 'static ' : '';
+      const kindPrefix = node.kind === 'get' || node.kind === 'set' ? `${node.kind} ` : '';
+      const asyncPrefix = node.value?.async ? 'async ' : '';
+      const genPrefix = node.value?.generator ? '*' : '';
+      const keyJS = node.computed ? `[${astToJS(node.key, locals)}]` : (node.key?.name || astToJS(node.key, locals));
+      const newLocals = new Set(locals);
+      const paramNames: string[] = [];
+      if (node.value?.params) {
+        for (const p of node.value.params) {
+          for (const pName of extractBindingNames(p)) {
+            newLocals.add(pName);
+          }
+          paramNames.push(paramToJS(p, locals));
+        }
+      }
+      if (node.value?.body?.type === 'BlockStatement' && Array.isArray(node.value.body.body)) {
+        for (const stmt of node.value.body.body) {
+          if (stmt.type === 'VariableDeclaration' && Array.isArray(stmt.declarations)) {
+            for (const d of stmt.declarations) {
+              for (const varName of extractBindingNames(d.id)) {
+                newLocals.add(varName);
+              }
+            }
+          } else if (stmt.type === 'FunctionDeclaration' && stmt.id?.name) {
+            newLocals.add(stmt.id.name);
+          }
+        }
+      }
+      const paramsJS = paramNames.join(', ');
+      const bodyCode = node.value?.body ? astToJS(node.value.body, newLocals) : '{}';
+      return `${staticPrefix}${asyncPrefix}${genPrefix}${kindPrefix}${keyJS}(${paramsJS}) ${bodyCode}`;
+    }
+
+    case 'PropertyDefinition': {
+      const staticPrefix = node.static ? 'static ' : '';
+      const keyJS = node.computed ? `[${astToJS(node.key, locals)}]` : (node.key?.name || astToJS(node.key, locals));
+      const valJS = node.value ? ` = ${astToJS(node.value, locals)}` : '';
+      return `${staticPrefix}${keyJS}${valJS}`;
     }
 
     case 'NewExpression':

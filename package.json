@@ -12,7 +12,9 @@
     "major": "node scripts/version/major.js"
   },
   "devDependencies": {
-    "happy-dom": "^20.11.1",
+    "@vitest/browser": "4.1.10",
+    "@vitest/browser-playwright": "4.1.10",
+    "playwright": "^1.62.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"

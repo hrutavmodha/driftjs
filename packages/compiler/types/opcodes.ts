@@ -10,10 +10,6 @@ export enum Opcode {
   SET_ATTR = 0x05,
   CREATE_FRAGMENT = 0x06,
   INTERPOLATE_TEXT = 0x07,
-  JUMP = 0x08,
-  JUMP_IF_FALSE = 0x09,
-  EVAL_EXPR = 0x0A,
-  LOOP_ITER = 0x0B,
   /** Execute a script-block AST stored in the constant pool to initialise the component scope. */
   EXEC_SCRIPT = 0x0C,
   /** Reactive conditional block: re-renders its subtree when deps change. */
@@ -35,7 +31,9 @@ export interface ImportSpec {
   readonly localName: string;
   readonly source: string;
   readonly isDefault: boolean;
-  readonly importedName?: string;
+  readonly isNamespace?: boolean | undefined;
+  readonly isSideEffect?: boolean | undefined;
+  readonly importedName?: string | undefined;
 }
 
 /**

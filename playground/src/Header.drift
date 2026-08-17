@@ -1,17 +1,21 @@
 <script>
-    let { title, subtitle } = props;
+  import { UserContext, NotificationContext } from './context';
 
-    console.log("Title is:", title);
-    console.log("Sub Title is:", subtitle);
+  let { title, subtitle } = props;
+  const user = UserContext.inject();
+  const notice = NotificationContext.inject();
 
-    console.log("4 second baad milenge!")
-    
-    setTimeout(() => {
-        title = "Hello, World!"
-        console.log("4 second baad mil gaye. Title =",title)
-    }, 4000)
-
+  let userName = user.name;
+  let unread = notice.unreadCount;
 </script>
 
-<h1>{title}</h1>
-<p>{subtitle}</p>
+<header class="playground-header">
+  <div class="header-main">
+    <h1>{title}</h1>
+    <p class="subtitle">{subtitle}</p>
+  </div>
+  <div class="header-user-status">
+    <span class="user-greeting">Signed in as <strong>{userName}</strong></span>
+    <span class="badge">Notifications: {unread}</span>
+  </div>
+</header>

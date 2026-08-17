@@ -1,0 +1,17 @@
+<script>
+  import { ThemeContext } from './context';
+  import NestedChild from './NestedChild.drift';
+
+  // Override ThemeContext specifically for this subtree
+  ThemeContext.provide({
+    mode: 'dark',
+    accentColor: '#ec4899',
+    fontFamily: 'monospace'
+  });
+</script>
+
+<div class="subtree-override-card">
+  <h3>Subtree Context Override Branch</h3>
+  <p>This branch overrides <code>ThemeContext</code> to <em>Dark (#ec4899)</em> without affecting sibling trees.</p>
+  <NestedChild />
+</div>

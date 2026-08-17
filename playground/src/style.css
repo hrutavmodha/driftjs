@@ -1,0 +1,174 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+  padding: 2rem;
+  line-height: 1.5;
+}
+
+.playground-layout {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.playground-header {
+  background: white;
+  padding: 1.5rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+}
+
+.playground-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.playground-header .subtitle {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.header-user-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-greeting {
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.badge {
+  background: #eff6ff;
+  color: #2563eb;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.playground-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.panel {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.panel h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #0f172a;
+}
+
+.panel .description {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 1rem;
+}
+
+.user-card {
+  background: #f1f5f9;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-avatar {
+  font-size: 1.75rem;
+}
+
+.user-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.user-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  background: #e2e8f0;
+  color: #475569;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.2rem;
+}
+
+.user-meta {
+  font-size: 0.85rem;
+  color: #475569;
+  text-align: right;
+}
+
+.nested-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.nested-box h4 {
+  margin-bottom: 0.5rem;
+  color: #334155;
+}
+
+.subtree-override-card {
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 1.25rem;
+  border-radius: 8px;
+}
+
+.subtree-override-card h3 {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+  color: #f472b6;
+}
+
+.subtree-override-card p {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-bottom: 1rem;
+}
+
+.subtree-override-card .nested-box {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.subtree-override-card .nested-box h4 {
+  color: #f472b6;
+}
