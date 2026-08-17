@@ -146,4 +146,25 @@ describe('DriftGenerator', () => {
     expect(module.declaredVars).toContain('title');
     expect(module.declaredVars).toContain('count');
   });
+
+  it('packages consequent and alternate branches as separate sub-modules', () => {
+    const mod = compile('@if flag { <i>A</i> } @else { <b>B</b> }');
+    const ifPos = mod.bytecode.indexOf(Opcode.REACTIVE_IF);
+    const consIdx = mod.bytecode[ifPos + 3]!;
+    const altIdx = mod.bytecode[ifPos + 4]!;
+    const consMod = mod.constants[consIdx] as any;
+    const altMod = mod.constants[altIdx] as any;
+    expect(Array.isArray(consMod.bytecode)).toBe(true);
+    expect(Array.isArray(altMod.bytecode)).toBe(true);
+    expect(consMod).not.toBe(altMod);
+  });
+
+  it('generates nested REACTIVE_IF inside consequent sub-module for nested @if', () => {
+    const mod = compile('@if outer { @if inner { <b>yes</b> } } @else { <i>no</i> }');
+    const ifPos = mod.bytecode.indexOf(Opcode.REACTIVE_IF);
+    const consIdx = mod.bytecode[ifPos + 3]!;
+    const consMod = mod.constants[consIdx] as any;
+    expect(consMod.bytecode).toContain(Opcode.REACTIVE_IF);
+  });
 });
+

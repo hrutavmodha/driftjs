@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "publish": "pnpm -r publish --no-git-checks --access public",
     "patch": "node scripts/version/patch.js",

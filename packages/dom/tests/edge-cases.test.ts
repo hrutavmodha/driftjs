@@ -7,175 +7,51 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
 
   it('handles NewExpression and ForStatement in VM script execution', () => {
     const vm = new DriftClientVM();
-    const scriptAst = [
-      {
-        type: 'VariableDeclaration',
-        declarations: [
-          {
-            id: { type: 'Identifier', name: 'items' },
-            init: {
-              type: 'NewExpression',
-              callee: { type: 'Identifier', name: 'Array' },
-              arguments: [{ type: 'Literal', value: 3 }]
-            }
-          }
-        ]
-      },
-      {
-        type: 'ForStatement',
-        init: {
-          type: 'VariableDeclaration',
-          declarations: [
-            {
-              id: { type: 'Identifier', name: 'i' },
-              init: { type: 'Literal', value: 0 }
-            }
-          ]
-        },
-        test: {
-          type: 'BinaryExpression',
-          operator: '<',
-          left: { type: 'Identifier', name: 'i' },
-          right: { type: 'Literal', value: 3 }
-        },
-        update: {
-          type: 'UpdateExpression',
-          operator: '++',
-          prefix: false,
-          argument: { type: 'Identifier', name: 'i' }
-        },
-        body: {
-          type: 'ExpressionStatement',
-          expression: {
-            type: 'AssignmentExpression',
-            operator: '=',
-            left: {
-              type: 'MemberExpression',
-              computed: true,
-              object: { type: 'Identifier', name: 'items' },
-              property: { type: 'Identifier', name: 'i' }
-            },
-            right: {
-              type: 'BinaryExpression',
-              operator: '*',
-              left: { type: 'Identifier', name: 'i' },
-              right: { type: 'Literal', value: 10 }
-            }
-          }
+    const scriptFn = {
+      __drift_fn__: `(scope) => {
+        let items = new Array(3);
+        for (let i = 0; i < 3; i++) {
+          items[i] = i * 10;
         }
-      }
-    ];
+        scope.items = items;
+      }`,
+    };
 
     const module: CompiledModule = {
       bytecode: [
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.RETURN, 1
+        Opcode.RETURN, 1,
       ],
-      constants: [scriptAst],
-      declaredVars: ['items']
+      constants: [scriptFn],
+      declaredVars: ['items'],
     };
 
     vm.execute(module, { document: doc });
     expect(vm.scope['items']).toEqual([0, 10, 20]);
   });
 
-  it('handles default parameter assignment (AssignmentPattern) and function scope writebacks', () => {
+  it('handles default parameter assignment and function scope writebacks', () => {
     const vm = new DriftClientVM();
-    const scriptAst = [
-      {
-        type: 'VariableDeclaration',
-        declarations: [
-          {
-            id: { type: 'Identifier', name: 'rowId' },
-            init: { type: 'Literal', value: 1 }
+    const scriptFn = {
+      __drift_fn__: `(scope, declaredVars, setScopeValue) => {
+        scope.rowId = 1;
+        scope.buildItems = function(count = 5) {
+          const result = new Array(count);
+          for (let i = 0; i < count; i++) {
+            result[i] = scope.rowId++;
           }
-        ]
-      },
-      {
-        type: 'FunctionDeclaration',
-        id: { type: 'Identifier', name: 'buildItems' },
-        params: [
-          {
-            type: 'AssignmentPattern',
-            left: { type: 'Identifier', name: 'count' },
-            right: { type: 'Literal', value: 5 }
-          }
-        ],
-        body: {
-          type: 'BlockStatement',
-          body: [
-            {
-              type: 'VariableDeclaration',
-              declarations: [
-                {
-                  id: { type: 'Identifier', name: 'result' },
-                  init: {
-                    type: 'NewExpression',
-                    callee: { type: 'Identifier', name: 'Array' },
-                    arguments: [{ type: 'Identifier', name: 'count' }]
-                  }
-                }
-              ]
-            },
-            {
-              type: 'ForStatement',
-              init: {
-                type: 'VariableDeclaration',
-                declarations: [
-                  {
-                    id: { type: 'Identifier', name: 'i' },
-                    init: { type: 'Literal', value: 0 }
-                  }
-                ]
-              },
-              test: {
-                type: 'BinaryExpression',
-                operator: '<',
-                left: { type: 'Identifier', name: 'i' },
-                right: { type: 'Identifier', name: 'count' }
-              },
-              update: {
-                type: 'UpdateExpression',
-                operator: '++',
-                prefix: false,
-                argument: { type: 'Identifier', name: 'i' }
-              },
-              body: {
-                type: 'ExpressionStatement',
-                expression: {
-                  type: 'AssignmentExpression',
-                  operator: '=',
-                  left: {
-                    type: 'MemberExpression',
-                    computed: true,
-                    object: { type: 'Identifier', name: 'result' },
-                    property: { type: 'Identifier', name: 'i' }
-                  },
-                  right: {
-                    type: 'UpdateExpression',
-                    operator: '++',
-                    prefix: false,
-                    argument: { type: 'Identifier', name: 'rowId' }
-                  }
-                }
-              }
-            },
-            {
-              type: 'ReturnStatement',
-              argument: { type: 'Identifier', name: 'result' }
-            }
-          ]
-        }
-      }
-    ];
+          return result;
+        };
+      }`,
+    };
 
     const module: CompiledModule = {
       bytecode: [
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.RETURN, 1
+        Opcode.RETURN, 1,
       ],
-      constants: [scriptAst],
-      declaredVars: ['rowId', 'buildItems']
+      constants: [scriptFn],
+      declaredVars: ['rowId', 'buildItems'],
     };
 
     vm.execute(module, { document: doc });
@@ -200,33 +76,33 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
         Opcode.INTERPOLATE_TEXT, 2, 2, // r2 = text(row.id)
         Opcode.APPEND_CHILD, 1, 2,
         Opcode.APPEND_CHILD, 0, 1,
-        Opcode.RETURN, 0
+        Opcode.RETURN, 0,
       ],
       constants: [
         'tr', 'td',
-        { type: 'MemberExpression', object: { type: 'Identifier', name: 'row' }, property: { type: 'Identifier', name: 'id' } }
-      ]
+        { __drift_fn__: '(scope) => scope.row.id' },
+      ],
     };
 
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // r0 = tbody
         Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 0xFF, 3, 4, // parent=r0, iter=data, itemName='row', bodyMod, deps=['data']
-        Opcode.RETURN, 0
+        Opcode.RETURN, 0,
       ],
       constants: [
         'tbody',
-        { type: 'Identifier', name: 'data' },
+        { __drift_fn__: '(scope) => scope.data' },
         'row',
         itemMod,
-        ['data']
+        ['data'],
       ],
-      declaredVars: ['data']
+      declaredVars: ['data'],
     };
 
     const parentElem = vm.execute(module, {
       document: doc,
-      scope: { data: [{ id: 1 }, { id: 2 }, { id: 3 }] }
+      scope: { data: [{ id: 1 }, { id: 2 }, { id: 3 }] },
     }) as Element;
 
     const rowsBefore = Array.from(parentElem.querySelectorAll('tr'));
@@ -261,50 +137,36 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // r0 = tr
         Opcode.SET_ATTR, 0, 1, 2, 1, // attr='class', val={selected === row.id ? 'danger' : ''}, isDynamic=1
-        Opcode.RETURN, 0
+        Opcode.RETURN, 0,
       ],
       constants: [
         'tr',
         'class',
-        {
-          type: 'ConditionalExpression',
-          test: {
-            type: 'BinaryExpression',
-            operator: '===',
-            left: { type: 'Identifier', name: 'selected' },
-            right: {
-              type: 'MemberExpression',
-              object: { type: 'Identifier', name: 'row' },
-              property: { type: 'Identifier', name: 'id' }
-            }
-          },
-          consequent: { type: 'Literal', value: 'danger' },
-          alternate: { type: 'Literal', value: '' }
-        }
-      ]
+        { __drift_fn__: '(scope) => (scope.selected === scope.row.id ? "danger" : "")' },
+      ],
     };
 
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // r0 = tbody
         Opcode.REACTIVE_FOR, 0, 1, 2, 0xFF, 0xFF, 3, 4, // parent=r0, iter=data, itemName='row', bodyMod, deps=['data', 'selected']
-        Opcode.RETURN, 0
+        Opcode.RETURN, 0,
       ],
       constants: [
         'tbody',
-        { type: 'Identifier', name: 'data' },
+        { __drift_fn__: '(scope) => scope.data' },
         'row',
         itemMod,
-        ['data', 'selected']
+        ['data', 'selected'],
       ],
-      declaredVars: ['data', 'selected']
+      declaredVars: ['data', 'selected'],
     };
 
     // Create 1,000 rows
     const data = Array.from({ length: 1000 }, (_, i) => ({ id: i + 1 }));
     const parentElem = vm.execute(module, {
       document: doc,
-      scope: { data, selected: null }
+      scope: { data, selected: null },
     }) as Element;
 
     const rowsBefore = Array.from(parentElem.querySelectorAll('tr'));
@@ -313,9 +175,7 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
 
     // Trigger row selection (select row id 5)
     vm.scope['selected'] = 5;
-    const start = performance.now();
     vm.triggerUpdates(new Set(['selected']));
-    const elapsed = performance.now() - start;
 
     const rowsAfter = Array.from(parentElem.querySelectorAll('tr'));
     expect(rowsAfter[4]!.getAttribute('class')).toBe('danger');

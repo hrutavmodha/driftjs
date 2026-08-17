@@ -34,7 +34,7 @@ describe('DriftClientVM', () => {
         Opcode.SET_ATTR, 0, 3, 4, 1,            // r0.setAttribute('data-id', eval(expr))
         Opcode.RETURN, 0,                       // return r0
       ],
-      constants: ['input', 'type', 'checkbox', 'data-id', { type: 'Identifier', name: 'id' }],
+      constants: ['input', 'type', 'checkbox', 'data-id', { __drift_fn__: '(scope) => scope.id' }],
     };
 
     const node = vm.execute(module, {
@@ -72,7 +72,7 @@ describe('DriftClientVM', () => {
       constants: ['span', 'Guest'],
       reactiveBindings: [],
     };
-    const condExpr = { type: 'Identifier', name: 'isLoggedIn' };
+    const condExpr = { __drift_fn__: '(scope) => scope.isLoggedIn' };
 
     const module: CompiledModule = {
       bytecode: [
@@ -117,7 +117,7 @@ describe('DriftClientVM', () => {
       constants: ['p', 'Shown'],
       reactiveBindings: [],
     };
-    const condExpr = { type: 'Identifier', name: 'show' };
+    const condExpr = { __drift_fn__: '(scope) => scope.show' };
 
     const module: CompiledModule = {
       bytecode: [
@@ -200,10 +200,10 @@ describe('DriftClientVM', () => {
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.RETURN, 0,
       ],
-      constants: ['li', { type: 'Identifier', name: 'item' }],
+      constants: ['li', { __drift_fn__: '(scope) => scope.item' }],
       reactiveBindings: [],
     };
-    const iterExpr = { type: 'Identifier', name: 'items' };
+    const iterExpr = { __drift_fn__: '(scope) => scope.items' };
 
     const module: CompiledModule = {
       bytecode: [
@@ -237,10 +237,10 @@ describe('DriftClientVM', () => {
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.RETURN, 0,
       ],
-      constants: ['li', { type: 'Identifier', name: 'item' }],
+      constants: ['li', { __drift_fn__: '(scope) => scope.item' }],
       reactiveBindings: [],
     };
-    const iterExpr = { type: 'Identifier', name: 'items' };
+    const iterExpr = { __drift_fn__: '(scope) => scope.items' };
 
     const module: CompiledModule = {
       bytecode: [
@@ -293,7 +293,7 @@ describe('DriftClientVM', () => {
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.RETURN, 0,
       ],
-      constants: ['p', { type: 'Identifier', name: 'count' }],
+      constants: ['p', { __drift_fn__: '(scope) => scope.count' }],
     };
 
     const initialScope = { count: 0 };
@@ -307,22 +307,16 @@ describe('DriftClientVM', () => {
 
   it('EXEC_SCRIPT initialises scope from VariableDeclaration and FunctionDeclaration AST', () => {
     const vmInstance = new DriftClientVM();
-    const scriptBody = [
-      {
-        type: 'VariableDeclaration', kind: 'let',
-        declarations: [{ type: 'VariableDeclarator', id: { type: 'Identifier', name: 'count' }, init: { type: 'Literal', value: 0 } }],
-      },
-      {
-        type: 'FunctionDeclaration',
-        id: { type: 'Identifier', name: 'increment' },
-        params: [],
-        body: {
-          type: 'BlockStatement',
-          body: [{ type: 'ExpressionStatement', expression: { type: 'UpdateExpression', operator: '++', prefix: false, argument: { type: 'Identifier', name: 'count' } } }],
-        },
-      },
-    ];
-    const countExpr = { type: 'Identifier', name: 'count' };
+    const scriptBody = {
+      __drift_fn__: `(scope, declaredVars, setScopeValue) => {
+        scope.count = 0;
+        scope.increment = function() {
+          scope.count++;
+          setScopeValue(scope, 'count', scope.count);
+        };
+      }`,
+    };
+    const countExpr = { __drift_fn__: '(scope) => scope.count' };
 
     const module: CompiledModule = {
       bytecode: [
@@ -942,22 +936,12 @@ describe('DriftClientVM', () => {
       ]),
       constants: [
         {
-          type: 'VariableDeclaration',
-          declarations: [
-            {
-              type: 'VariableDeclarator',
-              id: {
-                type: 'ObjectPattern',
-                properties: [
-                  { type: 'Property', key: { type: 'Identifier', name: 'title' }, value: { type: 'Identifier', name: 'title' } },
-                ],
-              },
-              init: { type: 'Identifier', name: 'props' },
-            },
-          ],
+          __drift_fn__: `(scope) => {
+            scope.title = scope.props ? scope.props.title : undefined;
+          }`,
         },
         'h1',
-        { type: 'Identifier', name: 'title' },
+        { __drift_fn__: '(scope) => scope.title' },
       ],
       declaredVars: ['title'],
       scope: {},
@@ -995,7 +979,7 @@ describe('DriftClientVM', () => {
       ]),
       constants: [
         'span',
-        { type: 'Identifier', name: 'count' },
+        { __drift_fn__: '(scope) => scope.count' },
       ],
       reactiveBindings: [
         { variable: 'count', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 3 }] },
@@ -1011,7 +995,7 @@ describe('DriftClientVM', () => {
       ]),
       constants: [
         'CounterDisplay',
-        { __drift_props__: true, count: { type: 'Identifier', name: 'parentCount' } },
+        { __drift_props__: true, count: { __drift_fn__: '(scope) => scope.parentCount' } },
       ],
       reactiveBindings: [
         { variable: 'parentCount', positions: [{ opcode: Opcode.CREATE_ELEMENT, pc: 0 }] },
@@ -1045,12 +1029,7 @@ describe('DriftClientVM', () => {
       ]),
       constants: [
         'p',
-        {
-          type: 'MemberExpression',
-          object: { type: 'Identifier', name: 'props' },
-          property: { type: 'Identifier', name: 'message' },
-          computed: false,
-        },
+        { __drift_fn__: '(scope) => scope.props.message' },
       ],
       declaredVars: [],
       scope: {},

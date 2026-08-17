@@ -1,5 +1,4 @@
 import { setScopeValue, inScopeChain } from './scope.js';
-import { astToJS } from 'driftjs-compiler';
 
 /**
  * Safely resolves an iterable object or array.
@@ -13,9 +12,12 @@ export function resolveIterable(rawIter: any): any[] {
 }
 
 /**
- * Executes a pre-compiled function string stored on AST constant nodes.
+ * Executes a pre-compiled function stored on constant pool entries.
  */
 export function executePrecompiledFn(node: any, scope: Record<string, any>, declaredVars?: Set<string>): any {
+  if (typeof node === 'function') {
+    return node(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable);
+  }
   if (typeof node.__drift_fn__ === 'function') {
     return node.__drift_fn__(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable);
   }
@@ -28,7 +30,7 @@ export function executePrecompiledFn(node: any, scope: Record<string, any>, decl
 }
 
 /**
- * Evaluates any JS expression (AST node, pre-compiled wrapper, function, or primitive).
+ * Evaluates any pre-compiled JS expression, function, or primitive value against the scope.
  */
 export function evaluateExpression(node: any, scope: Record<string, any>, declaredVars?: Set<string>): any {
   if (node === null || node === undefined) return node;
@@ -37,27 +39,20 @@ export function evaluateExpression(node: any, scope: Record<string, any>, declar
     return node(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable);
   }
 
-  if (typeof node === 'object' && node !== null && '__drift_fn__' in node) {
-    return executePrecompiledFn(node, scope, declaredVars);
+  if (typeof node === 'object' && node !== null) {
+    if ('__drift_fn__' in node || typeof node._executableFn === 'function') {
+      return executePrecompiledFn(node, scope, declaredVars);
+    }
+    if (Array.isArray(node)) {
+      let lastRes: any;
+      for (const item of node) {
+        lastRes = evaluateExpression(item, scope, declaredVars);
+      }
+      return lastRes;
+    }
   }
 
-  if (typeof node !== 'object' || node === null) {
-    return node;
-  }
-
-  const codeStr = astToJS(node);
-  if (!codeStr || codeStr.trim().length === 0) {
-    return undefined;
-  }
-
-  let executableFn: any;
-  try {
-    executableFn = new Function('scope', 'declaredVars', 'setScopeValue', 'inScopeChain', 'resolveIterable', 'return (' + codeStr + ')');
-  } catch {
-    executableFn = new Function('scope', 'declaredVars', 'setScopeValue', 'inScopeChain', 'resolveIterable', codeStr);
-  }
-
-  return executableFn(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable);
+  return node;
 }
 
 /**
@@ -66,7 +61,7 @@ export function evaluateExpression(node: any, scope: Record<string, any>, declar
 export function resolveValue(val: any, scope: Record<string, any>, declaredVars?: Set<string>): any {
   if (val === null || val === undefined) return val;
   if (typeof val === 'string') return inScopeChain(scope, val) ? scope[val] : val;
-  if (typeof val === 'object' && (val.type || '__drift_fn__' in val || typeof val._executableFn === 'function')) {
+  if (typeof val === 'object' && ('__drift_fn__' in val || typeof val._executableFn === 'function' || typeof val === 'function')) {
     return evaluateExpression(val, scope, declaredVars);
   }
   return val;
@@ -89,7 +84,11 @@ export function resolveComponentModule(raw: any): any | null {
  * Evaluates a props specification object (mapping prop keys to static values or expression ASTs)
  * against a VM scope, returning a plain JavaScript props object.
  */
-export function evaluatePropsSpec(propsSpec: Record<string, any> | null | undefined, scope: Record<string, any>, declaredVars?: Set<string>): Record<string, any> {
+export function evaluatePropsSpec(
+  propsSpec: Record<string, any> | null | undefined,
+  scope: Record<string, any>,
+  declaredVars?: Set<string>
+): Record<string, any> {
   if (!propsSpec || typeof propsSpec !== 'object') return {};
   const res: Record<string, any> = {};
   for (const key of Object.keys(propsSpec)) {

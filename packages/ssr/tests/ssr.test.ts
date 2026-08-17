@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DriftServerVM, renderToString } from '../src/index.js';
-import { Opcode, type CompiledModule } from 'driftjs-compiler';
+import { Opcode, type CompiledModule, compile } from 'driftjs-compiler';
 
 describe('DriftServerVM (SSR Engine)', () => {
   it('renders static elements with escape protection to HTML string', () => {
@@ -29,7 +29,7 @@ describe('DriftServerVM (SSR Engine)', () => {
       ],
       constants: [
         'input', 'type', 'checkbox', 'checked', true, 'data-id',
-        { type: 'Identifier', name: 'id' },
+        { __drift_fn__: '(scope) => scope.id' },
       ],
     };
 
@@ -60,7 +60,7 @@ describe('DriftServerVM (SSR Engine)', () => {
       ],
       constants: ['span', 'Guest User'],
     };
-    const condExpr = { type: 'Identifier', name: 'isAdmin' };
+    const condExpr = { __drift_fn__: '(scope) => scope.isAdmin' };
 
     const module: CompiledModule = {
       bytecode: [
@@ -92,9 +92,9 @@ describe('DriftServerVM (SSR Engine)', () => {
       constants: [
         'li',
         'data-index',
-        { type: 'Identifier', name: 'idx' },
+        { __drift_fn__: '(scope) => scope.idx' },
         null,
-        { type: 'Identifier', name: 'item' },
+        { __drift_fn__: '(scope) => scope.item' },
       ],
     };
 
@@ -106,7 +106,7 @@ describe('DriftServerVM (SSR Engine)', () => {
       ],
       constants: [
         'ul',
-        { type: 'Identifier', name: 'items' },
+        { __drift_fn__: '(scope) => scope.items' },
         'item',
         'idx',
         bodyMod,
@@ -119,18 +119,9 @@ describe('DriftServerVM (SSR Engine)', () => {
   });
 
   it('EXEC_SCRIPT initialises server scope before rendering HTML', () => {
-    const scriptAst = [
-      {
-        type: 'VariableDeclaration',
-        declarations: [
-          {
-            type: 'VariableDeclarator',
-            id: { type: 'Identifier', name: 'title' },
-            init: { type: 'Literal', value: 'SSR Server Heading' },
-          },
-        ],
-      },
-    ];
+    const scriptFn = {
+      __drift_fn__: '(scope) => { scope.title = "SSR Server Heading"; }',
+    };
 
     const module: CompiledModule = {
       bytecode: [
@@ -141,13 +132,37 @@ describe('DriftServerVM (SSR Engine)', () => {
         Opcode.RETURN, 1,
       ],
       constants: [
-        scriptAst,
+        scriptFn,
         'h2',
-        { type: 'Identifier', name: 'title' },
+        { __drift_fn__: '(scope) => scope.title' },
       ],
     };
 
     const html = renderToString(module);
     expect(html).toBe('<h2>SSR Server Heading</h2>');
+  });
+
+  it('renders end-to-end compiled .drift templates on the server', () => {
+    const src = `
+      <script>
+        let title = "Server Rendered Drift";
+        let items = ["Fast", "Zero-VDOM", "Bytecode"];
+      </script>
+      <div class="container">
+        <h1>{title}</h1>
+        <ul>
+          @for item in items {
+            <li>{item}</li>
+          }
+        </ul>
+      </div>
+    `;
+
+    const compiled = compile(src);
+    const html = renderToString(compiled);
+    expect(html).toContain('<h1>Server Rendered Drift</h1>');
+    expect(html).toContain('<li>Fast</li>');
+    expect(html).toContain('<li>Zero-VDOM</li>');
+    expect(html).toContain('<li>Bytecode</li>');
   });
 });

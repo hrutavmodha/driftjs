@@ -17,6 +17,14 @@ import {
   resolveIterable,
   resolveComponentModule,
   evaluatePropsSpec,
+  pushActiveVM,
+  popActiveVM,
+  createContext,
+  provide,
+  inject,
+  provideContext,
+  injectContext,
+  type Context,
 } from "driftjs-shared";
 
 
@@ -58,6 +66,9 @@ export class DriftClientVM {
   private childVMs = new WeakMap<Node, { vm: DriftClientVM; scope: Record<string, any>; propsSpec: any }>();
   private pendingDirtyVars = new Set<string>();
   private isUpdateScheduled = false;
+
+  public parentVM: DriftClientVM | null = null;
+  public contextMap = new Map<symbol | string, any>();
 
   constructor() {
     DriftClientVM.activeVMCount++;
@@ -124,6 +135,8 @@ export class DriftClientVM {
     this.isUpdateScheduled = false;
     this.scope = {};
     this.module = null;
+    this.contextMap.clear();
+    this.parentVM = null;
   }
 
   public markDirty(varName: string): void {
@@ -271,6 +284,7 @@ export class DriftClientVM {
             const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
             const propsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
             const childVM = new DriftClientVM();
+            childVM.parentVM = this;
             const propsScope = Object.assign(Object.create(scope), { props: propsObj }, propsObj);
             const compNode = childVM.execute(compMod, { scope: propsScope, document: doc });
             this.updateChildComponentProps(childVM.scope, childVM, propsObj);
@@ -851,9 +865,14 @@ export class DriftClientVM {
     }
     this.registers.fill(undefined);
 
-    const result = this.executeLoop(module.bytecode, module.constants, scope);
-    this.cursor = null;
-    return result;
+    pushActiveVM(this);
+    try {
+      const result = this.executeLoop(module.bytecode, module.constants, scope);
+      this.cursor = null;
+      return result;
+    } finally {
+      popActiveVM();
+    }
   }
 
   /**
@@ -984,3 +1003,12 @@ export function hydrate(component: CompiledModule, container: HTMLElement, optio
 }
 
 export * from "../types/index.js";
+export {
+  createContext,
+  provide,
+  inject,
+  provideContext,
+  injectContext,
+  type Context,
+};
+

@@ -218,4 +218,28 @@ describe('DriftLexer', () => {
     expect(tokens[0]?.type).toBe(TokenType.DirectiveIf);
     expect(tokens[0]?.value).toBe('(/{/g.test(val))');
   });
+
+  describe('@if, @else if, @else conditional directives', () => {
+    it('emits DirectiveIf token with condition as value', () => {
+      const tokens = collectTokens(new DriftLexer('@if count > 0 { <span>positive</span> }'));
+      expect(tokens[0]?.type).toBe(TokenType.DirectiveIf);
+      expect(tokens[0]?.value).toBe('count > 0');
+    });
+
+    it('emits DirectiveIf then DirectiveElse tokens for @if / @else', () => {
+      const tokens = collectTokens(new DriftLexer('@if ok { <b>yes</b> } @else { <b>no</b> }'));
+      const types = tokens.map((t) => t.type);
+      expect(types).toContain(TokenType.DirectiveIf);
+      expect(types).toContain(TokenType.DirectiveElse);
+      expect(types.indexOf(TokenType.DirectiveIf)).toBeLessThan(types.indexOf(TokenType.DirectiveElse));
+    });
+
+    it('emits DirectiveIf, DirectiveElseIf, and DirectiveElse tokens in sequence for ladders', () => {
+      const tokens = collectTokens(new DriftLexer('@if a { <p>a</p> } @else if b > 10 { <p>b</p> } @else { <p>c</p> }'));
+      const elseIfTok = tokens.find((t) => t.type === TokenType.DirectiveElseIf);
+      expect(elseIfTok).toBeDefined();
+      expect(elseIfTok?.value).toBe('b > 10');
+    });
+  });
 });
+

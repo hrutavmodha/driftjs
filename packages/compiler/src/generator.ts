@@ -523,6 +523,9 @@ export class DriftGenerator {
     if (value && typeof value === 'object' && value.type && typeof value.type === 'string') {
       const codeStr = astToJS(value);
       value = { __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable) => (${codeStr})` };
+    } else if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0]?.type) {
+      const codeStr = astToJS(value);
+      value = { __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable) => { ${codeStr}; }` };
     }
 
     const existingIndex = this.constants.findIndex((c) => this.isConstantEqual(c, value));

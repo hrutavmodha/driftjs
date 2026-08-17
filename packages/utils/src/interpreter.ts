@@ -2,9 +2,13 @@ import { evaluateExpression, executePrecompiledFn } from './evaluator.js';
 import { setScopeValue } from './scope.js';
 
 /**
- * Interprets a block of Acorn AST statements (used by <script> AST and functions).
+ * Executes a precompiled statement block or function (used by <script> blocks and event handlers).
  */
-export function executeBlockStatement(statements: any, scope: Record<string, any>, declaredVars?: Set<string>): any {
+export function executeBlockStatement(
+  statements: any,
+  scope: Record<string, any>,
+  declaredVars?: Set<string>
+): any {
   let result: any;
   if (!statements) return result;
 

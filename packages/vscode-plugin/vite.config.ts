@@ -3,7 +3,7 @@ import path from 'path';
 
 export default defineConfig({
   build: {
-    target: 'node16',
+    target: 'node22',
     outDir: 'dist',
     emptyOutDir: true,
     lib: {
@@ -13,7 +13,7 @@ export default defineConfig({
       },
       formats: ['cjs'],
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: ['vscode'],
       output: {
         entryFileNames: '[name].js',

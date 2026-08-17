@@ -19,9 +19,6 @@
     "prepublishOnly": "pnpm build && pnpm test"
   },
   "license": "MIT",
-  "dependencies": {
-    "driftjs-compiler": "workspace:*"
-  },
   "devDependencies": {
     "typescript": "^7.0.2",
     "vite": "^8.1.5",

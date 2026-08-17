@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { DriftClientVM } from '../src/index.js';
 import { Opcode } from '../types/index.js';
-import { executeBlockStatement } from 'driftjs-shared';
+import { setScopeValue } from 'driftjs-shared';
 
 describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', () => {
   it('updates DOM reactively when state changes inside an async function (async/await)', async () => {
@@ -14,14 +14,9 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
         Opcode.RETURN, 1,
       ]),
       constants: [
-        {
-          type: 'VariableDeclaration',
-          declarations: [
-            { id: { type: 'Identifier', name: 'status' }, init: { type: 'Literal', value: 'idle' } },
-          ],
-        },
+        { __drift_fn__: '(scope) => { scope.status = "idle"; }' },
         'span',
-        { type: 'Identifier', name: 'status' },
+        { __drift_fn__: '(scope) => scope.status' },
       ],
       reactiveBindings: [
         { variable: 'status', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 5 }] },
@@ -37,35 +32,11 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
 
     // Simulate async data fetching operation mutating state
     const loadData = async () => {
-      executeBlockStatement(
-        {
-          type: 'ExpressionStatement',
-          expression: {
-            type: 'AssignmentExpression',
-            operator: '=',
-            left: { type: 'Identifier', name: 'status' },
-            right: { type: 'Literal', value: 'loading' },
-          },
-        },
-        (vm as any).scope,
-        (vm as any).declaredVars
-      );
+      setScopeValue((vm as any).scope, 'status', 'loading');
 
       await new Promise((r) => setTimeout(r, 10));
 
-      executeBlockStatement(
-        {
-          type: 'ExpressionStatement',
-          expression: {
-            type: 'AssignmentExpression',
-            operator: '=',
-            left: { type: 'Identifier', name: 'status' },
-            right: { type: 'Literal', value: 'success' },
-          },
-        },
-        (vm as any).scope,
-        (vm as any).declaredVars
-      );
+      setScopeValue((vm as any).scope, 'status', 'success');
     };
 
     const promise = loadData();
@@ -90,14 +61,9 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
         Opcode.RETURN, 1,
       ]),
       constants: [
-        {
-          type: 'VariableDeclaration',
-          declarations: [
-            { id: { type: 'Identifier', name: 'count' }, init: { type: 'Literal', value: 0 } },
-          ],
-        },
+        { __drift_fn__: '(scope) => { scope.count = 0; }' },
         'div',
-        { type: 'Identifier', name: 'count' },
+        { __drift_fn__: '(scope) => scope.count' },
       ],
       reactiveBindings: [
         { variable: 'count', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 5 }] },
@@ -112,19 +78,7 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
     expect(root.textContent).toBe('0');
 
     setTimeout(() => {
-      executeBlockStatement(
-        {
-          type: 'ExpressionStatement',
-          expression: {
-            type: 'AssignmentExpression',
-            operator: '=',
-            left: { type: 'Identifier', name: 'count' },
-            right: { type: 'Literal', value: 100 },
-          },
-        },
-        (vm as any).scope,
-        (vm as any).declaredVars
-      );
+      setScopeValue((vm as any).scope, 'count', 100);
     }, 10);
 
     await new Promise((r) => setTimeout(r, 20));
@@ -143,7 +97,7 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
         Opcode.APPEND_CHILD, 1, 2,
         Opcode.RETURN, 1,
       ]),
-      constants: ['div', { type: 'Identifier', name: 'val' }],
+      constants: ['div', { __drift_fn__: '(scope) => scope.val' }],
       reactiveBindings: [
         { variable: 'val', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 2 }] },
       ],
@@ -186,12 +140,7 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
       ]),
       constants: [
         'div',
-        {
-          type: 'MemberExpression',
-          object: { type: 'Identifier', name: 'items' },
-          property: { type: 'Identifier', name: 'length' },
-          computed: false,
-        },
+        { __drift_fn__: '(scope) => scope.items.length' },
       ],
       reactiveBindings: [
         { variable: 'items', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 3 }] },
@@ -205,22 +154,9 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
 
     expect(root.textContent).toBe('2');
 
-    // Simulate array mutator call emitted by compiler: (items.push(3), setScopeValue(scope, 'items', items))
     const scope = (vm as any).scope;
     scope.items.push(3);
-    executeBlockStatement(
-      {
-        type: 'ExpressionStatement',
-        expression: {
-          type: 'AssignmentExpression',
-          operator: '=',
-          left: { type: 'Identifier', name: 'items' },
-          right: { type: 'Identifier', name: 'items' },
-        },
-      },
-      scope,
-      (vm as any).declaredVars
-    );
+    setScopeValue(scope, 'items', scope.items);
 
     await Promise.resolve();
 

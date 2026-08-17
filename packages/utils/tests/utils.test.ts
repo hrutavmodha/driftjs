@@ -4,7 +4,10 @@ import {
   executeBlockStatement,
   setScopeValue,
   syncDeclaredVars,
+  inScopeChain,
   resolveIterable,
+  resolveComponentModule,
+  evaluatePropsSpec,
   MAX_REGISTERS,
 } from '../src/index.js';
 
@@ -13,66 +16,74 @@ describe('driftjs-shared Module', () => {
     expect(MAX_REGISTERS).toBe(256);
   });
 
-  it('evaluates binary, logical, and member expressions', () => {
+  it('evaluates precompiled functions and closures', () => {
     const scope = { user: { age: 25 }, threshold: 20 };
-    const expr = {
-      type: 'BinaryExpression',
-      operator: '>',
-      left: {
-        type: 'MemberExpression',
-        object: { type: 'Identifier', name: 'user' },
-        property: { type: 'Identifier', name: 'age' },
-      },
-      right: { type: 'Identifier', name: 'threshold' },
-    };
+    const expr = { __drift_fn__: '(scope) => scope.user.age > scope.threshold' };
 
     expect(evaluateExpression(expr, scope)).toBe(true);
+
+    const fnExpr = (s: any) => s.user.age === 25;
+    expect(evaluateExpression(fnExpr, scope)).toBe(true);
   });
 
-  it('sets scope value up the prototype chain', () => {
-    const parentScope = { count: 0 };
+  it('sets scope value up the prototype chain and triggers dirty mark', () => {
+    let dirtyMarked = '';
+    const parentScope: any = { count: 0 };
+    Object.defineProperty(parentScope, '__drift_mark_dirty__', {
+      value: (name: string) => { dirtyMarked = name; },
+    });
     const childScope = Object.create(parentScope);
 
     setScopeValue(childScope, 'count', 5);
     expect(parentScope.count).toBe(5);
+    expect(dirtyMarked).toBe('count');
   });
 
-  it('resolves iterables cleanly', () => {
+  it('resolves iterables cleanly (arrays, Sets, null)', () => {
     expect(resolveIterable([1, 2, 3])).toEqual([1, 2, 3]);
     expect(resolveIterable(new Set(['a', 'b']))).toEqual(['a', 'b']);
     expect(resolveIterable(null)).toEqual([]);
   });
 
-  it('executes block statements and updates scope', () => {
+  it('executes precompiled block statements and updates scope', () => {
     const scope = { val: 10 };
-    const statements = [
-      {
-        type: 'ExpressionStatement',
-        expression: {
-          type: 'AssignmentExpression',
-          operator: '=',
-          left: { type: 'Identifier', name: 'val' },
-          right: { type: 'Literal', value: 42 },
-        },
-      },
-    ];
+    const statements = { __drift_fn__: '(scope) => { scope.val = 42; }' };
 
     executeBlockStatement(statements, scope);
     expect(scope.val).toBe(42);
   });
 
-  it('prevents prototype pollution & scope lookup hijacking for built-in Object properties', () => {
+  it('safely checks properties in scope chain without prototype pollution', () => {
     const scope = { name: 'Alice' };
-    const exprToString = { type: 'Identifier', name: 'toString' };
-    const exprValueOf = { type: 'Identifier', name: 'valueOf' };
-    const exprConstructor = { type: 'Identifier', name: 'constructor' };
+    expect(inScopeChain(scope, 'name')).toBe(true);
+    expect(inScopeChain(scope, 'toString')).toBe(false);
+    expect(inScopeChain(scope, 'valueOf')).toBe(false);
+    expect(inScopeChain(scope, 'constructor')).toBe(false);
 
-    expect(evaluateExpression(exprToString, scope)).toBeUndefined();
-    expect(evaluateExpression(exprValueOf, scope)).toBeUndefined();
-    expect(evaluateExpression(exprConstructor, scope)).toBeUndefined();
-
-    // User-declared toString override should resolve correctly
     const customScope = { toString: 'Custom String' };
-    expect(evaluateExpression(exprToString, customScope)).toBe('Custom String');
+    expect(inScopeChain(customScope, 'toString')).toBe(true);
+  });
+
+  it('unwraps component module exports properly', () => {
+    const rawMod = { bytecode: [0], constants: [] };
+    expect(resolveComponentModule(rawMod)).toBe(rawMod);
+    expect(resolveComponentModule({ default: rawMod })).toBe(rawMod);
+    expect(resolveComponentModule({ compiledModule: rawMod })).toBe(rawMod);
+    expect(resolveComponentModule({ program: rawMod })).toBe(rawMod);
+  });
+
+  it('evaluates props specification objects against scope', () => {
+    const scope = { activeId: 101, title: 'Test' };
+    const spec = {
+      __drift_props__: true,
+      id: { __drift_fn__: '(scope) => scope.activeId' },
+      staticProp: 'Hello',
+    };
+
+    const props = evaluatePropsSpec(spec, scope);
+    expect(props).toEqual({
+      id: 101,
+      staticProp: 'Hello',
+    });
   });
 });

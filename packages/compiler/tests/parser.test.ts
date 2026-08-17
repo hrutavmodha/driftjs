@@ -299,4 +299,38 @@ describe('DriftParser', () => {
     expect(hrNode.tagName).toBe('hr');
     expect(hrNode.isSelfClosing).toBe(true);
   });
+
+  describe('@if conditional AST structures', () => {
+    it('parses @if with complex JS condition expressions', () => {
+      const ast = new DriftParser(new DriftLexer('@if user.role === "admin" && isActive { <span>ok</span> }')).parse();
+      const ifNode = ast.body[0] as any;
+      expect(ifNode.type).toBe(ASTNodeType.If);
+      expect(ifNode.test).toBe('user.role === "admin" && isActive');
+      expect(ifNode.alternate).toBeNull();
+    });
+
+    it('chains multiple @else if branches into nested alternate IfNodes', () => {
+      const src = '@if x === 1 { <p>1</p> } @else if x === 2 { <p>2</p> } @else if x === 3 { <p>3</p> } @else { <p>other</p> }';
+      const ast = new DriftParser(new DriftLexer(src)).parse();
+      const n1 = ast.body[0] as any;
+      const n2 = n1.alternate;
+      const n3 = n2.alternate;
+      expect(n1.test).toBe('x === 1');
+      expect(n2.test).toBe('x === 2');
+      expect(n3.test).toBe('x === 3');
+      expect(Array.isArray(n3.alternate)).toBe(true);
+    });
+
+    it('parses doubly-nested and triply-nested @if blocks', () => {
+      const src = '@if a { @if b { @if c { <span>deep</span> } } }';
+      const ast = new DriftParser(new DriftLexer(src)).parse();
+      const n1 = ast.body[0] as any;
+      const n2 = n1.consequent.find((n: any) => n.type === ASTNodeType.If);
+      const n3 = n2.consequent.find((n: any) => n.type === ASTNodeType.If);
+      expect(n1.test).toBe('a');
+      expect(n2.test).toBe('b');
+      expect(n3.test).toBe('c');
+    });
+  });
 });
+

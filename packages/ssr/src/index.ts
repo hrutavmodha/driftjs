@@ -4,11 +4,26 @@ import {
   executeBlockStatement,
   resolveComponentModule,
   evaluatePropsSpec,
+  pushActiveVM,
+  popActiveVM,
+  createContext,
+  provide,
+  inject,
+  provideContext,
+  injectContext,
+  type Context,
 } from "driftjs-shared";
 import type { SSRExecutionOptions, ServerNode } from "../types/index.js";
 
 export * from "../types/index.js";
-
+export {
+  createContext,
+  provide,
+  inject,
+  provideContext,
+  injectContext,
+  type Context,
+};
 
 /**
  * Escapes special HTML characters to prevent XSS.
@@ -31,6 +46,9 @@ export class DriftServerVM {
   private readonly registers: ServerNode[] = new Array(DriftServerVM.MAX_REGISTERS);
   private scope: Record<string, any> = {};
   private declaredVars: Set<string> = new Set();
+
+  public parentVM: DriftServerVM | null = null;
+  public contextMap = new Map<symbol | string, any>();
 
   private checkRegister(index: number): void {
     if (index < 0 || index >= DriftServerVM.MAX_REGISTERS) {
@@ -65,43 +83,46 @@ export class DriftServerVM {
     const constants = module.constants;
     let pc = 0;
 
-    while (pc < bytecode.length) {
-      const opcode = bytecode[pc]!;
+    pushActiveVM(this);
+    try {
+      while (pc < bytecode.length) {
+        const opcode = bytecode[pc]!;
 
-      switch (opcode) {
-        case Opcode.RETURN: {
-          const reg = bytecode[pc + 1]!;
-          return this.getRegister(reg);
-        }
-
-        case Opcode.CREATE_ELEMENT: {
-          const dstReg = bytecode[pc + 1]!;
-          const tagIdx = bytecode[pc + 2]!;
-          const tag = String(constants[tagIdx]);
-          const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
-          const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
-          const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
-          const propsSpecIdx = isPropsSpec ? maybePropsIdx : 0xFF;
-
-          const rawComp = (this.scope && tag in this.scope) ? this.scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
-          const compMod = resolveComponentModule(rawComp);
-          if (compMod) {
-            const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
-            const propsObj = evaluatePropsSpec(propsSpec, this.scope, this.declaredVars);
-            const subVm = new DriftServerVM();
-            const compNode = subVm.execute(compMod, { scope: { props: propsObj, ...propsObj, ...this.scope } });
-            if (compNode) this.setRegister(dstReg, compNode);
-          } else {
-            this.setRegister(dstReg, {
-              type: 'element',
-              tag,
-              attrs: new Map(),
-              children: [],
-            });
+        switch (opcode) {
+          case Opcode.RETURN: {
+            const reg = bytecode[pc + 1]!;
+            return this.getRegister(reg);
           }
-          pc += isPropsSpec ? 4 : 3;
-          break;
-        }
+
+          case Opcode.CREATE_ELEMENT: {
+            const dstReg = bytecode[pc + 1]!;
+            const tagIdx = bytecode[pc + 2]!;
+            const tag = String(constants[tagIdx]);
+            const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
+            const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
+            const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
+            const propsSpecIdx = isPropsSpec ? maybePropsIdx : 0xFF;
+
+            const rawComp = (this.scope && tag in this.scope) ? this.scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
+            const compMod = resolveComponentModule(rawComp);
+            if (compMod) {
+              const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
+              const propsObj = evaluatePropsSpec(propsSpec, this.scope, this.declaredVars);
+              const subVm = new DriftServerVM();
+              subVm.parentVM = this;
+              const compNode = subVm.execute(compMod, { scope: { props: propsObj, ...propsObj, ...this.scope } });
+              if (compNode) this.setRegister(dstReg, compNode);
+            } else {
+              this.setRegister(dstReg, {
+                type: 'element',
+                tag,
+                attrs: new Map(),
+                children: [],
+              });
+            }
+            pc += isPropsSpec ? 4 : 3;
+            break;
+          }
 
         case Opcode.CREATE_TEXT: {
           const dstReg = bytecode[pc + 1]!;
@@ -214,9 +235,11 @@ export class DriftServerVM {
           const scriptIdx = bytecode[pc + 1]!;
           const scriptAst = constants[scriptIdx];
           if (Array.isArray(scriptAst)) {
-            executeBlockStatement(scriptAst, this.scope, this.declaredVars);
-          } else if (scriptAst && typeof scriptAst === 'object') {
-            executeBlockStatement([scriptAst], this.scope, this.declaredVars);
+            for (const stmt of scriptAst) {
+              evaluateExpression(stmt, this.scope, this.declaredVars);
+            }
+          } else if (scriptAst) {
+            evaluateExpression(scriptAst, this.scope, this.declaredVars);
           }
           pc += 2;
           break;
@@ -289,8 +312,12 @@ export class DriftServerVM {
     }
 
     return null;
+  } finally {
+    popActiveVM();
   }
 }
+}
+
 
 /**
  * Serializes a ServerNode tree directly into an HTML string.

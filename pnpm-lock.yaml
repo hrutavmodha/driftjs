@@ -98,10 +98,6 @@ importers:
         version: 4.1.10(@types/node@26.1.1)(happy-dom@20.11.1)(vite@8.1.5(@types/node@26.1.1))
 
   packages/utils:
-    dependencies:
-      driftjs-compiler:
-        specifier: workspace:*
-        version: link:../compiler
     devDependencies:
       typescript:
         specifier: ^7.0.2
