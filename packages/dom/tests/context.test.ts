@@ -52,7 +52,7 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const parentComponent: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1, // Child
+        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF, // Child
         Opcode.RETURN, 1,
       ]),
       constants: [
@@ -105,7 +105,7 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const middleParent: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.CREATE_ELEMENT, 0, 0, // div
-        Opcode.CREATE_ELEMENT, 1, 1, // DeepChild
+        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF, // DeepChild
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.RETURN, 0,
       ]),
@@ -118,7 +118,7 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const grandparent: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1, // MiddleParent
+        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF, // MiddleParent
         Opcode.RETURN, 1,
       ]),
       constants: [
@@ -170,7 +170,7 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const overriddenSubtree: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1, // deepChild
+        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF, // deepChild
         Opcode.RETURN, 1,
       ]),
       constants: [
@@ -188,7 +188,7 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     // Subtree 2 does not override (inherits 'blue' from root)
     const normalSubtree: CompiledModule = {
       bytecode: new Uint32Array([
-        Opcode.CREATE_ELEMENT, 0, 0, // deepChild
+        Opcode.MOUNT_COMPONENT, 0, 0, 0xFF, // deepChild
         Opcode.RETURN, 0,
       ]),
       constants: ['DeepChild'],
@@ -201,8 +201,8 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
         Opcode.CREATE_ELEMENT, 0, 1, // div
-        Opcode.CREATE_ELEMENT, 1, 2, // OverriddenSubtree
-        Opcode.CREATE_ELEMENT, 2, 3, // NormalSubtree
+        Opcode.MOUNT_COMPONENT, 1, 2, 0xFF, // OverriddenSubtree
+        Opcode.MOUNT_COMPONENT, 2, 3, 0xFF, // NormalSubtree
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.APPEND_CHILD, 0, 2,
         Opcode.RETURN, 0,

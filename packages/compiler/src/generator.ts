@@ -168,13 +168,14 @@ export class DriftGenerator {
           }
         }
       }
-      const propsSpecIdx = this.addConstant(propsSpec);
+      const hasAttributes = Object.keys(propsSpec).length > 1;
+      const propsSpecIdx = hasAttributes ? this.addConstant(propsSpec) : 0xFF;
       const pc = this.bytecode.length;
-      this.emit(Opcode.CREATE_ELEMENT, targetReg, tagConstIdx, propsSpecIdx);
+      this.emit(Opcode.MOUNT_COMPONENT, targetReg, tagConstIdx, propsSpecIdx);
 
       for (const attr of node.attributes) {
         if (attr.type === ASTNodeType.Attribute && attr.value !== null && typeof attr.value !== 'string' && attr.value.type === ASTNodeType.Interpolation) {
-          this.recordBindingPositions(attr.value.expression, pc, Opcode.CREATE_ELEMENT);
+          this.recordBindingPositions(attr.value.expression, pc, Opcode.MOUNT_COMPONENT);
         }
       }
     } else {

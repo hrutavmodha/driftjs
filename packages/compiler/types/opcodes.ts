@@ -16,6 +16,8 @@ export enum Opcode {
   REACTIVE_IF = 0x0D,
   /** Reactive loop block: re-renders its subtree when deps change. */
   REACTIVE_FOR = 0x0E,
+  /** Mounts a child Single File Component (SFC) into a register. */
+  MOUNT_COMPONENT = 0x0F,
 }
 
 /**

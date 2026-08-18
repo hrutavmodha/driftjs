@@ -196,8 +196,8 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
 
     const bodyMod: CompiledModule = {
       bytecode: [
-        // CREATE_ELEMENT with propsSpec (4 bytes: opcode + 3 operand bytes)
-        Opcode.CREATE_ELEMENT, 0, 0, 1,
+        // MOUNT_COMPONENT with propsSpec (4 bytes: opcode + 3 operand bytes)
+        Opcode.MOUNT_COMPONENT, 0, 0, 1,
         // Followed by SET_ATTR (5 bytes)
         Opcode.SET_ATTR, 0, 2, 3, 1,
         Opcode.RETURN, 0,

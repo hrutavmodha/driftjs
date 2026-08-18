@@ -908,7 +908,7 @@ describe('DriftClientVM', () => {
     const parentModule: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
+        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF,
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.RETURN, 0,
       ],
@@ -949,7 +949,7 @@ describe('DriftClientVM', () => {
 
     const parentComponent = {
       bytecode: new Uint32Array([
-        Opcode.CREATE_ELEMENT, 0, 0, 1,
+        Opcode.MOUNT_COMPONENT, 0, 0, 1,
         Opcode.RETURN, 0,
       ]),
       constants: [
@@ -990,7 +990,7 @@ describe('DriftClientVM', () => {
 
     const parentComponent = {
       bytecode: new Uint32Array([
-        Opcode.CREATE_ELEMENT, 0, 0, 1,
+        Opcode.MOUNT_COMPONENT, 0, 0, 1,
         Opcode.RETURN, 0,
       ]),
       constants: [
@@ -998,7 +998,7 @@ describe('DriftClientVM', () => {
         { __drift_props__: true, count: { __drift_fn__: '(scope) => scope.parentCount' } },
       ],
       reactiveBindings: [
-        { variable: 'parentCount', positions: [{ opcode: Opcode.CREATE_ELEMENT, pc: 0 }] },
+        { variable: 'parentCount', positions: [{ opcode: Opcode.MOUNT_COMPONENT, pc: 0 }] },
       ],
       declaredVars: ['CounterDisplay', 'parentCount'],
       scope: {
@@ -1037,7 +1037,7 @@ describe('DriftClientVM', () => {
 
     const parentComponent = {
       bytecode: new Uint32Array([
-        Opcode.CREATE_ELEMENT, 0, 0, 1,
+        Opcode.MOUNT_COMPONENT, 0, 0, 1,
         Opcode.RETURN, 0,
       ]),
       constants: [

@@ -43,7 +43,7 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
         Opcode.CREATE_ELEMENT, 0, 1, // header
-        Opcode.CREATE_ELEMENT, 1, 2, // Child
+        Opcode.MOUNT_COMPONENT, 1, 2, 0xFF, // Child
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.RETURN, 0,
       ]),
@@ -123,7 +123,7 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
     const middle: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.CREATE_ELEMENT, 0, 0, // section
-        Opcode.CREATE_ELEMENT, 1, 1, // Leaf
+        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF, // Leaf
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.RETURN, 0,
       ]),
@@ -137,7 +137,7 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
         Opcode.CREATE_ELEMENT, 0, 1, // main
-        Opcode.CREATE_ELEMENT, 1, 2, // Middle
+        Opcode.MOUNT_COMPONENT, 1, 2, 0xFF, // Middle
         Opcode.APPEND_CHILD, 0, 1,
         Opcode.RETURN, 0,
       ]),
@@ -203,7 +203,7 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
           // Consequent sub-module containing <Badge />
           bytecode: new Uint32Array([
             Opcode.CREATE_FRAGMENT, 0,
-            Opcode.CREATE_ELEMENT, 1, 0, // Badge
+            Opcode.MOUNT_COMPONENT, 1, 0, 0xFF, // Badge
             Opcode.APPEND_CHILD, 0, 1,
             Opcode.RETURN, 0,
           ]),
@@ -266,7 +266,7 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
           // Loop body sub-module containing <Item />
           bytecode: new Uint32Array([
             Opcode.CREATE_FRAGMENT, 0,
-            Opcode.CREATE_ELEMENT, 1, 0,
+            Opcode.MOUNT_COMPONENT, 1, 0, 0xFF,
             Opcode.APPEND_CHILD, 0, 1,
             Opcode.RETURN, 0,
           ]),

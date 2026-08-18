@@ -19,7 +19,7 @@ DriftJS compiles `.drift` template ASTs into a compact, binary-serializable byte
 | Opcode Name | Hex | Dec | Length (Bytes) | Operands | Category | Summary |
 | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
 | **`RETURN`** | `0x00` | `0` | 2 | `reg` | Control Flow | Returns DOM node/fragment from register as execution output |
-| **`CREATE_ELEMENT`** | `0x01` | `1` | 3/4 | `dstReg, tagIdx, [propsSpecIdx]` | DOM Node Creation | Instantiates DOM Element / mounts component sub-module into `dstReg` |
+| **`CREATE_ELEMENT`** | `0x01` | `1` | 3 | `dstReg, tagIdx` | DOM Node Creation | Instantiates standard DOM Element with tag `constants[tagIdx]` into `dstReg` |
 | **`CREATE_TEXT`** | `0x02` | `2` | 3 | `dstReg, textIdx` | DOM Node Creation | Creates static or evaluated DOM TextNode with content `constants[textIdx]` |
 | **`CREATE_COMMENT`** | `0x03` | `3` | 3 | `dstReg, commentIdx` | DOM Node Creation | Creates DOM Comment node with content `constants[commentIdx]` |
 | **`APPEND_CHILD`** | `0x04` | `4` | 3 | `parentReg, childReg` | DOM Manipulation | Appends node `childReg` to parent element `parentReg` |
@@ -29,6 +29,7 @@ DriftJS compiles `.drift` template ASTs into a compact, binary-serializable byte
 | **`EXEC_SCRIPT`** | `0x0C` | `12` | 2 | `scriptIdx` | Scope Initialisation | Executes `<script>` AST `constants[scriptIdx]` into component scope |
 | **`REACTIVE_IF`** | `0x0D` | `13` | 6 | `parentReg, condIdx, consIdx, altIdx, depsIdx` | Reactive Block | Binds dynamic conditional `@if` block between comment anchors |
 | **`REACTIVE_FOR`** | `0x0E` | `14` | 8 | `parentReg, iterIdx, itemNameIdx, idxNameIdx, keyIdx, bodyIdx, depsIdx` | Reactive Block | Binds dynamic `@for` loop with LIS reconciliation & fast-path patching |
+| **`MOUNT_COMPONENT`** | `0x0F` | `15` | 4 | `dstReg, compIdx, propsSpecIdx` | Component Mounting | Instantiates child Single File Component VM with props into `dstReg` |
 
 ---
 
@@ -40,9 +41,14 @@ DriftJS compiles `.drift` template ASTs into a compact, binary-serializable byte
 - **Description**: Stops execution of the current module and returns the DOM Node or DocumentFragment stored in register `reg`.
 
 ### `CREATE_ELEMENT` (`0x01`)
-- **Bytecode**: `0x01 <dstReg> <tagIdx> [propsSpecIdx]`
-- **Length**: 3 or 4 bytes
-- **Description**: Instantiates a DOM element using the HTML tag name string stored at `constants[tagIdx]` (e.g. `'tr'`, `'div'`, `'button'`) and places the element reference in `dstReg`. If `propsSpecIdx` is present, passes evaluated props to component sub-module.
+- **Bytecode**: `0x01 <dstReg> <tagIdx>`
+- **Length**: 3 bytes (Fixed)
+- **Description**: Instantiates a standard DOM element using the HTML tag name string stored at `constants[tagIdx]` (e.g. `'tr'`, `'div'`, `'button'`) and places the element reference in `dstReg`.
+
+### `MOUNT_COMPONENT` (`0x0F`)
+- **Bytecode**: `0x0F <dstReg> <compIdx> <propsSpecIdx>`
+- **Length**: 4 bytes (Fixed)
+- **Description**: Resolves child Single File Component (SFC) module stored at `constants[compIdx]` from scope or global, evaluates props specification `constants[propsSpecIdx]` against current scope, spawns an isolated child VM instance, and mounts the returned root node into `dstReg`. Re-evaluates props in-place on reactive updates.
 
 ### `CREATE_TEXT` (`0x02`)
 - **Bytecode**: `0x02 <dstReg> <textIdx>`
