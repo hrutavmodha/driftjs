@@ -437,6 +437,48 @@ export class DriftGenerator {
       case 'UpdateExpression':
         for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
         break;
+      case 'ObjectExpression':
+        if (Array.isArray(node.properties)) {
+          for (const prop of node.properties) {
+            if (prop.type === 'Property') {
+              if (prop.computed) {
+                for (const id of this.extractIdentifiers(prop.key)) ids.add(id);
+              }
+              for (const id of this.extractIdentifiers(prop.value)) ids.add(id);
+            } else if (prop.type === 'SpreadElement') {
+              for (const id of this.extractIdentifiers(prop.argument)) ids.add(id);
+            }
+          }
+        }
+        break;
+      case 'ArrayExpression':
+        if (Array.isArray(node.elements)) {
+          for (const el of node.elements) {
+            if (el) for (const id of this.extractIdentifiers(el)) ids.add(id);
+          }
+        }
+        break;
+      case 'TemplateLiteral':
+        if (Array.isArray(node.expressions)) {
+          for (const expr of node.expressions) {
+            for (const id of this.extractIdentifiers(expr)) ids.add(id);
+          }
+        }
+        break;
+      case 'TaggedTemplateExpression':
+        for (const id of this.extractIdentifiers(node.tag)) ids.add(id);
+        for (const id of this.extractIdentifiers(node.quasi)) ids.add(id);
+        break;
+      case 'SpreadElement':
+        for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
+        break;
+      case 'SequenceExpression':
+        if (Array.isArray(node.expressions)) {
+          for (const expr of node.expressions) {
+            for (const id of this.extractIdentifiers(expr)) ids.add(id);
+          }
+        }
+        break;
       case 'MemberExpression':
         for (const id of this.extractIdentifiers(node.object)) ids.add(id);
         break;

@@ -22,16 +22,16 @@
   });
 </script>
 
-<div class="user-card" style={"border-left: 5px solid " + accent}>
+<div class="user-card" style={{ borderLeft: '5px solid ' + accent }}>
   <div class="user-header">
     <span class="user-avatar">{avatar}</span>
     <div>
       <h3 class="user-name">{name}</h3>
-      <span class="user-badge" style={"background: " + accent + "1a; color: " + accent}>{role}</span>
+      <span class="user-badge" style={{ background: accent + '1a', color: accent }}>{role}</span>
     </div>
   </div>
   <div class="user-meta">
     <p>Theme Mode: <strong>{mode}</strong></p>
-    <p>Accent Color: <strong style={"color: " + accent}>{accent}</strong></p>
+    <p>Accent Color: <strong style={{ color: accent }}>{accent}</strong></p>
   </div>
 </div>

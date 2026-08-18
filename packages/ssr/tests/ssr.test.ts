@@ -211,4 +211,31 @@ describe('DriftServerVM (SSR Engine)', () => {
     expect(html).not.toContain('</source>');
     expect(html).not.toContain('</wbr>');
   });
+
+  it('renders React-like style objects properly during server-side rendering', () => {
+    const src = `
+      <script>
+        let accentColor = '#3b82f6';
+        let radius = 12;
+      </script>
+      <div 
+        class="banner"
+        style={{ 
+          backgroundColor: accentColor, 
+          borderRadius: radius, 
+          padding: 20, 
+          opacity: 0.9,
+          zIndex: 5 
+        }}
+      >
+        <span>SSR Content</span>
+      </div>
+    `;
+    const compiled = compile(src);
+    const html = renderToString(compiled);
+
+    expect(html).toContain('class="banner"');
+    expect(html).toContain('style="background-color: #3b82f6; border-radius: 12px; padding: 20px; opacity: 0.9; z-index: 5"');
+    expect(html).toContain('<span>SSR Content</span>');
+  });
 });

@@ -28,7 +28,7 @@
   }
 </script>
 
-<div class="subtree-override-card" style={"border-left: 5px solid " + localAccent}>
+<div class="subtree-override-card" style={{ borderLeft: '5px solid ' + localAccent }}>
   <div class="subtree-header">
     <div>
       <h3>Subtree Context Override Branch</h3>

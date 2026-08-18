@@ -18,9 +18,9 @@
   });
 </script>
 
-<div class="nested-box" style={"border-left: 4px solid " + accent}>
+<div class="nested-box" style={{ borderLeft: '4px solid ' + accent }}>
   <h4>Deep Descendant Consumer</h4>
   <p>Inherited User: <strong>{userName}</strong></p>
   <p>Inherited Theme Mode: <strong>{mode}</strong></p>
-  <p>Inherited Accent Color: <strong style={"color: " + accent}>{accent}</strong></p>
+  <p>Inherited Accent Color: <strong style={{ color: accent }}>{accent}</strong></p>
 </div>

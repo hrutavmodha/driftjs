@@ -6,6 +6,8 @@ import {
   resolveIterable,
   resolveComponentModule,
   evaluatePropsSpec,
+  normalizeStyle,
+  camelToKebab,
   MAX_REGISTERS,
 } from '../src/index.js';
 
@@ -82,6 +84,66 @@ describe('driftjs-shared Module', () => {
     expect(props).toEqual({
       id: 101,
       staticProp: 'Hello',
+    });
+  });
+
+  describe('normalizeStyle helper', () => {
+    it('handles null, undefined, false, and empty string', () => {
+      expect(normalizeStyle(null)).toBe('');
+      expect(normalizeStyle(undefined)).toBe('');
+      expect(normalizeStyle(false)).toBe('');
+      expect(normalizeStyle('')).toBe('');
+    });
+
+    it('preserves existing CSS string input', () => {
+      expect(normalizeStyle('color: red; padding: 10px;')).toBe('color: red; padding: 10px;');
+    });
+
+    it('converts camelCase properties to kebab-case', () => {
+      expect(camelToKebab('backgroundColor')).toBe('background-color');
+      expect(camelToKebab('borderRadius')).toBe('border-radius');
+      expect(camelToKebab('borderLeftWidth')).toBe('border-left-width');
+      expect(camelToKebab('--customVar')).toBe('--customVar');
+    });
+
+    it('normalizes style objects with automatic pixel units', () => {
+      const style = {
+        backgroundColor: '#3b82f6',
+        borderRadius: 12,
+        padding: 20,
+        color: '#ffffff',
+      };
+      expect(normalizeStyle(style)).toBe('background-color: #3b82f6; border-radius: 12px; padding: 20px; color: #ffffff');
+    });
+
+    it('respects unitless CSS properties', () => {
+      const style = {
+        opacity: 0.85,
+        zIndex: 100,
+        flex: 1,
+        lineHeight: 1.5,
+        fontWeight: 600,
+      };
+      expect(normalizeStyle(style)).toBe('opacity: 0.85; z-index: 100; flex: 1; line-height: 1.5; font-weight: 600');
+    });
+
+    it('ignores null, undefined, empty, and false values in style objects', () => {
+      const style = {
+        color: 'red',
+        display: null,
+        margin: undefined,
+        border: false,
+        padding: '',
+      };
+      expect(normalizeStyle(style)).toBe('color: red');
+    });
+
+    it('normalizes arrays of style objects', () => {
+      const styles = [
+        { color: 'red', padding: 8 },
+        { backgroundColor: 'blue', borderRadius: 4 },
+      ];
+      expect(normalizeStyle(styles)).toBe('color: red; padding: 8px; background-color: blue; border-radius: 4px');
     });
   });
 });

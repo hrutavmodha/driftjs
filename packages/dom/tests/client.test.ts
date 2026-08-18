@@ -1327,6 +1327,59 @@ describe('DriftClientVM', () => {
     vmInstance.unmount();
     document.body.removeChild(container);
   });
+
+  it('supports React-like style objects with reactive updates', () => {
+    const src = `
+      <script>
+        let bgColor = '#3b82f6';
+        let radius = 12;
+        let pad = 20;
+        let isVisible = true;
+      </script>
+      <div 
+        class="card"
+        style={{ 
+          backgroundColor: bgColor, 
+          borderRadius: radius, 
+          padding: pad,
+          opacity: isVisible ? 1 : 0,
+          zIndex: 10
+        }}
+      >
+        <span>Content</span>
+      </div>
+    `;
+
+    const lexer = new DriftLexer(src);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const transformer = new DriftTransformer(ast);
+    const mod = new DriftGenerator(transformer.transform()).generate();
+
+    const vmInstance = new DriftClientVM();
+    const root = vmInstance.execute(mod, { document }) as Node;
+    const div = (root.nodeType === 11 ? (root as DocumentFragment).firstElementChild : root) as HTMLElement;
+
+    expect(div).toBeDefined();
+    expect(div.tagName.toLowerCase()).toBe('div');
+    const styleAttr = div.getAttribute('style') || '';
+    expect(styleAttr).toContain('background-color: #3b82f6');
+    expect(styleAttr).toContain('border-radius: 12px');
+    expect(styleAttr).toContain('padding: 20px');
+    expect(styleAttr).toContain('opacity: 1');
+    expect(styleAttr).toContain('z-index: 10');
+
+    // Mutate reactive variables
+    (vmInstance as any).scope.bgColor = '#10b981';
+    (vmInstance as any).scope.radius = 24;
+    (vmInstance as any).scope.isVisible = false;
+    vmInstance.triggerUpdates(new Set(['bgColor', 'radius', 'isVisible']));
+
+    const updatedStyle = div.getAttribute('style') || '';
+    expect(updatedStyle).toContain('background-color: #10b981');
+    expect(updatedStyle).toContain('border-radius: 24px');
+    expect(updatedStyle).toContain('opacity: 0');
+  });
 });
 
 

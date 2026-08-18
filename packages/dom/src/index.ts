@@ -15,6 +15,7 @@ import {
   resolveIterable,
   resolveComponentModule,
   evaluatePropsSpec,
+  normalizeStyle,
   pushActiveVM,
   popActiveVM,
   createContext,
@@ -342,7 +343,7 @@ export class DriftClientVM {
           const attrName = String(constants[bytecode[pc + 2]!]);
           const rawVal = constants[bytecode[pc + 3]!];
           const isDynamic = bytecode[pc + 4]!;
-          const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
+          let val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
 
           if (elem) {
             if (attrName.startsWith('on') && typeof val === 'function') {
@@ -369,13 +370,16 @@ export class DriftClientVM {
               handlers[eventName] = wrappedHandler;
               this.ensureEventDelegated(eventName);
             } else {
+              if (attrName === 'style') {
+                val = normalizeStyle(val);
+              }
               if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
                 (elem as any)[attrName] = val ?? '';
               }
               if (typeof elem.setAttribute === 'function') {
                 if (val === true) {
                   elem.setAttribute(attrName, '');
-                } else if (val === false || val == null) {
+                } else if (val === false || val == null || (attrName === 'style' && val === '')) {
                   if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
                 } else {
                   elem.setAttribute(attrName, String(val));
@@ -727,8 +731,11 @@ export class DriftClientVM {
           const rawVal = constants[bytecode[pc + 3]!];
           const isDynamic = bytecode[pc + 4]!;
           if (isDynamic === 1) {
-            const val = evaluateExpression(rawVal, childScope, this.declaredVars);
-            const targetVal = val === true ? '' : val === false || val == null ? null : String(val);
+            let val = evaluateExpression(rawVal, childScope, this.declaredVars);
+            if (attrName === 'style') {
+              val = normalizeStyle(val);
+            }
+            const targetVal = val === true ? '' : val === false || val == null || (attrName === 'style' && val === '') ? null : String(val);
             const currentVal = elem.hasAttribute(attrName) ? elem.getAttribute(attrName) : null;
             if (targetVal !== currentVal) {
               if (targetVal === null) {
@@ -831,16 +838,19 @@ export class DriftClientVM {
         const attrName = String(constants[bytecode[pc + 2]!]);
         const rawVal = constants[bytecode[pc + 3]!];
         const isDynamic = bytecode[pc + 4]!;
-        const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
+        let val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
 
         if (elem) {
+          if (attrName === 'style') {
+            val = normalizeStyle(val);
+          }
           if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
             (elem as any)[attrName] = val ?? '';
           }
           if (typeof elem.setAttribute === 'function') {
             if (val === true) {
               elem.setAttribute(attrName, '');
-            } else if (val === false || val == null) {
+            } else if (val === false || val == null || (attrName === 'style' && val === '')) {
               if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
             } else {
               elem.setAttribute(attrName, String(val));

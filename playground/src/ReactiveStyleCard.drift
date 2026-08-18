@@ -74,7 +74,7 @@
   <div class="css-tester-preview">
     <div 
       class="dynamic-preview-box" 
-      style={"background-color: " + boxColor + "; color: " + textColor + "; border-radius: " + radius + "px; padding: " + padding + "px;"}
+      style={{ backgroundColor: boxColor, color: textColor, borderRadius: radius, padding: padding }}
     >
       <div class="preview-inner">
         <h4>Live CSS Reactive Box</h4>

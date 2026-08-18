@@ -3,6 +3,7 @@ import {
   evaluateExpression,
   resolveComponentModule,
   evaluatePropsSpec,
+  normalizeStyle,
   pushActiveVM,
   popActiveVM,
   createContext,
@@ -191,7 +192,10 @@ export class DriftServerVM {
           }
 
           const rawVal = constants[valIdx];
-          const val = isDynamic === 1 ? evaluateExpression(rawVal, this.scope, this.declaredVars) : rawVal;
+          let val = isDynamic === 1 ? evaluateExpression(rawVal, this.scope, this.declaredVars) : rawVal;
+          if (attrName === 'style') {
+            val = normalizeStyle(val);
+          }
 
           if (!elemNode.attrs) elemNode.attrs = new Map();
           elemNode.attrs.set(attrName, val);
@@ -321,6 +325,9 @@ export function serializeNode(node: ServerNode | string): string {
     let attrsStr = '';
     if (node.attrs && node.attrs.size > 0) {
       for (const [k, v] of node.attrs.entries()) {
+        if (k === 'style' && (v === '' || v == null || v === false)) {
+          continue;
+        }
         if (v === '' || v === true) {
           attrsStr += ` ${k}`;
         } else if (v !== null && v !== undefined && v !== false) {
