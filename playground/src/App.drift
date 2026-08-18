@@ -1,27 +1,80 @@
 <script>
-  import { UserContext, ThemeContext, NotificationContext } from './context';
+  import {
+    UserContext,
+    ThemeContext,
+    NotificationContext,
+    createUserStore,
+    createThemeStore,
+    createNotificationStore
+  } from './context';
   import Header from './Header.drift';
   import UserProfile from './UserProfile.drift';
   import SubtreeOverride from './SubtreeOverride.drift';
   import NestedChild from './NestedChild.drift';
+  import ReactiveStyleCard from './ReactiveStyleCard.drift';
 
-  // Provide root contexts for the entire VM component tree
-  UserContext.provide({
+  // 1. Instantiate root reactive stores
+  const rootUserStore = createUserStore({
     name: 'Ada Lovelace',
     role: 'Lead Architect',
     avatar: '👩‍💻'
   });
 
-  ThemeContext.provide({
+  const rootThemeStore = createThemeStore({
     mode: 'light',
     accentColor: '#3b82f6',
     fontFamily: 'Inter, system-ui, sans-serif'
   });
 
-  NotificationContext.provide({
+  const rootNoticeStore = createNotificationStore({
     unreadCount: 4,
     latestNotice: 'Context API initialized successfully'
   });
+
+  // 2. Provide root stores into root VM Context
+  UserContext.provide(rootUserStore);
+  ThemeContext.provide(rootThemeStore);
+  NotificationContext.provide(rootNoticeStore);
+
+  // 3. Local reactive variables for root UI feedback
+  let currentUserName = rootUserStore.user.name;
+  let currentThemeMode = rootThemeStore.theme.mode;
+  let currentAccent = rootThemeStore.theme.accentColor;
+  let currentNotice = rootNoticeStore.notice.latestNotice;
+
+  rootUserStore.subscribe((u) => {
+    currentUserName = u.name;
+  });
+
+  rootThemeStore.subscribe((t) => {
+    currentThemeMode = t.mode;
+    currentAccent = t.accentColor;
+  });
+
+  rootNoticeStore.subscribe((n) => {
+    currentNotice = n.latestNotice;
+  });
+
+  // Action methods to mutate context
+  function selectUser(name, role, avatar) {
+    rootUserStore.setUser({ name, role, avatar });
+  }
+
+  function toggleRootTheme() {
+    rootThemeStore.toggleMode();
+  }
+
+  function setRootAccent(color) {
+    rootThemeStore.setAccentColor(color);
+  }
+
+  function triggerAlert() {
+    rootNoticeStore.increment();
+  }
+
+  function clearAllNotices() {
+    rootNoticeStore.clear();
+  }
 </script>
 
 <div class="playground-layout">
@@ -30,23 +83,61 @@
     subtitle="Hierarchical VM Scope & Reactive Dependency Injection" 
   />
 
+  <section class="control-center">
+    <div class="control-group">
+      <label class="control-label">Mutate UserContext:</label>
+      <div class="btn-row">
+        <button class="btn btn-primary" onClick={() => selectUser('Ada Lovelace', 'Lead Architect', '👩‍💻')}>👩‍💻 Ada</button>
+        <button class="btn btn-primary" onClick={() => selectUser('Alan Turing', 'Cryptanalyst & Pioneer', '👨‍🔬')}>👨‍🔬 Alan</button>
+        <button class="btn btn-primary" onClick={() => selectUser('Grace Hopper', 'Compiler Pioneer', '🚀')}>🚀 Grace</button>
+        <button class="btn btn-primary" onClick={() => selectUser('Linus Torvalds', 'Kernel Maintainer', '🐧')}>🐧 Linus</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">Mutate ThemeContext:</label>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onClick={toggleRootTheme}>Toggle Mode ({currentThemeMode})</button>
+        <button class="btn btn-color" style="background: #3b82f6; color: white;" onClick={() => setRootAccent('#3b82f6')}>Blue</button>
+        <button class="btn btn-color" style="background: #10b981; color: white;" onClick={() => setRootAccent('#10b981')}>Emerald</button>
+        <button class="btn btn-color" style="background: #8b5cf6; color: white;" onClick={() => setRootAccent('#8b5cf6')}>Violet</button>
+        <button class="btn btn-color" style="background: #f97316; color: white;" onClick={() => setRootAccent('#f97316')}>Orange</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">Mutate NotificationContext:</label>
+      <div class="btn-row">
+        <button class="btn btn-warning" onClick={triggerAlert}>Trigger Alert (+1)</button>
+        <button class="btn btn-outline" onClick={clearAllNotices}>Clear Alerts</button>
+        <span class="notice-preview">Active Notice: {currentNotice}</span>
+      </div>
+    </div>
+  </section>
+
   <main class="playground-body">
     <section class="panel">
-      <h2>1. Direct Context Consumer (No Props Drilling)</h2>
-      <p class="description">This component injects <code>UserContext</code> and <code>ThemeContext</code> directly from the root VM.</p>
+      <h2>1. Direct Context Consumer (User & Theme)</h2>
+      <p class="description">This component injects <code>UserContext</code> and <code>ThemeContext</code> directly from the root VM. Notice how changes above immediately update this card.</p>
       <UserProfile />
     </section>
 
     <section class="panel">
-      <h2>2. Context Inheritance (Grandparent ➔ DeepChild)</h2>
-      <p class="description">This child directly inherits the root <code>ThemeContext</code> and <code>UserContext</code>.</p>
+      <h2>2. Deep Context Consumer (Grandparent ➔ DeepChild)</h2>
+      <p class="description">This child directly inherits root context across component hierarchy without props drilling.</p>
       <NestedChild />
     </section>
 
     <section class="panel">
-      <h2>3. Subtree Context Shadowing / Override</h2>
-      <p class="description">This subtree re-provides <code>ThemeContext</code> with dark mode and pink accent, overriding only its own descendants.</p>
+      <h2>3. Subtree Context Shadowing Branch</h2>
+      <p class="description">This subtree re-provides an independent <code>ThemeContext</code>. Changing the subtree branch does NOT affect sibling panels above!</p>
       <SubtreeOverride />
+    </section>
+
+    <section class="panel">
+      <h2>4. Live CSS & Style Attribute Reactivity</h2>
+      <p class="description">Test dynamic CSS attribute patching in real time with color inputs, range sliders, and presets.</p>
+      <ReactiveStyleCard />
     </section>
   </main>
 </div>

@@ -1,17 +1,46 @@
 <script>
-  import { ThemeContext } from './context';
+  import { ThemeContext, createThemeStore } from './context';
   import NestedChild from './NestedChild.drift';
 
   // Override ThemeContext specifically for this subtree
-  ThemeContext.provide({
+  const localThemeStore = createThemeStore({
     mode: 'dark',
     accentColor: '#ec4899',
     fontFamily: 'monospace'
   });
+
+  ThemeContext.provide(localThemeStore);
+
+  let localMode = localThemeStore.theme.mode;
+  let localAccent = localThemeStore.theme.accentColor;
+
+  localThemeStore.subscribe((t) => {
+    localMode = t.mode;
+    localAccent = t.accentColor;
+  });
+
+  function toggleLocalDark() {
+    localThemeStore.toggleMode();
+  }
+
+  function setLocalColor(c) {
+    localThemeStore.setAccentColor(c);
+  }
 </script>
 
-<div class="subtree-override-card">
-  <h3>Subtree Context Override Branch</h3>
-  <p>This branch overrides <code>ThemeContext</code> to <em>Dark (#ec4899)</em> without affecting sibling trees.</p>
+<div class="subtree-override-card" style={"border-left: 5px solid " + localAccent}>
+  <div class="subtree-header">
+    <div>
+      <h3>Subtree Context Override Branch</h3>
+      <p class="subtree-desc">This branch provides its own <code>ThemeContext</code>. Changes here only affect this subtree and its nested children!</p>
+    </div>
+    <div class="subtree-actions">
+      <button class="btn btn-sm" onClick={toggleLocalDark}>Toggle Branch Mode ({localMode})</button>
+      <button class="btn btn-sm btn-pink" onClick={() => setLocalColor('#ec4899')}>Pink</button>
+      <button class="btn btn-sm btn-cyan" onClick={() => setLocalColor('#06b6d4')}>Cyan</button>
+      <button class="btn btn-sm btn-yellow" onClick={() => setLocalColor('#eab308')}>Amber</button>
+    </div>
+  </div>
+
   <NestedChild />
 </div>

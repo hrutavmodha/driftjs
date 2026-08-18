@@ -149,18 +149,33 @@ body {
   color: #f8fafc;
   padding: 1.25rem;
   border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.subtree-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .subtree-override-card h3 {
-  font-size: 1rem;
+  font-size: 1.05rem;
   margin-bottom: 0.25rem;
   color: #f472b6;
 }
 
-.subtree-override-card p {
+.subtree-desc {
   font-size: 0.85rem;
   color: #94a3b8;
-  margin-bottom: 1rem;
+}
+
+.subtree-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
 .subtree-override-card .nested-box {
@@ -172,3 +187,243 @@ body {
 .subtree-override-card .nested-box h4 {
   color: #f472b6;
 }
+
+/* Control Center Styles */
+.control-center {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.control-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn {
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-secondary {
+  background: #0f172a;
+  color: white;
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-outline {
+  background: transparent;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+.btn-outline:hover {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+}
+
+.btn-pink {
+  background: #ec4899;
+  color: white;
+}
+
+.btn-cyan {
+  background: #06b6d4;
+  color: white;
+}
+
+.btn-yellow {
+  background: #eab308;
+  color: black;
+}
+
+.notice-preview {
+  font-size: 0.825rem;
+  color: #64748b;
+  font-style: italic;
+  margin-left: 0.5rem;
+}
+
+/* CSS Reactivity Tester Styles */
+.css-tester-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .css-tester-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.css-tester-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.control-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.control-field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.input-with-color {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.color-picker-input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 44px;
+  height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  padding: 2px;
+}
+
+.color-picker-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-picker-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+
+.color-hex-badge {
+  font-family: monospace;
+  font-size: 0.875rem;
+  background: #f1f5f9;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+.slider-input {
+  width: 100%;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.preset-btn {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.preset-btn:hover {
+  transform: scale(1.05);
+}
+
+.css-tester-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dynamic-preview-box {
+  width: 100%;
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  transition: all 0.15s ease-out;
+}
+
+.preview-inner h4 {
+  font-size: 1.1rem;
+  margin-bottom: 0.35rem;
+}
+
+.preview-inner p {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.preview-inner code {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+

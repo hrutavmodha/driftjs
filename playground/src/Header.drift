@@ -2,11 +2,19 @@
   import { UserContext, NotificationContext } from './context';
 
   let { title, subtitle } = props;
-  const user = UserContext.inject();
-  const notice = NotificationContext.inject();
+  const userStore = UserContext.inject();
+  const noticeStore = NotificationContext.inject();
 
-  let userName = user.name;
-  let unread = notice.unreadCount;
+  let userName = userStore.user.name;
+  let unread = noticeStore.notice.unreadCount;
+
+  userStore.subscribe((u) => {
+    userName = u.name;
+  });
+
+  noticeStore.subscribe((n) => {
+    unread = n.unreadCount;
+  });
 </script>
 
 <header class="playground-header">
@@ -16,6 +24,6 @@
   </div>
   <div class="header-user-status">
     <span class="user-greeting">Signed in as <strong>{userName}</strong></span>
-    <span class="badge">Notifications: {unread}</span>
+    <span class="badge">Live Alerts: {unread}</span>
   </div>
 </header>
