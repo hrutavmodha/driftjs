@@ -1,6 +1,16 @@
 {
   "name": "driftjs-shared",
-  "version": "0.0.6",
+  "version": "0.0.7",
+  "description": "Shared utilities, Context API, scope resolution helpers, and runtime evaluators for DriftJS.",
+  "keywords": [
+    "driftjs",
+    "shared",
+    "context-api",
+    "scope",
+    "evaluator",
+    "utilities",
+    "reactivity"
+  ],
   "type": "module",
   "files": [
     "dist",

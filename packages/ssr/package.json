@@ -1,6 +1,17 @@
 {
   "name": "driftjs-ssr",
-  "version": "0.0.6",
+  "version": "0.0.7",
+  "description": "Headless Server-Side Rendering (SSR) register Virtual Machine and HTML serializer for DriftJS.",
+  "keywords": [
+    "driftjs",
+    "ssr",
+    "server-side-rendering",
+    "html-serializer",
+    "virtual-machine",
+    "register-vm",
+    "reactivity",
+    "rendering"
+  ],
   "type": "module",
   "files": [
     "dist",

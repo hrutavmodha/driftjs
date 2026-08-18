@@ -1,5 +1,6 @@
 {
   "name": "driftjs-template",
+  "description": "Starter template for DriftJS CSR and SSR applications",
   "private": true,
   "version": "0.0.0",
   "type": "module",

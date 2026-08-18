@@ -203,7 +203,7 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
         Opcode.RETURN, 0,
       ],
       constants: [
-        'div',
+        'CustomDiv',
         { __drift_props__: true, foo: 'bar' },
         'data-test',
         { __drift_fn__: '(scope) => scope.updatedValue' },

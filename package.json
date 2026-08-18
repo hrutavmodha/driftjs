@@ -1,5 +1,16 @@
 {
   "name": "driftjs-monorepo",
+  "description": "Register VM-based reactivity engine and AOT compiler for high-performance web applications.",
+  "keywords": [
+    "driftjs",
+    "compiler",
+    "virtual-machine",
+    "register-vm",
+    "reactivity",
+    "ssr",
+    "dom",
+    "vite-plugin"
+  ],
   "private": true,
   "type": "module",
   "scripts": {

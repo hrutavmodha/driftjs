@@ -1,6 +1,19 @@
 {
   "name": "driftjs-compiler",
-  "version": "0.0.6",
+  "version": "0.0.7",
+  "description": "AOT compiler, lexer, parser, AST transformer, and register VM bytecode generator for DriftJS.",
+  "keywords": [
+    "driftjs",
+    "compiler",
+    "parser",
+    "lexer",
+    "ast",
+    "bytecode",
+    "virtual-machine",
+    "aot-compiler",
+    "reactivity",
+    "ui"
+  ],
   "type": "module",
   "files": [
     "dist",

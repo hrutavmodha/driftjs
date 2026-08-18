@@ -270,14 +270,15 @@ export class DriftClientVM {
           const dstReg = bytecode[pc + 1]!;
           const tagConstIdx = bytecode[pc + 2]!;
           const tag = String(constants[tagConstIdx]);
-          const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
-          const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
-          const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
-          const propsSpecIdx = isPropsSpec ? maybePropsIdx : 0xFF;
 
           const rawComp = (scope && tag in scope) ? scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
           const compMod = resolveComponentModule(rawComp);
           if (compMod) {
+            const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
+            const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
+            const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
+            const propsSpecIdx = isPropsSpec ? maybePropsIdx : 0xFF;
+
             const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
             const propsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
             const childVM = new DriftClientVM();
@@ -289,11 +290,12 @@ export class DriftClientVM {
               this.childVMs.set(compNode, { vm: childVM, scope: childVM.scope, propsSpec });
               this.setRegister(dstReg, compNode);
             }
+            pc += isPropsSpec ? 4 : 3;
           } else {
             const elem = this.cursor ? this.cursor.claimElement(tag, doc) : doc.createElement(tag);
             this.setRegister(dstReg, elem);
+            pc += 3;
           }
-          pc += isPropsSpec ? 4 : 3;
           break;
         }
 
@@ -704,7 +706,11 @@ export class DriftClientVM {
         case Opcode.RETURN:
           return;
         case Opcode.CREATE_ELEMENT: {
-          const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xff;
+          const tagIdx = bytecode[pc + 2]!;
+          const tag = String(constants[tagIdx]);
+          const firstChar = tag.charAt(0);
+          const isCompTag = (firstChar !== '' && firstChar === firstChar.toUpperCase() && firstChar !== firstChar.toLowerCase()) || (childScope && tag in childScope);
+          const maybePropsIdx = isCompTag && pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xff;
           const propsCandidate = (maybePropsIdx !== 0xff && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
           const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
           pc += isPropsSpec ? 4 : 3;
@@ -845,16 +851,22 @@ export class DriftClientVM {
       }
       case Opcode.CREATE_ELEMENT: {
         const dstReg = bytecode[pc + 1]!;
-        const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
-        const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
-        const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
-        if (isPropsSpec) {
-          const compNode = this.getRegister(dstReg);
-          const childEntry = compNode ? this.childVMs.get(compNode) : null;
-          if (childEntry) {
-            const { vm: childVM, scope: childScope, propsSpec } = childEntry;
-            const newPropsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
-            this.updateChildComponentProps(childScope, childVM, newPropsObj);
+        const tagConstIdx = bytecode[pc + 2]!;
+        const tag = String(constants[tagConstIdx]);
+        const rawComp = (scope && tag in scope) ? scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
+        const compMod = resolveComponentModule(rawComp);
+        if (compMod) {
+          const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
+          const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
+          const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
+          if (isPropsSpec) {
+            const compNode = this.getRegister(dstReg);
+            const childEntry = compNode ? this.childVMs.get(compNode) : null;
+            if (childEntry) {
+              const { vm: childVM, scope: childScope, propsSpec } = childEntry;
+              const newPropsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
+              this.updateChildComponentProps(childScope, childVM, newPropsObj);
+            }
           }
         }
         break;

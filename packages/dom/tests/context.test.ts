@@ -291,10 +291,10 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     `;
 
     const childMod = compile(childSrc);
-    childMod.scope = { ThemeCtx, UserCtx };
+    (childMod as any).scope = { ThemeCtx, UserCtx };
 
     const parentMod = compile(parentSrc);
-    parentMod.scope = { ThemeCtx, UserCtx, Child: childMod };
+    (parentMod as any).scope = { ThemeCtx, UserCtx, Child: childMod };
 
     const vm = new DriftClientVM();
     const container = document.createElement('div');

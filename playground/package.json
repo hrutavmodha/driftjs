@@ -1,5 +1,6 @@
 {
   "name": "driftjs-playground",
+  "description": "Interactive developer playground for DriftJS Context API and component features",
   "private": true,
   "version": "0.0.4",
   "type": "module",

@@ -1,7 +1,18 @@
 {
   "name": "create-drift",
-  "version": "0.0.6",
-  "description": "CLI scaffolding tool for DriftJS register VM applications",
+  "version": "0.0.7",
+  "description": "Interactive CLI scaffolding tool for DriftJS register VM client and server applications.",
+  "keywords": [
+    "create-drift",
+    "driftjs",
+    "cli",
+    "scaffolding",
+    "starter",
+    "template",
+    "generator",
+    "virtual-machine"
+  ],
+  "license": "MIT",
   "type": "module",
   "files": [
     "bin",

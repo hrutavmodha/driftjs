@@ -102,20 +102,21 @@ export class DriftServerVM {
             const dstReg = bytecode[pc + 1]!;
             const tagIdx = bytecode[pc + 2]!;
             const tag = String(constants[tagIdx]);
-            const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
-            const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
-            const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
-            const propsSpecIdx = isPropsSpec ? maybePropsIdx : 0xFF;
 
             const rawComp = (this.scope && tag in this.scope) ? this.scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
             const compMod = resolveComponentModule(rawComp);
             if (compMod) {
+              const maybePropsIdx = pc + 3 < bytecode.length ? bytecode[pc + 3]! : 0xFF;
+              const propsCandidate = (maybePropsIdx !== 0xFF && maybePropsIdx < constants.length) ? constants[maybePropsIdx] : null;
+              const isPropsSpec = propsCandidate && typeof propsCandidate === 'object' && propsCandidate.__drift_props__ === true;
+              const propsSpecIdx = isPropsSpec ? maybePropsIdx : 0xFF;
               const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
               const propsObj = evaluatePropsSpec(propsSpec, this.scope, this.declaredVars);
               const subVm = new DriftServerVM();
               subVm.parentVM = this;
               const compNode = subVm.execute(compMod, { scope: { props: propsObj, ...propsObj, ...this.scope } });
               if (compNode) this.setRegister(dstReg, compNode);
+              pc += isPropsSpec ? 4 : 3;
             } else {
               this.setRegister(dstReg, {
                 type: 'element',
@@ -123,8 +124,8 @@ export class DriftServerVM {
                 attrs: new Map(),
                 children: [],
               });
+              pc += 3;
             }
-            pc += isPropsSpec ? 4 : 3;
             break;
           }
 

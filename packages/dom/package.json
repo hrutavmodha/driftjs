@@ -1,6 +1,19 @@
 {
   "name": "driftjs-dom",
-  "version": "0.0.6",
+  "version": "0.0.7",
+  "description": "High-performance register-based Virtual Machine and reconciler for client-side DOM rendering in DriftJS.",
+  "keywords": [
+    "driftjs",
+    "dom",
+    "client",
+    "virtual-machine",
+    "register-vm",
+    "reactivity",
+    "reconciler",
+    "hydration",
+    "ui"
+  ],
+  "license": "MIT",
   "type": "module",
   "files": [
     "dist",
