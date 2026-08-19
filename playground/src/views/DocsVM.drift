@@ -1,0 +1,97 @@
+<div class="docs-article">
+  <h1>2. Register Virtual Machine Architecture</h1>
+  <p class="lead-text">
+    The Drift Client VM (<code>DriftClientVM</code>) and Server VM (<code>DriftServerVM</code>) execute AOT-compiled register bytecode streams using a fixed 256-register array (<code>r0..r255</code>).
+  </p>
+
+  <hr class="divider" />
+
+  <h2>Instruction Set Architecture (ISA)</h2>
+  <p>Drift bytecode instructions are compact numeric streams referencing registers and constant pool entries:</p>
+
+  <div class="table-card">
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Opcode</th>
+          <th>Hex</th>
+          <th>Mnemonic</th>
+          <th>Operands</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>0</code></td>
+          <td><code>0x00</code></td>
+          <td><code>RETURN</code></td>
+          <td><code>reg</code></td>
+          <td>Halts execution and returns the DOM node or fragment stored in <code>reg</code>.</td>
+        </tr>
+        <tr>
+          <td><code>1</code></td>
+          <td><code>0x01</code></td>
+          <td><code>CREATE_ELEMENT</code></td>
+          <td><code>dstReg, tagIdx</code></td>
+          <td>Creates an HTML Element with tag name <code>constants[tagIdx]</code> into <code>dstReg</code>.</td>
+        </tr>
+        <tr>
+          <td><code>2</code></td>
+          <td><code>0x02</code></td>
+          <td><code>CREATE_TEXT</code></td>
+          <td><code>dstReg, textIdx</code></td>
+          <td>Creates a static TextNode into <code>dstReg</code>.</td>
+        </tr>
+        <tr>
+          <td><code>4</code></td>
+          <td><code>0x04</code></td>
+          <td><code>APPEND_CHILD</code></td>
+          <td><code>parentReg, childReg</code></td>
+          <td>Appends node in <code>childReg</code> to parent node in <code>parentReg</code>.</td>
+        </tr>
+        <tr>
+          <td><code>5</code></td>
+          <td><code>0x05</code></td>
+          <td><code>SET_ATTR</code></td>
+          <td><code>elemReg, nameIdx, valIdx, isDynamic</code></td>
+          <td>Sets attribute/property or registers delegated event handler on <code>elemReg</code>.</td>
+        </tr>
+        <tr>
+          <td><code>7</code></td>
+          <td><code>0x07</code></td>
+          <td><code>INTERPOLATE_TEXT</code></td>
+          <td><code>dstReg, exprIdx</code></td>
+          <td>Evaluates dynamic expression and creates an in-place bound TextNode into <code>dstReg</code>.</td>
+        </tr>
+        <tr>
+          <td><code>12</code></td>
+          <td><code>0x0C</code></td>
+          <td><code>EXEC_SCRIPT</code></td>
+          <td><code>scriptIdx</code></td>
+          <td>Executes component <code>&lt;script&gt;</code> statements to populate VM scope.</td>
+        </tr>
+        <tr>
+          <td><code>13</code></td>
+          <td><code>0x0D</code></td>
+          <td><code>REACTIVE_IF</code></td>
+          <td><code>parentReg, condIdx, consIdx, altIdx, depsIdx</code></td>
+          <td>Anchors <code>&#64;if</code> block between comment delimiters with isolated re-renders.</td>
+        </tr>
+        <tr>
+          <td><code>14</code></td>
+          <td><code>0x0E</code></td>
+          <td><code>REACTIVE_FOR</code></td>
+          <td><code>parentReg, iterIdx, itemIdx, idxIdx, keyIdx, bodyIdx, depsIdx</code></td>
+          <td>Keyed loop region with LIS-based reconciler (<code>reconcileKeyedList</code>).</td>
+        </tr>
+        <tr>
+          <td><code>15</code></td>
+          <td><code>0x0F</code></td>
+          <td><code>MOUNT_COMPONENT</code></td>
+          <td><code>dstReg, tagIdx, propsSpecIdx</code></td>
+          <td>Instantiates and mounts a child component sub-module into <code>dstReg</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

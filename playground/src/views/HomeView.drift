@@ -1,0 +1,203 @@
+<script>
+  import { RouterLink } from 'driftjs-router';
+  import { CounterContext } from '../context.js';
+
+  const counterStore = CounterContext.inject();
+
+  let counter = counterStore ? counterStore.counter : 0;
+  let historyLogs = counterStore ? counterStore.historyLogs : [];
+
+  function increment() {
+    if (counterStore) {
+      counterStore.increment();
+      counter = counterStore.counter;
+      historyLogs = counterStore.historyLogs;
+    } else {
+      counter++;
+      historyLogs = ['Incremented to ' + counter, ...historyLogs.slice(0, 4)];
+    }
+  }
+
+  function decrement() {
+    if (counterStore) {
+      counterStore.decrement();
+      counter = counterStore.counter;
+      historyLogs = counterStore.historyLogs;
+    } else {
+      counter--;
+      historyLogs = ['Decremented to ' + counter, ...historyLogs.slice(0, 4)];
+    }
+  }
+
+  function reset() {
+    if (counterStore) {
+      counterStore.reset();
+      counter = counterStore.counter;
+      historyLogs = counterStore.historyLogs;
+    } else {
+      counter = 0;
+      historyLogs = ['Reset counter to 0', ...historyLogs.slice(0, 4)];
+    }
+  }
+</script>
+
+<div class="view-container">
+  <!-- Hero Section -->
+  <section class="hero-card">
+    <div class="badge-row">
+      <span class="pill-badge pill-purple">Register VM</span>
+      <span class="pill-badge pill-blue">AOT Bytecode</span>
+      <span class="pill-badge pill-green">Zero-VDOM</span>
+    </div>
+    <h1 class="hero-title">High-Performance Reactivity Engine &amp; AOT Compiler</h1>
+    <p class="hero-subtitle">
+      DriftJS replaces traditional virtual DOM diffing and proxy graphs with a lightweight 256-register Virtual Machine executing build-time compiled bytecode directly in the browser and on the server.
+    </p>
+    <div class="hero-cta-row">
+      <RouterLink to="/docs/intro" label="📖 Read Documentation" class="btn btn-hero-primary" />
+      <RouterLink to="/benchmarks" label="⚡ Run Live Benchmarks" class="btn btn-hero-secondary" />
+      <RouterLink to="/pioneers" label="👤 View Pioneers Directory" class="btn btn-hero-outline" />
+    </div>
+  </section>
+
+  <!-- Interactive Quick Counter Demo -->
+  <section class="demo-section">
+    <div class="section-header">
+      <h2>Interactive Live VM Counter Demo</h2>
+      <p>State mutations schedule microtask batch updates that patch DOM text nodes in-place without tree re-rendering.</p>
+    </div>
+
+    <div class="demo-card">
+      <div class="counter-display">
+        <span class="counter-label">Current VM State</span>
+        <div class="counter-number">{counter}</div>
+        <div class="status-pill">
+          @if counter === 0 {
+            <span class="badge badge-zero">Neutral (0)</span>
+          } @else if counter > 0 {
+            <span class="badge badge-positive">Positive (+{counter})</span>
+          } @else {
+            <span class="badge badge-negative">Negative ({counter})</span>
+          }
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-danger" onclick={decrement}>- Decrement (-1)</button>
+        <button class="btn btn-outline" onclick={reset}>↺ Reset</button>
+        <button class="btn btn-success" onclick={increment}>+ Increment (+1)</button>
+      </div>
+
+      <div class="log-box">
+        <h4>Recent Mutation Microtasks:</h4>
+        @if historyLogs.length === 0 {
+          <p class="empty-log">No mutations triggered yet. Click a button above!</p>
+        } @else {
+          <ul class="log-list">
+            @for log in historyLogs {
+              <li class="log-item"><code>⚡ {log}</code></li>
+            }
+          </ul>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Core Architecture Pillars -->
+  <section class="features-section">
+    <div class="section-header">
+      <h2>Architectural Pillars</h2>
+      <p>Designed from first principles for computational efficiency, predictable memory usage, and zero runtime bloat.</p>
+    </div>
+
+    <div class="grid-cards">
+      <div class="feature-card">
+        <div class="card-icon">🧠</div>
+        <h3>256 Register VM</h3>
+        <p>Instructions operate on dedicated registers (<code>r0..r255</code>), avoiding call stack allocations and garbage collection overhead.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="card-icon">🎯</div>
+        <h3>In-Place DOM Patching</h3>
+        <p>No VDOM diffing tree walks. <code>INTERPOLATE_TEXT</code> and <code>SET_ATTR</code> mutate targeted DOM nodes directly in O(1) time.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="card-icon">🌐</div>
+        <h3>Native Context API</h3>
+        <p>Type-safe dependency injection with VM prototype chain inheritance, eliminating props-drilling across deep component trees.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="card-icon">🧭</div>
+        <h3>Client-Side SPA Router</h3>
+        <p>Full-featured routing engine with HTML5 history, hash navigation, dynamic route matching, and nested outlets (<code>&lt;RouterView /&gt;</code>).</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="card-icon">🌊</div>
+        <h3>SSR &amp; TreeWalker Hydration</h3>
+        <p>Fast server serialization to valid HTML with comment delimiters and DOM hydration claiming via browser TreeWalker cursor.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="card-icon">📦</div>
+        <h3>AOT Single File Components</h3>
+        <p>Authored in declarative <code>.drift</code> files with <code>&#64;if</code>, <code>&#64;for</code>, and <code>&#64;switch</code> directives, compiled at build time by Vite.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison Matrix -->
+  <section class="comparison-section">
+    <div class="section-header">
+      <h2>Architecture Comparison Matrix</h2>
+      <p>How DriftJS compares against virtual DOM and compiler-driven frontend frameworks.</p>
+    </div>
+
+    <div class="table-card">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Architecture Dimension</th>
+            <th>DriftJS</th>
+            <th>React</th>
+            <th>Vue 3</th>
+            <th>Svelte 5</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Reactivity Engine</strong></td>
+            <td><span class="highlight-good">Register VM Bytecode</span></td>
+            <td>Virtual DOM Diffing</td>
+            <td>Proxy Graphs + VDOM</td>
+            <td>Runes + Signals</td>
+          </tr>
+          <tr>
+            <td><strong>Update Complexity</strong></td>
+            <td><span class="highlight-good">O(1) In-Place Patching</span></td>
+            <td>O(N) Tree Reconciliation</td>
+            <td>O(N) Block Tree Diffing</td>
+            <td>O(1) Signal Triggering</td>
+          </tr>
+          <tr>
+            <td><strong>Memory Overhead</strong></td>
+            <td><span class="highlight-good">Minimal (Fixed Registers)</span></td>
+            <td>High (Fiber Tree Nodes)</td>
+            <td>Moderate (VNodes)</td>
+            <td>Low (DOM closures)</td>
+          </tr>
+          <tr>
+            <td><strong>CSP Compliance</strong></td>
+            <td><span class="highlight-good">100% (No eval / No new Function)</span></td>
+            <td>100%</td>
+            <td>100%</td>
+            <td>100%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

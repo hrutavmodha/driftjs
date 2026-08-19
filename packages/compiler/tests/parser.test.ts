@@ -359,5 +359,14 @@ describe('DriftParser', () => {
     expect(pNode.type).toBe(ASTNodeType.Element);
     expect(pNode.tagName).toBe('p');
   });
+
+  it('decodes HTML character entities in text nodes and attributes', () => {
+    const src = '<div>Current: &#123;count&#125; &amp; &lt;h1&gt; &#64;if &quot;hello&quot;</div>';
+    const ast = new DriftParser(new DriftLexer(src)).parse();
+    const div = ast.body[0] as ElementNode;
+    const text = div.children[0] as TextNode;
+    expect(text.type).toBe(ASTNodeType.Text);
+    expect(text.content).toBe('Current: {count} & <h1> @if "hello"');
+  });
 });
 

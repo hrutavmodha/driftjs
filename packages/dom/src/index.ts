@@ -448,6 +448,7 @@ export class DriftClientVM {
           // Track child regions registered by sub-module renders so we can remove
           // stale ones before each re-render (prevents parentNode-null crashes).
           let childRegions: ReactiveRegion[] = [];
+          let ifRegion: ReactiveRegion | null = null;
 
           const renderIf = () => {
             for (const r of childRegions) {
@@ -471,6 +472,9 @@ export class DriftClientVM {
               }
             }
             childRegions = vm.reactiveRegions.slice(before);
+            if (ifRegion) {
+              ifRegion.childRegions = childRegions;
+            }
           };
           renderIf();
 
@@ -481,7 +485,7 @@ export class DriftClientVM {
             }
           }
 
-          const ifRegion: ReactiveRegion = {
+          ifRegion = {
             deps,
             reRender: () => {
               renderIf();

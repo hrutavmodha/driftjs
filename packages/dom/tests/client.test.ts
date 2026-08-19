@@ -1380,6 +1380,42 @@ describe('DriftClientVM', () => {
     expect(updatedStyle).toContain('border-radius: 24px');
     expect(updatedStyle).toContain('opacity: 0');
   });
+
+  it('correctly evaluates dynamic expression props passed to components', () => {
+    const childSrc = `
+      <script>
+        let label = props.label || '';
+        let to = props.to || '';
+      </script>
+      <a href={to}>{label}</a>
+    `;
+    const childLexer = new DriftLexer(childSrc);
+    const childParser = new DriftParser(childLexer);
+    const childAst = childParser.parse();
+    const childMod = new DriftGenerator(new DriftTransformer(childAst).transform()).generate();
+
+    const parentSrc = `
+      <script>
+        let p = { id: 'ada', name: 'Ada' };
+      </script>
+      <div>
+        <Link to={'/pioneers/' + p.id} label={'View Profile →'} />
+      </div>
+    `;
+    const parentLexer = new DriftLexer(parentSrc);
+    const parentParser = new DriftParser(parentLexer);
+    const parentAst = parentParser.parse();
+    const parentMod = new DriftGenerator(new DriftTransformer(parentAst).transform()).generate();
+    (parentMod as any).scope = { Link: childMod };
+
+    const vmInstance = new DriftClientVM();
+    const root = vmInstance.execute(parentMod, { document }) as HTMLElement;
+
+    const link = root.querySelector('a');
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute('href')).toBe('/pioneers/ada');
+    expect(link?.textContent).toBe('View Profile →');
+  });
 });
 
 

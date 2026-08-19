@@ -1,0 +1,72 @@
+<div class="view-container">
+  <div class="header-card">
+    <div class="badge-row">
+      <span class="pill-badge pill-purple">DriftJS Evolution</span>
+      <span class="pill-badge pill-blue">Open Source</span>
+    </div>
+    <h1>🚀 DriftJS Product Roadmap &amp; Release History</h1>
+    <p>Track current milestones, upcoming initiatives, and architecture enhancements.</p>
+  </div>
+
+  <div class="grid-cards">
+    <div class="roadmap-card completed">
+      <div class="roadmap-status">✅ Completed (v0.0.7)</div>
+      <h3>Native Client-Side SPA Router</h3>
+      <p>Full-featured routing package (<code>driftjs-router</code>) with HTML5 web history, hash routing, in-memory driver, dynamic parameter extraction, nested outlets (<code>&lt;RouterView /&gt;</code>), and navigation guards.</p>
+    </div>
+
+    <div class="roadmap-card completed">
+      <div class="roadmap-status">✅ Completed (v0.0.7)</div>
+      <h3>Type-Safe Global Context API</h3>
+      <p>Hierarchical VM scope dependency injection (<code>createContext</code>, <code>provide</code>, <code>inject</code>) with zero props drilling, full client DOM and SSR support.</p>
+    </div>
+
+    <div class="roadmap-card in-progress">
+      <div class="roadmap-status">🚧 In Progress</div>
+      <h3>Official Documentation Website</h3>
+      <p>Building the production documentation website dogfooding DriftJS itself to test real-world ergonomics and developer experience.</p>
+    </div>
+
+    <div class="roadmap-card planned">
+      <div class="roadmap-status">📋 Planned (v0.1.0)</div>
+      <h3>Chrome &amp; Firefox DevTools Extension</h3>
+      <p>Live register VM inspection, bytecode disassembly viewer, and real-time reactive dependency graph visualizer.</p>
+    </div>
+
+    <div class="roadmap-card planned">
+      <div class="roadmap-status">📋 Planned (v0.2.0)</div>
+      <h3>Streaming SSR &amp; Selective Hydration</h3>
+      <p>Asynchronous boundary streaming with progressive TreeWalker hydration for sub-millisecond Time to Interactive (TTI).</p>
+    </div>
+  </div>
+
+  <div class="section-header" style="margin-top: 1.5rem;">
+    <h2>📦 Version Release History</h2>
+  </div>
+
+  <div class="release-timeline">
+    <div class="release-item">
+      <div class="release-tag">v0.0.7</div>
+      <div class="release-content">
+        <h4>Native Client-Side Router &amp; Context Mechanism</h4>
+        <p>Introduced <code>driftjs-router</code> package, separated <code>MOUNT_COMPONENT</code> opcode (0x0F), and implemented complete global Context API.</p>
+      </div>
+    </div>
+
+    <div class="release-item">
+      <div class="release-tag">v0.0.6</div>
+      <div class="release-content">
+        <h4>React-like Style Object &amp; Dynamic CSS Reactivity</h4>
+        <p>Added camelCase property normalization, auto-unit appending, and in-place reactive style patching.</p>
+      </div>
+    </div>
+
+    <div class="release-item">
+      <div class="release-tag">v0.0.5</div>
+      <div class="release-content">
+        <h4>LIS Keyed List Reconciler &amp; TreeWalker Hydration</h4>
+        <p>Implemented Longest Increasing Subsequence keyed list reconciliation and client TreeWalker hydration cursor claiming.</p>
+      </div>
+    </div>
+  </div>
+</div>

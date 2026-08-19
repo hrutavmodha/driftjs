@@ -1,0 +1,32 @@
+<div class="docs-article">
+  <h1>5. Server-Side Rendering &amp; Hydration</h1>
+  <p class="lead-text">
+    DriftJS provides headless server-side rendering (<code>driftjs-ssr</code>) and browser TreeWalker DOM hydration (<code>driftjs-dom</code>).
+  </p>
+
+  <hr class="divider" />
+
+  <h2>Server Rendering (Node.js / Edge)</h2>
+  <p>
+    <code>DriftServerVM</code> executes compiled bytecode without relying on browser globals (<code>window</code> or <code>document</code>), constructing a virtual server tree that serializes to valid HTML:
+  </p>
+  <div class="code-block">
+    <pre><code>import &#123; renderToString &#125; from 'driftjs-ssr';
+import App from './src/App.drift';
+
+const html = renderToString(App, &#123;
+  scope: &#123; user: &#123; name: 'Ada' &#125; &#125;
+&#125;);</code></pre>
+  </div>
+
+  <h2>Hydration Cursor (Client)</h2>
+  <p>
+    On the client, <code>hydrate(component, container)</code> uses a browser <code>TreeWalker</code> (<code>HydrationCursor</code>) to claim existing server-rendered HTML nodes and comment delimiters (<code>&lt;!--if--&gt;</code>, <code>&lt;!--for--&gt;</code>) without destroying and recreating the DOM tree.
+  </p>
+  <div class="code-block">
+    <pre><code>import &#123; hydrate &#125; from 'driftjs-dom';
+import App from './App.drift';
+
+hydrate(App, document.getElementById('app'));</code></pre>
+  </div>
+</div>

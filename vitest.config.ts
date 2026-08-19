@@ -1,7 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
+import { driftPlugin } from './packages/vite-plugin/src/index.js';
 
 export default defineConfig({
+  plugins: [driftPlugin()],
   test: {
     projects: [
       {
@@ -40,9 +42,25 @@ export default defineConfig({
         },
       },
       {
+        plugins: [driftPlugin()],
         test: {
           name: 'dom',
           include: ['packages/dom/tests/**/*.test.ts'],
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            instances: [
+              { browser: 'chromium' },
+            ],
+            headless: true,
+          },
+        },
+      },
+      {
+        plugins: [driftPlugin()],
+        test: {
+          name: 'router',
+          include: ['packages/router/tests/**/*.test.ts'],
           browser: {
             enabled: true,
             provider: playwright(),

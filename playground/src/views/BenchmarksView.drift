@@ -1,0 +1,146 @@
+<script>
+  let items = [];
+  let nextId = 1;
+  let lastTimeMs = 0;
+  let operationName = 'None';
+
+  const adjectives = ['Quantum', 'Atomic', 'Hyper', 'Turbo', 'Neural', 'Cyber', 'Nano', 'Zero-VDOM', 'Blazing', 'Reactive'];
+  const nouns = ['Engine', 'Register', 'Bytecode', 'Reconciler', 'Compiler', 'Cursor', 'Hydrator', 'Pipeline', 'Signal', 'Fiber'];
+
+  function generateRows(count) {
+    const list = [];
+    for (let i = 0; i < count; i++) {
+      const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+      const noun = nouns[Math.floor(Math.random() * nouns.length)];
+      list.push({
+        id: nextId++,
+        label: adj + ' ' + noun + ' #' + nextId,
+        selected: false
+      });
+    }
+    return list;
+  }
+
+  function render100() {
+    const t0 = performance.now();
+    items = generateRows(100);
+    operationName = 'Render 100 Rows';
+    requestAnimationFrame(() => {
+      lastTimeMs = Math.round((performance.now() - t0) * 100) / 100;
+    });
+  }
+
+  function render1000() {
+    const t0 = performance.now();
+    items = generateRows(1000);
+    operationName = 'Render 1,000 Rows';
+    requestAnimationFrame(() => {
+      lastTimeMs = Math.round((performance.now() - t0) * 100) / 100;
+    });
+  }
+
+  function clearRows() {
+    const t0 = performance.now();
+    items = [];
+    operationName = 'Clear All Rows';
+    requestAnimationFrame(() => {
+      lastTimeMs = Math.round((performance.now() - t0) * 100) / 100;
+    });
+  }
+
+  function swapRows() {
+    if (items.length < 2) return;
+    const t0 = performance.now();
+    const copy = [...items];
+    const temp = copy[1];
+    copy[1] = copy[copy.length - 2];
+    copy[copy.length - 2] = temp;
+    items = copy;
+    operationName = 'Swap Row #2 & #' + (items.length - 1);
+    requestAnimationFrame(() => {
+      lastTimeMs = Math.round((performance.now() - t0) * 100) / 100;
+    });
+  }
+
+  function updateEvery10th() {
+    if (items.length === 0) return;
+    const t0 = performance.now();
+    const copy = items.map((item, idx) => {
+      if (idx % 10 === 0) {
+        return { ...item, label: item.label + ' (Updated ⚡)' };
+      }
+      return item;
+    });
+    items = copy;
+    operationName = 'Update Every 10th Row';
+    requestAnimationFrame(() => {
+      lastTimeMs = Math.round((performance.now() - t0) * 100) / 100;
+    });
+  }
+</script>
+
+<div class="view-container">
+  <div class="header-card">
+    <div class="badge-row">
+      <span class="pill-badge pill-green">LIS Reconciler</span>
+      <span class="pill-badge pill-purple">In-Place Fast Path</span>
+    </div>
+    <h1>⚡ Live Keyed List Reconciler Benchmark</h1>
+    <p>Test DriftJS's register VM list reconciliation performance with Longest Increasing Subsequence algorithm.</p>
+  </div>
+
+  <!-- Benchmark Action Controls -->
+  <div class="control-center">
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick={render100}>Create 100 Rows</button>
+      <button class="btn btn-success" onclick={render1000}>Create 1,000 Rows</button>
+      <button class="btn btn-warning" onclick={updateEvery10th}>Update Every 10th</button>
+      <button class="btn btn-secondary" onclick={swapRows}>Swap Rows</button>
+      <button class="btn btn-danger" onclick={clearRows}>Clear All</button>
+    </div>
+  </div>
+
+  <!-- Performance Summary Card -->
+  <div class="benchmark-stats">
+    <div class="stat-box">
+      <span class="stat-num">{items.length}</span>
+      <span class="stat-label">Active List Items</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-num">{lastTimeMs} ms</span>
+      <span class="stat-label">JS Execution Time</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-num">{operationName}</span>
+      <span class="stat-label">Last Operation</span>
+    </div>
+  </div>
+
+  <!-- Items Table -->
+  <div class="table-card">
+    @if items.length === 0 {
+      <div class="empty-bench">
+        <p>No items in list. Click a button above to generate rows!</p>
+      </div>
+    } @else {
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th style="width: 80px;">ID</th>
+            <th>Label Description</th>
+            <th style="width: 120px;">Reactivity</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for row in items {
+            <tr>
+              <td><code>#{row.id}</code></td>
+              <td><strong>{row.label}</strong></td>
+              <td><span class="pill-badge pill-green">In-Place</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</div>

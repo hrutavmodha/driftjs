@@ -1,143 +1,103 @@
 <script>
-  import {
-    UserContext,
-    ThemeContext,
-    NotificationContext,
-    createUserStore,
-    createThemeStore,
-    createNotificationStore
-  } from './context';
-  import Header from './Header.drift';
-  import UserProfile from './UserProfile.drift';
-  import SubtreeOverride from './SubtreeOverride.drift';
-  import NestedChild from './NestedChild.drift';
-  import ReactiveStyleCard from './ReactiveStyleCard.drift';
+  import { RouterContext, RouterView, RouterLink } from 'driftjs-router';
+  import { CounterContext } from './context.js';
+  import { router } from './routes';
 
-  // 1. Instantiate root reactive stores
-  const rootUserStore = createUserStore({
-    name: 'Ada Lovelace',
-    role: 'Lead Architect',
-    avatar: '👩‍💻'
-  });
+  RouterContext.provide(router);
 
-  const rootThemeStore = createThemeStore({
-    mode: 'light',
-    accentColor: '#3b82f6',
-    fontFamily: 'Inter, system-ui, sans-serif'
-  });
+  let counterState = {
+    counter: 0,
+    historyLogs: [],
+  };
 
-  const rootNoticeStore = createNotificationStore({
-    unreadCount: 4,
-    latestNotice: 'Context API initialized successfully'
-  });
-
-  // 2. Provide root stores into root VM Context
-  UserContext.provide(rootUserStore);
-  ThemeContext.provide(rootThemeStore);
-  NotificationContext.provide(rootNoticeStore);
-
-  // 3. Local reactive variables for root UI feedback
-  let currentUserName = rootUserStore.user.name;
-  let currentThemeMode = rootThemeStore.theme.mode;
-  let currentAccent = rootThemeStore.theme.accentColor;
-  let currentNotice = rootNoticeStore.notice.latestNotice;
-
-  rootUserStore.subscribe((u) => {
-    currentUserName = u.name;
-  });
-
-  rootThemeStore.subscribe((t) => {
-    currentThemeMode = t.mode;
-    currentAccent = t.accentColor;
-  });
-
-  rootNoticeStore.subscribe((n) => {
-    currentNotice = n.latestNotice;
-  });
-
-  // Action methods to mutate context
-  function selectUser(name, role, avatar) {
-    rootUserStore.setUser({ name, role, avatar });
+  function increment() {
+    counterState.counter++;
+    counterState.historyLogs = ['Incremented to ' + counterState.counter, ...counterState.historyLogs.slice(0, 4)];
   }
 
-  function toggleRootTheme() {
-    rootThemeStore.toggleMode();
+  function decrement() {
+    counterState.counter--;
+    counterState.historyLogs = ['Decremented to ' + counterState.counter, ...counterState.historyLogs.slice(0, 4)];
   }
 
-  function setRootAccent(color) {
-    rootThemeStore.setAccentColor(color);
+  function reset() {
+    counterState.counter = 0;
+    counterState.historyLogs = ['Reset counter to 0', ...counterState.historyLogs.slice(0, 4)];
   }
 
-  function triggerAlert() {
-    rootNoticeStore.increment();
+  CounterContext.provide({
+    get counter() {
+      return counterState.counter;
+    },
+    get historyLogs() {
+      return counterState.historyLogs;
+    },
+    increment,
+    decrement,
+    reset,
+  });
+
+  let activePath = router.currentRoute.fullPath;
+  let activeName = router.currentRoute.name || 'unnamed';
+
+  if (router && typeof router.subscribe === 'function') {
+    router.subscribe((to) => {
+      activePath = to.fullPath;
+      activeName = to.name || 'unnamed';
+    });
   }
 
-  function clearAllNotices() {
-    rootNoticeStore.clear();
+  function goBack() {
+    router.back();
+  }
+
+  function goForward() {
+    router.forward();
+  }
+
+  function navigateTo(path) {
+    router.push(path);
   }
 </script>
 
 <div class="playground-layout">
-  <Header 
-    title="DriftJS Context API Playground" 
-    subtitle="Hierarchical VM Scope & Reactive Dependency Injection" 
-  />
-
-  <section class="control-center">
-    <div class="control-group">
-      <label class="control-label">Mutate UserContext:</label>
-      <div class="btn-row">
-        <button class="btn btn-primary" onClick={() => selectUser('Ada Lovelace', 'Lead Architect', '👩‍💻')}>👩‍💻 Ada</button>
-        <button class="btn btn-primary" onClick={() => selectUser('Alan Turing', 'Cryptanalyst & Pioneer', '👨‍🔬')}>👨‍🔬 Alan</button>
-        <button class="btn btn-primary" onClick={() => selectUser('Grace Hopper', 'Compiler Pioneer', '🚀')}>🚀 Grace</button>
-        <button class="btn btn-primary" onClick={() => selectUser('Linus Torvalds', 'Kernel Maintainer', '🐧')}>🐧 Linus</button>
+  <header class="playground-header">
+    <div class="brand-title">
+      <span class="logo-mark">⚡</span>
+      <div>
+        <h1>DriftJS Playground</h1>
+        <p class="subtitle">AOT Register Virtual Machine &amp; Native Client-Side Router</p>
       </div>
     </div>
-
-    <div class="control-group">
-      <label class="control-label">Mutate ThemeContext:</label>
-      <div class="btn-row">
-        <button class="btn btn-secondary" onClick={toggleRootTheme}>Toggle Mode ({currentThemeMode})</button>
-        <button class="btn btn-color" style="background: #3b82f6; color: white;" onClick={() => setRootAccent('#3b82f6')}>Blue</button>
-        <button class="btn btn-color" style="background: #10b981; color: white;" onClick={() => setRootAccent('#10b981')}>Emerald</button>
-        <button class="btn btn-color" style="background: #8b5cf6; color: white;" onClick={() => setRootAccent('#8b5cf6')}>Violet</button>
-        <button class="btn btn-color" style="background: #f97316; color: white;" onClick={() => setRootAccent('#f97316')}>Orange</button>
-      </div>
+    <div class="header-user-status">
+      <span class="badge">v0.0.7 Active</span>
     </div>
+  </header>
 
-    <div class="control-group">
-      <label class="control-label">Mutate NotificationContext:</label>
-      <div class="btn-row">
-        <button class="btn btn-warning" onClick={triggerAlert}>Trigger Alert (+1)</button>
-        <button class="btn btn-outline" onClick={clearAllNotices}>Clear Alerts</button>
-        <span class="notice-preview">Active Notice: {currentNotice}</span>
-      </div>
+  <nav class="nav-bar">
+    <RouterLink to="/" label="🏠 Home" class="nav-link" />
+    <RouterLink to="/docs/intro" label="📚 Documentation" class="nav-link" />
+    <RouterLink to="/pioneers" label="👤 Pioneers Directory" class="nav-link" />
+    <RouterLink to="/benchmarks" label="⚡ Benchmarks" class="nav-link" />
+    <RouterLink to="/roadmap" label="🗺️ Roadmap" class="nav-link" />
+  </nav>
+
+  <section class="router-inspector">
+    <div class="inspector-path">
+      <span>Active Route:</span>
+      <code>{activePath}</code>
+      <span>(Name: <em>{activeName}</em>)</span>
+    </div>
+    <div class="inspector-actions">
+      <button class="btn-nav-action" onclick={goBack}>⬅ Back</button>
+      <button class="btn-nav-action" onclick={goForward}>➡ Forward</button>
+      <button class="btn-nav-action" onclick={() => navigateTo('/pioneers/ada?tab=achievements')}>Ada Profile</button>
+      <button class="btn-nav-action" onclick={() => navigateTo('/docs/vm')}>VM Docs</button>
+      <button class="btn-nav-action" onclick={() => navigateTo('/non-existent-page')}>404 Test</button>
     </div>
   </section>
 
   <main class="playground-body">
-    <section class="panel">
-      <h2>1. Direct Context Consumer (User & Theme)</h2>
-      <p class="description">This component injects <code>UserContext</code> and <code>ThemeContext</code> directly from the root VM. Notice how changes above immediately update this card.</p>
-      <UserProfile />
-    </section>
-
-    <section class="panel">
-      <h2>2. Deep Context Consumer (Grandparent ➔ DeepChild)</h2>
-      <p class="description">This child directly inherits root context across component hierarchy without props drilling.</p>
-      <NestedChild />
-    </section>
-
-    <section class="panel">
-      <h2>3. Subtree Context Shadowing Branch</h2>
-      <p class="description">This subtree re-provides an independent <code>ThemeContext</code>. Changing the subtree branch does NOT affect sibling panels above!</p>
-      <SubtreeOverride />
-    </section>
-
-    <section class="panel">
-      <h2>4. Live CSS & Style Attribute Reactivity</h2>
-      <p class="description">Test dynamic CSS attribute patching in real time with color inputs, range sliders, and presets.</p>
-      <ReactiveStyleCard />
-    </section>
+    <RouterView />
   </main>
 </div>

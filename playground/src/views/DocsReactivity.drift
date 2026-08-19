@@ -1,0 +1,34 @@
+<div class="docs-article">
+  <h1>3. Fine-Grained Reactivity Engine</h1>
+  <p class="lead-text">
+    DriftJS uses a direct dependency indexing model combined with microtask change batching, bypassing virtual DOM overhead completely.
+  </p>
+
+  <hr class="divider" />
+
+  <h2>Change Notification &amp; Microtask Batching</h2>
+  <p>
+    When a variable in the component scope is modified (e.g. <code>count++</code>), the VM invokes <code>markDirty('count')</code>. All dirty variables are collected in a <code>Set&lt;string&gt;</code> and processed in a single batched microtask via <code>queueMicrotask()</code>:
+  </p>
+
+  <div class="code-block">
+    <pre><code>// In DriftClientVM:
+public markDirty(varName: string): void &#123;
+  this.pendingDirtyVars.add(varName);
+  if (!this.isUpdateScheduled) &#123;
+    this.isUpdateScheduled = true;
+    queueMicrotask(() =&gt; this.flushUpdates());
+  &#125;
+&#125;</code></pre>
+  </div>
+
+  <h2>Reactive Bindings &amp; In-Place DOM Patching</h2>
+  <p>
+    The compiler records a table of <code>ReactiveBinding</code> structures mapping variable names to exact program counter (<code>pc</code>) bytecode positions. When <code>triggerUpdates(changedVars)</code> runs:
+  </p>
+  <ul class="bullet-list">
+    <li><strong><code>INTERPOLATE_TEXT</code></strong>: Updates <code>textNode.nodeValue</code> directly in O(1) time.</li>
+    <li><strong><code>SET_ATTR</code></strong>: Mutates the element attribute, property, or style object in-place.</li>
+    <li><strong><code>REACTIVE_IF</code> / <code>REACTIVE_FOR</code></strong>: Re-renders only the reactive subtree situated strictly between DOM comment delimiters.</li>
+  </ul>
+</div>

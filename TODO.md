@@ -9,6 +9,6 @@
 - [ ] **Official DriftJS Documentation Website (Dogfooding)**
   - Build the complete official documentation and landing website using DriftJS itself to test real-world developer experience, performance, and ergonomics.
 
-- [ ] **Native Client-Side Router (`driftjs-router`)**
-  - Design and implement a dedicated client-side router package to support the DriftJS documentation website and SPAs.
-  - Features to evaluate: history & hash modes, dynamic route params, nested routes/outlets, scroll restoration, and navigation guards.
+- [x] **Native Client-Side Router (`driftjs-router`)**
+  - Designed and implemented a dedicated client-side router package with history, hash, and memory drivers, dynamic route parameters, nested routes/outlets, scroll restoration, and navigation guards.
+  - Complete with declarative `.drift` SFCs (`src/components/RouterView.drift`, `src/components/RouterLink.drift`, `src/components/Link.drift`), native component helpers, and 100% test coverage across 21 test suites.

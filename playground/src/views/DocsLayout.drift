@@ -1,0 +1,39 @@
+<script>
+  import { RouterView, RouterLink } from 'driftjs-router';
+</script>
+
+<div class="view-container">
+  <div class="docs-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="docs-sidebar">
+      <div class="sidebar-header">
+        <h3>📚 Documentation</h3>
+        <span class="docs-version">v0.0.7</span>
+      </div>
+
+      <nav class="docs-nav-menu">
+        <div class="nav-group">
+          <span class="nav-group-title">Getting Started</span>
+          <RouterLink to="/docs/intro" label="1. Introduction &amp; Syntax" class="docs-link" />
+        </div>
+
+        <div class="nav-group">
+          <span class="nav-group-title">Core Engine</span>
+          <RouterLink to="/docs/vm" label="2. Register Virtual Machine" class="docs-link" />
+          <RouterLink to="/docs/reactivity" label="3. Fine-Grained Reactivity" class="docs-link" />
+        </div>
+
+        <div class="nav-group">
+          <span class="nav-group-title">Ecosystem &amp; Web</span>
+          <RouterLink to="/docs/router" label="4. Client-Side Router" class="docs-link" />
+          <RouterLink to="/docs/ssr" label="5. SSR &amp; Hydration" class="docs-link" />
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Sub-Route Content Outlet -->
+    <main class="docs-content">
+      <RouterView />
+    </main>
+  </div>
+</div>

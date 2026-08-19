@@ -1,0 +1,37 @@
+<script>
+  import { RouterLink } from 'driftjs-router';
+
+  const pioneers = [
+    { id: 'ada', name: 'Ada Lovelace', tag: 'Algorithms', icon: '👩‍💻', summary: 'Published the first machine algorithm in 1843 for Babbage\'s Analytical Engine.' },
+    { id: 'alan', name: 'Alan Turing', tag: 'Computation', icon: '👨‍🔬', summary: 'Formulated the Turing Machine concept and broke Enigma ciphers at Bletchley Park.' },
+    { id: 'grace', name: 'Grace Hopper', tag: 'Compilers', icon: '🚀', summary: 'Pioneered compiler development and paved the way for modern machine-independent languages.' },
+    { id: 'margaret', name: 'Margaret Hamilton', tag: 'Software Engineering', icon: '🌌', summary: 'Led MIT software engineering team for the Apollo 11 Moon landing guidance system.' },
+    { id: 'linus', name: 'Linus Torvalds', tag: 'Operating Systems', icon: '🐧', summary: 'Created the open-source Linux kernel and the Git version control system.' },
+    { id: 'neumann', name: 'John von Neumann', tag: 'Architecture', icon: '🏛️', summary: 'Defined the stored-program architecture that powers all modern CPU register machines.' }
+  ];
+</script>
+
+<div class="view-container">
+  <div class="header-card">
+    <div class="badge-row">
+      <span class="pill-badge pill-purple">Dynamic Routing</span>
+      <span class="pill-badge pill-blue">/pioneers/:id</span>
+    </div>
+    <h1>Computing Pioneers Directory</h1>
+    <p>Click any pioneer to navigate to their dedicated dynamic route and test parameter extraction.</p>
+  </div>
+
+  <div class="grid-cards">
+    @for p in pioneers {
+      <div class="pioneer-card">
+        <div class="pioneer-card-header">
+          <span class="pioneer-avatar">{p.icon}</span>
+          <span class="pill-badge pill-blue">{p.tag}</span>
+        </div>
+        <h3>{p.name}</h3>
+        <p>{p.summary}</p>
+        <RouterLink to={'/pioneers/' + p.id} label={'View Profile →'} class="btn btn-outline btn-full" />
+      </div>
+    }
+  </div>
+</div>

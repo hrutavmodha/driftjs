@@ -12,6 +12,8 @@
       "driftjs-shared/*": ["./packages/utils/*"],
       "driftjs-vite-plugin": ["./packages/vite-plugin/src/index.ts"],
       "driftjs-vite-plugin/*": ["./packages/vite-plugin/*"],
+      "driftjs-router": ["./packages/router/src/index.ts"],
+      "driftjs-router/*": ["./packages/router/*"],
       "create-drift": ["./packages/cli/src/index.ts"],
       "create-drift/*": ["./packages/cli/*"],
       "drift-vscode": ["./packages/vscode-plugin/src/index.ts"],
@@ -24,6 +26,8 @@
       "@driftjs/ssr/*": ["./packages/ssr/*"],
       "@driftjs/utils": ["./packages/utils/src/index.ts"],
       "@driftjs/utils/*": ["./packages/utils/*"],
+      "@driftjs/router": ["./packages/router/src/index.ts"],
+      "@driftjs/router/*": ["./packages/router/*"],
       "@driftjs/vite-plugin": ["./packages/vite-plugin/src/index.ts"],
       "@driftjs/vite-plugin/*": ["./packages/vite-plugin/*"]
     },

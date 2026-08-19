@@ -1,0 +1,57 @@
+<div class="docs-article">
+  <h1>1. Introduction to DriftJS</h1>
+  <p class="lead-text">
+    DriftJS is a register Virtual Machine-based reactivity engine and AOT compiler for modern web applications and server-side rendering.
+  </p>
+
+  <hr class="divider" />
+
+  <h2>Single File Component (.drift) Format</h2>
+  <p>
+    DriftJS components combine component logic in a <code>&lt;script&gt;</code> block and declarative HTML markup containing template directives in a single <code>.drift</code> file:
+  </p>
+
+  <div class="code-block">
+    <pre><code>&lt;script&gt;
+  let count = 0;
+
+  function increment() {
+    count++;
+  }
+&lt;/script&gt;
+
+&lt;div class="counter-card"&gt;
+  &lt;h2&gt;Current Count: &#123;count&#125;&lt;/h2&gt;
+  &lt;button onclick=&#123;increment&#125;&gt;Increment&lt;/button&gt;
+&lt;/div&gt;</code></pre>
+  </div>
+
+  <h2>Template Directives</h2>
+  <p>DriftJS provides first-class template control flow directives:</p>
+
+  <div class="directive-card">
+    <h3>Conditional Directives: <code>&#64;if</code> / <code>&#64;else if</code> / <code>&#64;else</code></h3>
+    <p>Anchored dynamically between DOM comments (<code>&lt;!--if--&gt;</code> and <code>&lt;!--/if--&gt;</code>), swapping branches in-place when reactive condition dependencies change.</p>
+    <div class="code-block">
+      <pre><code>&#64;if status === 'active' &#123;
+  &lt;span class="badge active"&gt;Online&lt;/span&gt;
+&#125; &#64;else if status === 'away' &#123;
+  &lt;span class="badge away"&gt;Away&lt;/span&gt;
+&#125; &#64;else &#123;
+  &lt;span class="badge offline"&gt;Offline&lt;/span&gt;
+&#125;</code></pre>
+    </div>
+  </div>
+
+  <div class="directive-card">
+    <h3>Iterative Directive: <code>&#64;for item in items</code></h3>
+    <p>Reconciles list items with Longest Increasing Subsequence (LIS) algorithm to minimize DOM moves, accompanied by fast in-place attribute patching for unchanged rows.</p>
+    <div class="code-block">
+      <pre><code>&lt;ul&gt;
+  &#64;for user in userList &#123;
+    &lt;li key=&#123;user.id&#125;&gt;&#123;user.name&#125; - &#123;user.role&#125;&lt;/li&gt;
+  &#125;
+&lt;/ul&gt;</code></pre>
+    </div>
+  </div>
+</div>

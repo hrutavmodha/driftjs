@@ -1,0 +1,46 @@
+<script>
+  import { RouterContext } from '../router.js';
+
+  const router = RouterContext.inject();
+  let to = props.to || '/';
+  let replace = props.replace || false;
+  let target = props.target || '_self';
+  let rel = props.rel || '';
+  let customClass = props.class || '';
+  let label = props.label || props.title || '';
+
+  function computeHref() {
+    if (!router) return typeof to === 'string' ? to : (to && to.path ? to.path : '#');
+    return router.resolve(to).href;
+  }
+
+  function computeClass() {
+    if (!router) return customClass;
+    if (router.currentRoute.path === router.resolve(to).path) {
+      return (customClass ? customClass + ' ' : '') + ((props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active') + ' ' + (props.exactActiveClass || (router.options && router.options.linkExactActiveClass) || 'router-link-exact-active'));
+    }
+    if (router.resolve(to).path !== '/' && router.currentRoute.path.startsWith(router.resolve(to).path)) {
+      return (customClass ? customClass + ' ' : '') + (props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active');
+    }
+    return customClass;
+  }
+
+  function handleClick(e) {
+    if (e.defaultPrevented) return;
+    if (e.button !== 0) return;
+    if (target && target !== '_self') return;
+    if (e.metaKey || e.altKey || e.ctrlKey || e.shiftKey) return;
+
+    e.preventDefault();
+    if (!router) return;
+    if (replace) {
+      router.replace(to);
+    } else {
+      router.push(to);
+    }
+  }
+</script>
+
+<a href={computeHref()} class={computeClass()} target={target} rel={rel} onclick={handleClick}>
+  {label}
+</a>

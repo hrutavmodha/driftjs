@@ -1,0 +1,26 @@
+<script>
+  import { RouterContext, RouterLink } from 'driftjs-router';
+
+  const router = RouterContext.inject();
+
+  function getPath() {
+    return (router && router.currentRoute && router.currentRoute.path) || '/unknown';
+  }
+
+  let currentPath = getPath();
+
+  if (router && typeof router.subscribe === 'function') {
+    router.subscribe(() => {
+      currentPath = getPath();
+    });
+  }
+</script>
+
+<div class="view-container not-found-card">
+  <div class="not-found-icon">🔍 404</div>
+  <h2>Route Not Found</h2>
+  <p>No matched route registered for: <code>{currentPath}</code></p>
+  <div class="btn-row">
+    <RouterLink to="/" label="🏠 Return to Home" class="btn btn-primary" />
+  </div>
+</div>

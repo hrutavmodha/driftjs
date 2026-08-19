@@ -1,0 +1,35 @@
+<script>
+  import { RouterContext, RouterDepthContext } from '../router.js';
+
+  const router = RouterContext.inject();
+  const depth = RouterDepthContext.inject(0);
+  let CurrentComponent = null;
+
+  RouterDepthContext.provide(depth + 1);
+
+  function updateCurrentComponent() {
+    if (!router || !router.currentRoute || !router.currentRoute.matched || !router.currentRoute.matched[depth]) {
+      if (CurrentComponent !== null) {
+        CurrentComponent = null;
+      }
+      return;
+    }
+    if (CurrentComponent !== (router.currentRoute.matched[depth].components?.default || router.currentRoute.matched[depth].component || null)) {
+      CurrentComponent = router.currentRoute.matched[depth].components?.default || router.currentRoute.matched[depth].component || null;
+    }
+  }
+
+  updateCurrentComponent();
+
+  if (router && typeof router.subscribe === 'function') {
+    router.subscribe(() => {
+      updateCurrentComponent();
+    });
+  }
+</script>
+
+<div class="drift-router-view">
+  @if CurrentComponent {
+    <CurrentComponent />
+  }
+</div>

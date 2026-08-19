@@ -1,0 +1,161 @@
+<script>
+  import { RouterContext, RouterLink } from 'driftjs-router';
+
+  const router = RouterContext.inject();
+
+  const pioneerDb = {
+    ada: {
+      name: 'Ada Lovelace',
+      title: 'Countess of Lovelace, First Computer Programmer',
+      icon: '👩‍💻',
+      years: '1815 – 1852',
+      field: 'Algorithmic Computation',
+      bio: 'Augusta Ada King, Countess of Lovelace was an English mathematician and writer, chiefly known for her work on Charles Babbage\'s proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognize that the machine had applications beyond pure calculation.',
+      achievements: [
+        'Wrote Note G containing the first published computer algorithm (Bernoulli numbers calculation).',
+        'Envisioned computers manipulating symbols, music, and graphics, not just arithmetic.',
+        'Conceptualized software loops and conditional branching.'
+      ],
+      quote: '"The Analytical Engine weaves algebraic patterns just as the Jacquard loom weaves flowers and leaves."'
+    },
+    alan: {
+      name: 'Alan Turing',
+      title: 'Father of Modern Computer Science & Artificial Intelligence',
+      icon: '👨‍🔬',
+      years: '1912 – 1954',
+      field: 'Theoretical Computer Science & Cryptanalysis',
+      bio: 'Alan Mathison Turing OBE FRS was an English mathematician, computer scientist, logician, cryptanalyst, philosopher, and theoretical biologist. He played a pivotal role in cracking intercepted coded messages during World War II.',
+      achievements: [
+        'Devised the Universal Turing Machine model foundation for all modern CPUs.',
+        'Designed the Bombe machine to decipher German Enigma ciphers.',
+        'Formulated the Turing Test for machine intelligence.'
+      ],
+      quote: '"We can only see a short distance ahead, but we can see plenty there that needs to be done."'
+    },
+    grace: {
+      name: 'Grace Hopper',
+      title: 'Rear Admiral, Compiler Pioneer',
+      icon: '🚀',
+      years: '1906 – 1992',
+      field: 'Compiler Construction & Programming Languages',
+      bio: 'Grace Brewster Murray Hopper was an American computer scientist, mathematician, and United States Navy rear admiral. One of the first programmers of the Harvard Mark I computer, she was a pioneer of computer programming.',
+      achievements: [
+        'Created the A-0 System, one of the world\'s first compiler systems.',
+        'Championed the development of machine-independent programming languages (leading to COBOL).',
+        'Popularized the term "debugging" after finding an actual moth inside a Mark II computer relay.'
+      ],
+      quote: '"A ship in port is safe, but that\'s not what ships are built for. Sail out to sea and do new things."'
+    },
+    margaret: {
+      name: 'Margaret Hamilton',
+      title: 'Director of MIT Software Engineering for Apollo',
+      icon: '🌌',
+      years: '1936 – Present',
+      field: 'Asynchronous Systems & Software Engineering',
+      bio: 'Margaret Heafield Hamilton is an American computer scientist, systems engineer, and business owner. She was director of the Software Engineering Division of the MIT Instrumentation Laboratory, which developed on-board flight software for NASA\'s Apollo program.',
+      achievements: [
+        'Coined the term "Software Engineering" to establish software development as a rigorous engineering discipline.',
+        'Created asynchronous priority scheduling for the Apollo 11 Guidance Computer, preventing lunar landing abort.',
+        'Recipient of the Presidential Medal of Freedom.'
+      ],
+      quote: '"There was no second chance. We all knew that."'
+    },
+    linus: {
+      name: 'Linus Torvalds',
+      title: 'Creator of Linux & Git',
+      icon: '🐧',
+      years: '1969 – Present',
+      field: 'Operating Systems & Distributed Systems',
+      bio: 'Linus Benedict Torvalds is a Finnish-American software engineer who is the creator and historically the lead developer of the Linux kernel, used by Android, ChromeOS, and internet infrastructure worldwide.',
+      achievements: [
+        'Created the Linux kernel in 1991 from Helsinki, now powering billions of devices and top supercomputers.',
+        'Created Git in 2005 to manage distributed kernel development.',
+        'Recipient of the 2012 Millennium Technology Prize.'
+      ],
+      quote: '"Talk is cheap. Show me the code."'
+    },
+    neumann: {
+      name: 'John von Neumann',
+      title: 'Polymath & Architect of the Stored-Program Computer',
+      icon: '🏛️',
+      years: '1903 – 1957',
+      field: 'Computer Architecture & Quantum Logic',
+      bio: 'John von Neumann was a Hungarian-American mathematician, physicist, computer scientist, engineer and polymath. His seminal 1945 report "First Draft of a Report on the EDVAC" defined the architecture of modern register machines.',
+      achievements: [
+        'Formulated the Von Neumann Architecture (CPU, registers, control unit, memory, I/O).',
+        'Co-founded game theory and cellular automata.',
+        'Pioneered numerical meteorological forecasting and Monte Carlo simulations.'
+      ],
+      quote: '"If people do not believe that mathematics is simple, it is only because they do not realize how complicated life is."'
+    }
+  };
+
+  function getPioneer() {
+    if (!router || !router.currentRoute || !router.currentRoute.params) return pioneerDb.ada;
+    const id = router.currentRoute.params.id || 'ada';
+    return pioneerDb[id] || pioneerDb.ada;
+  }
+
+  function getPioneerId() {
+    return (router && router.currentRoute && router.currentRoute.params && router.currentRoute.params.id) || 'ada';
+  }
+
+  function getActiveTab() {
+    return (router && router.currentRoute && router.currentRoute.query && router.currentRoute.query.tab) || 'bio';
+  }
+
+  let pioneer = getPioneer();
+  let pid = getPioneerId();
+  let tab = getActiveTab();
+
+  if (router && typeof router.subscribe === 'function') {
+    router.subscribe(() => {
+      pioneer = getPioneer();
+      pid = getPioneerId();
+      tab = getActiveTab();
+    });
+  }
+</script>
+
+<div class="view-container">
+  <div class="header-card">
+    <div class="badge-row">
+      <RouterLink to="/pioneers" label="← Back to Directory" class="btn btn-outline btn-sm" />
+      <span class="pill-badge pill-purple">Route: /pioneers/{pid}</span>
+    </div>
+    <h1>👤 {pioneer.name}</h1>
+    <p class="subtitle">{pioneer.title} ({pioneer.years})</p>
+  </div>
+
+  <div class="profile-card">
+    <div class="profile-avatar">{pioneer.icon}</div>
+    <div class="profile-info">
+      <div class="badge-row">
+        <span class="pill-badge pill-blue">{pioneer.field}</span>
+      </div>
+      <blockquote class="pioneer-quote">{pioneer.quote}</blockquote>
+
+      <div class="tab-bar">
+        <RouterLink to={'/pioneers/' + pid + '?tab=bio'} label="📖 Biography" class="tab-btn" />
+        <RouterLink to={'/pioneers/' + pid + '?tab=achievements'} label="🏆 Key Achievements" class="tab-btn" />
+      </div>
+
+      <div class="tab-content">
+        @if tab === 'achievements' {
+          <div class="achieve-box">
+            <h3>Major Contributions:</h3>
+            <ul class="bullet-list">
+              @for ach in pioneer.achievements {
+                <li>{ach}</li>
+              }
+            </ul>
+          </div>
+        } @else {
+          <div class="bio-box">
+            <p>{pioneer.bio}</p>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

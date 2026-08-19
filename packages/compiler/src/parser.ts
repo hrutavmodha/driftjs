@@ -43,6 +43,58 @@ class ArrayTokenSource implements TokenSource {
 }
 
 /**
+ * Decodes standard named and numeric HTML character references in text nodes and attributes.
+ */
+export function decodeHTMLEntities(text: string): string {
+  if (!text || !text.includes('&')) return text;
+  return text.replace(/&(?:#(\d+)|#x([0-9a-fA-F]+)|([a-zA-Z0-9]+));/g, (match, dec, hex, named) => {
+    if (dec) {
+      const code = parseInt(dec, 10);
+      return String.fromCodePoint ? String.fromCodePoint(code) : String.fromCharCode(code);
+    }
+    if (hex) {
+      const code = parseInt(hex, 16);
+      return String.fromCodePoint ? String.fromCodePoint(code) : String.fromCharCode(code);
+    }
+    switch (named) {
+      case 'amp': return '&';
+      case 'lt': return '<';
+      case 'gt': return '>';
+      case 'quot': return '"';
+      case 'apos': return "'";
+      case 'nbsp': return '\u00A0';
+      case 'copy': return '©';
+      case 'reg': return '®';
+      case 'trade': return '™';
+      case 'mdash': return '—';
+      case 'ndash': return '–';
+      case 'hellip': return '…';
+      case 'laquo': return '«';
+      case 'raquo': return '»';
+      case 'ldquo': return '“';
+      case 'rdquo': return '”';
+      case 'lsquo': return '‘';
+      case 'rsquo': return '’';
+      case 'bull': return '•';
+      case 'times': return '×';
+      case 'divide': return '÷';
+      case 'plusmn': return '±';
+      case 'euro': return '€';
+      case 'pound': return '£';
+      case 'yen': return '¥';
+      case 'cent': return '¢';
+      case 'deg': return '°';
+      case 'para': return '¶';
+      case 'sect': return '§';
+      case 'micro': return 'µ';
+      case 'middot': return '·';
+      default:
+        return match;
+    }
+  });
+}
+
+/**
  * Parser for Drift template tokens producing a structured AST.
  *
  * The parser lazily pulls tokens from the lexer on demand and keeps a small
@@ -119,7 +171,7 @@ export class DriftParser {
       this.advance();
       return {
         type: ASTNodeType.Text,
-        content: token.value,
+        content: decodeHTMLEntities(token.value),
         loc: token.loc,
       };
     }
@@ -239,7 +291,7 @@ export class DriftParser {
         return {
           type: ASTNodeType.Attribute,
           name,
-          value: valueToken.value,
+          value: decodeHTMLEntities(valueToken.value),
           loc: { start: startLoc, end: valueToken.loc.end },
         };
       }

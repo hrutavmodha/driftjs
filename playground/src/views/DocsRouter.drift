@@ -1,0 +1,54 @@
+<div class="docs-article">
+  <h1>4. Client-Side SPA Router (driftjs-router)</h1>
+  <p class="lead-text">
+    <code>driftjs-router</code> provides single-page application navigation with history, hash, and memory drivers, dynamic route parameters, nested routes/outlets, and navigation guards.
+  </p>
+
+  <hr class="divider" />
+
+  <h2>Initializing the Router</h2>
+  <div class="code-block">
+    <pre><code>import &#123; createRouter, createWebHistory, createWebHashHistory &#125; from 'driftjs-router';
+import HomeView from './views/HomeView.drift';
+import UserDetailView from './views/UserDetailView.drift';
+
+export const router = createRouter(&#123;
+  history: createWebHistory(),
+  routes: [
+    &#123; path: '/', component: HomeView &#125;,
+    &#123; path: '/users/:id', component: UserDetailView &#125;,
+  ],
+&#125;);</code></pre>
+  </div>
+
+  <h2>Providing Router Context in App.drift</h2>
+  <p>Provide the router instance using DriftJS native Context API:</p>
+  <div class="code-block">
+    <pre><code>&lt;script&gt;
+  import &#123; RouterContext, RouterView, RouterLink &#125; from 'driftjs-router';
+  import &#123; router &#125; from './routes';
+
+  RouterContext.provide(router);
+&lt;/script&gt;
+
+&lt;nav&gt;
+  &lt;RouterLink to="/" label="Home" /&gt;
+  &lt;RouterLink to="/users/ada" label="Ada's Profile" /&gt;
+&lt;/nav&gt;
+
+&lt;main&gt;
+  &lt;RouterView /&gt;
+&lt;/main&gt;</code></pre>
+  </div>
+
+  <h2>Navigation Guards</h2>
+  <p>Protect routes and handle redirects with global and route-level guards:</p>
+  <div class="code-block">
+    <pre><code>router.beforeEach((to, from) =&gt; &#123;
+  if (to.path.startsWith('/admin') &amp;&amp; !isAuthenticated()) &#123;
+    return '/login';
+  &#125;
+  return true;
+&#125;);</code></pre>
+  </div>
+</div>

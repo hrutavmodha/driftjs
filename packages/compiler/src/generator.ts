@@ -164,7 +164,15 @@ export class DriftGenerator {
           } else if (typeof attr.value === 'string') {
             propsSpec[attr.name] = attr.value;
           } else if (attr.value.type === ASTNodeType.Interpolation) {
-            propsSpec[attr.name] = attr.value.expression;
+            const expr = attr.value.expression;
+            if (expr && typeof expr === 'object' && expr.type) {
+              const codeStr = astToJS(expr);
+              propsSpec[attr.name] = {
+                __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable) => (${codeStr})`
+              };
+            } else {
+              propsSpec[attr.name] = expr;
+            }
           }
         }
       }
@@ -732,15 +740,18 @@ export function astToJS(node: any, locals?: Set<string>): string {
     case 'ConditionalExpression':
       return `(${astToJS(node.test, locals)} ? ${astToJS(node.consequent, locals)} : ${astToJS(node.alternate, locals)})`;
 
-    case 'MemberExpression':
+    case 'MemberExpression': {
+      const opt = node.optional ? '?.' : '.';
       return node.computed
-        ? `(${astToJS(node.object, locals)}[${astToJS(node.property, locals)}])`
-        : `(${astToJS(node.object, locals)}.${node.property.name})`;
+        ? (node.optional ? `(${astToJS(node.object, locals)}?.[${astToJS(node.property, locals)}])` : `(${astToJS(node.object, locals)}[${astToJS(node.property, locals)}])`)
+        : `(${astToJS(node.object, locals)}${opt}${node.property.name})`;
+    }
 
     case 'CallExpression': {
       const calleeJS = astToJS(node.callee, locals);
       const argsJS = node.arguments ? node.arguments.map((arg: any) => astToJS(arg, locals)).join(', ') : '';
-      const rawCall = `(${calleeJS}(${argsJS}))`;
+      const optCall = node.optional ? '?.(' : '(';
+      const rawCall = `(${calleeJS}${optCall}${argsJS}))`;
       if (
         node.callee?.type === 'MemberExpression' &&
         node.callee.property?.type === 'Identifier'
@@ -841,7 +852,54 @@ export function astToJS(node: any, locals?: Set<string>): string {
       return `[${node.elements ? node.elements.map((el: any) => el?.type === 'SpreadElement' ? '...' + astToJS(el.argument, locals) : astToJS(el, locals)).join(', ') : ''}]`;
 
     case 'ObjectExpression':
-      return `{${node.properties ? node.properties.map((prop: any) => prop.type === 'SpreadElement' ? '...' + astToJS(prop.argument, locals) : `${prop.computed ? '[' + astToJS(prop.key, locals) + ']' : prop.key.name}: ${astToJS(prop.value, locals)}`).join(', ') : ''}}`;
+      return `{${node.properties ? node.properties.map((prop: any) => {
+        if (prop.type === 'SpreadElement') {
+          return '...' + astToJS(prop.argument, locals);
+        }
+        const keyJS = prop.computed
+          ? `[${astToJS(prop.key, locals)}]`
+          : (prop.key?.name || (typeof prop.key?.value === 'string' ? JSON.stringify(prop.key.value) : String(prop.key?.value ?? '')));
+
+        if (prop.kind === 'get' || prop.kind === 'set') {
+          const fn = prop.value;
+          const newLocals = new Set(locals);
+          const paramNames: string[] = [];
+          if (fn.params) {
+            for (const p of fn.params) {
+              for (const pName of extractBindingNames(p)) {
+                newLocals.add(pName);
+              }
+              paramNames.push(paramToJS(p, locals));
+            }
+          }
+          const bodyCode = fn.body?.type === 'BlockStatement'
+            ? `{ ${fn.body.body.map((s: any) => astToJS(s, newLocals)).filter(Boolean).join('; ')}; }`
+            : `{ ${astToJS(fn.body, newLocals)}; }`;
+          return `${prop.kind} ${keyJS}(${paramNames.join(', ')}) ${bodyCode}`;
+        }
+
+        if (prop.method) {
+          const fn = prop.value;
+          const newLocals = new Set(locals);
+          const paramNames: string[] = [];
+          if (fn.params) {
+            for (const p of fn.params) {
+              for (const pName of extractBindingNames(p)) {
+                newLocals.add(pName);
+              }
+              paramNames.push(paramToJS(p, locals));
+            }
+          }
+          const asyncPrefix = fn.async ? 'async ' : '';
+          const generatorStar = fn.generator ? '*' : '';
+          const bodyCode = fn.body?.type === 'BlockStatement'
+            ? `{ ${fn.body.body.map((s: any) => astToJS(s, newLocals)).filter(Boolean).join('; ')}; }`
+            : `{ ${astToJS(fn.body, newLocals)}; }`;
+          return `${asyncPrefix}${generatorStar}${keyJS}(${paramNames.join(', ')}) ${bodyCode}`;
+        }
+
+        return `${keyJS}: ${astToJS(prop.value, locals)}`;
+      }).join(', ') : ''}}`;
 
     case 'RestElement':
     case 'SpreadElement':
@@ -1023,7 +1081,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
                   if (locals && locals.has(varName)) {
                     declsArr.push(`${varName} = ${expr}`);
                   } else {
-                    declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`);
+                    declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
                   }
                 }
               }
@@ -1041,7 +1099,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
                 if (locals && locals.has(varName)) {
                   declsArr.push(`${varName} = ${expr}`);
                 } else {
-                  declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`);
+                  declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
                 }
               } else if (el.type === 'AssignmentPattern') {
                 const varName = el.left?.name || astToJS(el.left, locals);
@@ -1052,7 +1110,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
                   if (locals && locals.has(varName)) {
                     declsArr.push(`${varName} = ${expr}`);
                   } else {
-                    declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`);
+                    declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
                   }
                 }
               } else if (el.type === 'RestElement') {
@@ -1063,7 +1121,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
                   if (locals && locals.has(varName)) {
                     declsArr.push(`${varName} = ${expr}`);
                   } else {
-                    declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`);
+                    declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
                   }
                 }
               }
@@ -1075,7 +1133,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
             if (locals && d.id?.name && locals.has(d.id.name)) {
               declsArr.push(`${d.id.name} = ${valJS}`);
             } else {
-              declsArr.push(`(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${valJS}) : ((scope || {})[${JSON.stringify(name)}] = ${valJS}))`);
+              declsArr.push(`((scope || {})[${JSON.stringify(name)}] = ${valJS})`);
             }
           }
         }
@@ -1117,7 +1175,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
       const generatorStar = node.generator ? '*' : '';
       const fnCode = `${asyncPrefix}function${generatorStar} ${name || ''}(${paramsJS}) ${bodyCode}`;
       if (name) {
-        return `(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${fnCode}) : ((scope || {})[${JSON.stringify(name)}] = ${fnCode}))`;
+        return `((scope || {})[${JSON.stringify(name)}] = ${fnCode})`;
       }
       return fnCode;
     }
@@ -1175,7 +1233,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
       const bodyJS = astToJS(node.body, newLocals);
       const classCode = `class ${name || ''}${superJS} ${bodyJS}`;
       if (node.type === 'ClassDeclaration' && name) {
-        return `(typeof setScopeValue === 'function' ? setScopeValue(scope, ${JSON.stringify(name)}, ${classCode}) : ((scope || {})[${JSON.stringify(name)}] = ${classCode}))`;
+        return `((scope || {})[${JSON.stringify(name)}] = ${classCode})`;
       }
       return `(${classCode})`;
     }

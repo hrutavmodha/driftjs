@@ -85,6 +85,24 @@ driftjs/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
+│   ├── router/            # driftjs-router — Client-Side SPA Router
+│   │   ├── index.ts       # Package entry: re-exports src/ and types/
+│   │   ├── src/           # Implementation logic: router, matcher, history, components
+│   │   │   ├── index.ts   # Barrel: re-exports router, matcher, history, components
+│   │   │   ├── router.ts  # createRouter(), RouterContext, navigation engine
+│   │   │   ├── matcher.ts # Route pattern matching, parameter and query extraction
+│   │   │   ├── history.ts # BrowserHistory, HashHistory, MemoryHistory drivers
+│   │   │   └── components.ts # RouterView and Link native component helpers
+│   │   ├── types/         # Type definitions: RouteRecord, MatchedRoute, Router, RouterOptions
+│   │   │   └── index.ts   # Barrel: re-exports all router types
+│   │   ├── tests/         # Unit and integration test suites
+│   │   │   ├── matcher.test.ts
+│   │   │   ├── history.test.ts
+│   │   │   ├── router.test.ts
+│   │   │   └── components.test.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
 │   ├── vite-plugin/       # driftjs-vite-plugin — Build-time SFC Compiler
 │   │   ├── index.ts       # Package entry: driftPlugin()
 │   │   ├── src/
@@ -331,8 +349,16 @@ DriftJS VM instructions are variable-length byte streams operating on 256 intern
 
 ## Coding & Contribution Guidelines
 
-1. **TypeScript Strict Mode:** All code must compile cleanly with `strict: true`, `noUncheckedIndexedAccess: true`, and `exactOptionalPropertyTypes: true`.
-2. **ESM Imports:** Always use explicit `.js` extensions in import paths across all TypeScript modules (`import { ... } from './lexer.js'`).
-3. **No `with` Statements:** Transpiled JavaScript strings emitted by `astToJS` must never use `with (scope)`. Identifier lookups must explicitly query the scope chain.
-4. **No Direct DOM Manipulation in Core VM Loop:** Keep DOM construction logic abstracted to ensure SSR / Client VM architectural symmetry.
-5. **Report Bugs in `docs/BUGS.md`:** Any newly discovered defects, type errors, or spec mismatches should be documented with severity and reproduction in [`docs/BUGS.md`](file:///home/hrutav-modha/Documents/driftjs/docs/BUGS.md).
+1. **Strict Package File & Directory Structure (MANDATORY):** Every package in `packages/*` MUST strictly and exclusively follow this architecture:
+   - `index.ts` at package root: exports the public API by re-exporting from `./src/index.js` and `./types/index.js`.
+   - `src/`: contains **ONLY** implementation logic files and a barrel `src/index.ts`. Never place type definitions directly in `src/`.
+   - `types/`: contains **ONLY** TypeScript interfaces, type aliases, and enums, with a barrel `types/index.ts`.
+   - `tests/`: contains **ONLY** Vitest test suites (`*.test.ts`).
+   - *All agents and contributors must strictly and exclusively follow this layout without exception.*
+2. **TypeScript Strict Mode:** All code must compile cleanly with `strict: true`, `noUncheckedIndexedAccess: true`, and `exactOptionalPropertyTypes: true`.
+3. **ESM Imports:** Always use explicit `.js` extensions in import paths across all TypeScript modules (`import { ... } from './lexer.js'`).
+4. **No `with` Statements:** Transpiled JavaScript strings emitted by `astToJS` must never use `with (scope)`. Identifier lookups must explicitly query the scope chain.
+5. **No Direct DOM Manipulation in Core VM Loop:** Keep DOM construction logic abstracted to ensure SSR / Client VM architectural symmetry.
+6. **Report Bugs in `docs/BUGS.md`:** Any newly discovered defects, type errors, or spec mismatches should be documented with severity and reproduction in [`docs/BUGS.md`](file:///home/hrutav-modha/Documents/driftjs/docs/BUGS.md).
+7. **Author Components as `.drift` SFC Files:** Whenever the context calls for creating, providing, or testing DriftJS components (for libraries, plugins, UI features, or templates), author them as declarative `.drift` Single File Components combining `<script>` logic and template markup, processed through the `driftjs-compiler` pipeline (`compile()` / `driftPlugin`). Do not hand-craft raw VM bytecode arrays or manually construct `CompiledModule` objects in TypeScript or JavaScript files.
+
