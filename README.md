@@ -5,7 +5,7 @@
     <em>Zero Virtual DOM Overhead • Expression Engine • Keyed LIS Reconciliation • Built for Speed</em>
   </p>
   <br />
-  <img src="assets/logo.png" alt="DriftJS Logo" width="180" />
+  <img src="assets/icon.png" alt="DriftJS Logo" width="180" />
 </div>
 
 ---
