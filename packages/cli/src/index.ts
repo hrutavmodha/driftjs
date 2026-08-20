@@ -45,10 +45,6 @@ export function scaffoldProject(options: ScaffoldOptions): void {
       if (fs.existsSync(serverJsPath)) {
         fs.rmSync(serverJsPath, { force: true });
       }
-    } else if (renderMode === 'ssr') {
-      if (pkgData.dependencies) {
-        delete pkgData.dependencies['driftjs-dom'];
-      }
     }
 
     // Sanitize workspace:* protocols so npm/yarn/bun/pnpm work seamlessly

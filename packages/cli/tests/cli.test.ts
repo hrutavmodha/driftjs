@@ -107,7 +107,7 @@ describe('DriftJS CLI Scaffolder', () => {
     expect(fs.existsSync(path.join(targetDir, 'server.js'))).toBe(false);
   });
 
-  it('should remove driftjs-dom dependency when SSR mode is selected', () => {
+  it('should retain driftjs-dom and driftjs-ssr dependencies when SSR mode is selected', () => {
     scaffoldProject({
       projectName: 'ssr-app',
       targetDir,
@@ -117,7 +117,7 @@ describe('DriftJS CLI Scaffolder', () => {
 
     const pkgData = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
     expect(pkgData.dependencies['driftjs-ssr']).toBeDefined();
-    expect(pkgData.dependencies['driftjs-dom']).toBeUndefined();
+    expect(pkgData.dependencies['driftjs-dom']).toBeDefined();
   });
 
   it('should skip node_modules and dist directories during copy', () => {

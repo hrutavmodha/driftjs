@@ -716,7 +716,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
   switch (node.type) {
     case 'Identifier':
       if (locals && locals.has(node.name)) return node.name;
-      return `((typeof inScopeChain === 'function' ? inScopeChain(scope, ${JSON.stringify(node.name)}) : Object.prototype.hasOwnProperty.call(scope || {}, ${JSON.stringify(node.name)})) ? scope[${JSON.stringify(node.name)}] : (typeof globalThis !== 'undefined' && Object.prototype.hasOwnProperty.call(globalThis, ${JSON.stringify(node.name)}) ? globalThis[${JSON.stringify(node.name)}] : undefined))`;
+      return `((typeof inScopeChain === 'function' ? inScopeChain(scope, ${JSON.stringify(node.name)}) : Object.prototype.hasOwnProperty.call(scope || {}, ${JSON.stringify(node.name)})) ? scope[${JSON.stringify(node.name)}] : (typeof globalThis !== 'undefined' && globalThis && (${JSON.stringify(node.name)} in globalThis) ? globalThis[${JSON.stringify(node.name)}] : undefined))`;
 
     case 'Literal':
       if (typeof node.raw === 'string') return node.raw;

@@ -126,7 +126,7 @@ export class DriftServerVM {
               const propsObj = evaluatePropsSpec(propsSpec, this.scope, this.declaredVars);
               const subVm = new DriftServerVM();
               subVm.parentVM = this;
-              const compNode = subVm.execute(compMod, { scope: { props: propsObj, ...propsObj, ...this.scope } });
+              const compNode = subVm.execute(compMod, { scope: { ...this.scope, ...propsObj, props: propsObj } });
               if (compNode) this.setRegister(dstReg, compNode);
             }
             pc += 4;
@@ -316,15 +316,16 @@ export class DriftServerVM {
 /**
  * Serializes a ServerNode tree directly into an HTML string.
  */
-export function serializeNode(node: ServerNode | string): string {
-  if (typeof node === 'string') return escapeHtml(node);
-  if (node.type === 'text') return escapeHtml(node.content ?? '');
+export function serializeNode(node: ServerNode | string, isRawText = false): string {
+  if (typeof node === 'string') return isRawText ? node : escapeHtml(node);
+  if (node.type === 'text') return isRawText ? (node.content ?? '') : escapeHtml(node.content ?? '');
   if (node.type === 'comment') return `<!--${node.content ?? ''}-->`;
   if (node.type === 'fragment') {
-    return node.children.map(serializeNode).join('');
+    return node.children.map((c) => serializeNode(c, isRawText)).join('');
   }
   if (node.type === 'element') {
     const tag = node.tag!;
+    const isRaw = tag.toLowerCase() === 'script' || tag.toLowerCase() === 'style';
     let attrsStr = '';
     if (node.attrs && node.attrs.size > 0) {
       for (const [k, v] of node.attrs.entries()) {
@@ -342,7 +343,7 @@ export function serializeNode(node: ServerNode | string): string {
     if (selfClosing) {
       return `<${tag}${attrsStr} />`;
     }
-    const childrenStr = node.children.map(serializeNode).join('');
+    const childrenStr = node.children.map((c) => serializeNode(c, isRaw)).join('');
     return `<${tag}${attrsStr}>${childrenStr}</${tag}>`;
   }
   return '';
