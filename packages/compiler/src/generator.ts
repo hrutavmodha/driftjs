@@ -925,6 +925,19 @@ export function astToJS(node: any, locals?: Set<string>): string {
 
     case 'BlockStatement': {
       const newLocals = new Set(locals);
+      if (Array.isArray(node.body)) {
+        for (const stmt of node.body) {
+          if (stmt.type === 'VariableDeclaration' && Array.isArray(stmt.declarations)) {
+            for (const d of stmt.declarations) {
+              for (const varName of extractBindingNames(d.id)) {
+                newLocals.add(varName);
+              }
+            }
+          } else if (stmt.type === 'FunctionDeclaration' && stmt.id?.name) {
+            newLocals.add(stmt.id.name);
+          }
+        }
+      }
       const stmts = node.body ? node.body.map((stmt: any) => astToJS(stmt, newLocals)).filter(Boolean) : [];
       // Emit as a real block `{ }` so that `return`/`break`/`continue` inside are valid statements.
       return `{ ${stmts.join('; ')}; }`;
@@ -1058,7 +1071,22 @@ export function astToJS(node: any, locals?: Set<string>): string {
     }
 
     case 'VariableDeclaration': {
-      const newLocals = new Set(locals);
+      if (locals) {
+        const declsArr: string[] = [];
+        if (node.declarations) {
+          for (const d of node.declarations) {
+            const idJS = d.id?.type === 'Identifier' ? d.id.name : astToJS(d.id, locals);
+            const valJS = d.init ? astToJS(d.init, locals) : undefined;
+            if (valJS !== undefined) {
+              declsArr.push(`${idJS} = ${valJS}`);
+            } else {
+              declsArr.push(`${idJS}`);
+            }
+          }
+        }
+        return `${node.kind || 'let'} ${declsArr.join(', ')}`;
+      }
+
       const declsArr: string[] = [];
       if (node.declarations) {
         for (const d of node.declarations) {
@@ -1076,13 +1104,8 @@ export function astToJS(node: any, locals?: Set<string>): string {
                   varName = astToJS(prop.value, locals);
                 }
                 if (varName) {
-                  newLocals.add(varName);
                   const expr = `((${valJS} && (${JSON.stringify(propKey)} in ${valJS})) ? ${valJS}[${JSON.stringify(propKey)}] : ${defaultValJS ?? 'undefined'})`;
-                  if (locals && locals.has(varName)) {
-                    declsArr.push(`${varName} = ${expr}`);
-                  } else {
-                    declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
-                  }
+                  declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
                 }
               }
             }
@@ -1094,47 +1117,27 @@ export function astToJS(node: any, locals?: Set<string>): string {
               if (!el) continue;
               if (el.type === 'Identifier') {
                 const varName = el.name;
-                newLocals.add(varName);
                 const expr = `(${valJS} ? ${valJS}[${i}] : undefined)`;
-                if (locals && locals.has(varName)) {
-                  declsArr.push(`${varName} = ${expr}`);
-                } else {
-                  declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
-                }
+                declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
               } else if (el.type === 'AssignmentPattern') {
                 const varName = el.left?.name || astToJS(el.left, locals);
                 const defaultValJS = astToJS(el.right, locals);
                 if (varName) {
-                  newLocals.add(varName);
                   const expr = `((${valJS} && ${valJS}[${i}] !== undefined) ? ${valJS}[${i}] : ${defaultValJS})`;
-                  if (locals && locals.has(varName)) {
-                    declsArr.push(`${varName} = ${expr}`);
-                  } else {
-                    declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
-                  }
+                  declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
                 }
               } else if (el.type === 'RestElement') {
                 const varName = el.argument?.name || astToJS(el.argument, locals);
                 if (varName) {
-                  newLocals.add(varName);
                   const expr = `((${valJS} && typeof ${valJS}.slice === 'function') ? ${valJS}.slice(${i}) : [])`;
-                  if (locals && locals.has(varName)) {
-                    declsArr.push(`${varName} = ${expr}`);
-                  } else {
-                    declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
-                  }
+                  declsArr.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
                 }
               }
             }
           } else {
             const name = d.id?.name || astToJS(d.id, locals);
-            if (d.id?.name) newLocals.add(d.id.name);
             const valJS = d.init ? astToJS(d.init, locals) : 'undefined';
-            if (locals && d.id?.name && locals.has(d.id.name)) {
-              declsArr.push(`${d.id.name} = ${valJS}`);
-            } else {
-              declsArr.push(`((scope || {})[${JSON.stringify(name)}] = ${valJS})`);
-            }
+            declsArr.push(`((scope || {})[${JSON.stringify(name)}] = ${valJS})`);
           }
         }
       }
