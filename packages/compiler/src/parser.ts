@@ -50,11 +50,25 @@ export function decodeHTMLEntities(text: string): string {
   return text.replace(/&(?:#(\d+)|#x([0-9a-fA-F]+)|([a-zA-Z0-9]+));/g, (match, dec, hex, named) => {
     if (dec) {
       const code = parseInt(dec, 10);
-      return String.fromCodePoint ? String.fromCodePoint(code) : String.fromCharCode(code);
+      try {
+        if (!isNaN(code) && code >= 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)) {
+          return String.fromCodePoint ? String.fromCodePoint(code) : String.fromCharCode(code);
+        }
+        return '\uFFFD';
+      } catch {
+        return '\uFFFD';
+      }
     }
     if (hex) {
       const code = parseInt(hex, 16);
-      return String.fromCodePoint ? String.fromCodePoint(code) : String.fromCharCode(code);
+      try {
+        if (!isNaN(code) && code >= 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)) {
+          return String.fromCodePoint ? String.fromCodePoint(code) : String.fromCharCode(code);
+        }
+        return '\uFFFD';
+      } catch {
+        return '\uFFFD';
+      }
     }
     switch (named) {
       case 'amp': return '&';
@@ -254,7 +268,7 @@ export class DriftParser {
       'Expected closing tag name'
     );
 
-    if (closingTagToken.value !== tagName) {
+    if (closingTagToken.value !== tagName && closingTagToken.value.toLowerCase() !== tagName.toLowerCase()) {
       throw new DriftParserError(
         `Mismatched closing tag. Expected '</${tagName}>' but got '</${closingTagToken.value}>'`,
         closingTagToken.loc.start.line,

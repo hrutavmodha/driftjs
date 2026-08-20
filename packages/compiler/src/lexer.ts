@@ -959,11 +959,12 @@ export class DriftLexer {
   }
 
   private isRawTextClosingTagAhead(closingSequence: string): boolean {
-    if (!this.startsWith(closingSequence)) {
+    const len = closingSequence.length;
+    if (this.source.slice(this.offset, this.offset + len).toLowerCase() !== closingSequence.toLowerCase()) {
       return false;
     }
 
-    const boundary = this.peek(closingSequence.length);
+    const boundary = this.peek(len);
     return boundary === '' || boundary === '>' || boundary === ' ' || boundary === '\t' || boundary === '\r' || boundary === '\n';
   }
 }
