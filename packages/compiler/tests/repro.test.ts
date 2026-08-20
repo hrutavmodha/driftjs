@@ -18,8 +18,9 @@ describe('DriftJS Compiler - Reproduction Test Cases for Identified Bugs', () =>
     const lexer = new DriftLexer(template);
     const parser = new DriftParser(lexer);
     const ast = parser.parse();
-
-    const forNode = (ast.body[0] as any).children[0];
+    const divNode = ast.body.find((n: any) => n.type === ASTNodeType.Element) as any;
+    const forNode = divNode.children.find((n: any) => n.type === ASTNodeType.For);
+    expect(forNode).toBeDefined();
     expect(forNode.type).toBe(ASTNodeType.For);
     expect(forNode.item).toBe('item');
     expect(forNode.key).toBeNull();

@@ -412,11 +412,34 @@ export class DriftParser {
 
     const inIndex = (() => {
       let parenDepth = 0;
+      let bracketDepth = 0;
+      let braceDepth = 0;
+      let inQuote: string | null = null;
+      let isEscaped = false;
+
       for (let i = 0; i <= header.length - 4; i++) {
-        const ch = header[i];
+        const ch = header[i]!;
+        if (inQuote !== null) {
+          if (isEscaped) {
+            isEscaped = false;
+          } else if (ch === '\\') {
+            isEscaped = true;
+          } else if (ch === inQuote) {
+            inQuote = null;
+          }
+          continue;
+        }
+        if (ch === '"' || ch === "'" || ch === '`') {
+          inQuote = ch;
+          continue;
+        }
         if (ch === '(') parenDepth++;
         else if (ch === ')') parenDepth--;
-        else if (parenDepth === 0 && header.slice(i, i + 4) === ' in ') {
+        else if (ch === '[') bracketDepth++;
+        else if (ch === ']') bracketDepth--;
+        else if (ch === '{') braceDepth++;
+        else if (ch === '}') braceDepth--;
+        else if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0 && header.slice(i, i + 4) === ' in ') {
           return i;
         }
       }
@@ -435,10 +458,51 @@ export class DriftParser {
     let rawIterable = header.slice(inIndex + 4).trim();
     let key: string | null = null;
 
-    const keyMatch = rawIterable.match(/\s+key\s+(.+)$/);
-    if (keyMatch) {
-      key = keyMatch[1]!.trim();
-      rawIterable = rawIterable.slice(0, keyMatch.index).trim();
+    const keyMatchInfo = (() => {
+      let parenDepth = 0;
+      let bracketDepth = 0;
+      let braceDepth = 0;
+      let inQuote: string | null = null;
+      let isEscaped = false;
+
+      for (let i = 0; i < rawIterable.length; i++) {
+        const ch = rawIterable[i]!;
+        if (inQuote !== null) {
+          if (isEscaped) {
+            isEscaped = false;
+          } else if (ch === '\\') {
+            isEscaped = true;
+          } else if (ch === inQuote) {
+            inQuote = null;
+          }
+          continue;
+        }
+        if (ch === '"' || ch === "'" || ch === '`') {
+          inQuote = ch;
+          continue;
+        }
+        if (ch === '(') parenDepth++;
+        else if (ch === ')') parenDepth--;
+        else if (ch === '[') bracketDepth++;
+        else if (ch === ']') bracketDepth--;
+        else if (ch === '{') braceDepth++;
+        else if (ch === '}') braceDepth--;
+        else if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
+          const match = rawIterable.slice(i).match(/^(\s+key\s+)(.+)$/);
+          if (match && match[1] && match[2]) {
+            return {
+              iterableEnd: i,
+              key: match[2].trim(),
+            };
+          }
+        }
+      }
+      return null;
+    })();
+
+    if (keyMatchInfo) {
+      key = keyMatchInfo.key;
+      rawIterable = rawIterable.slice(0, keyMatchInfo.iterableEnd).trim();
     }
 
     const iterable = rawIterable;

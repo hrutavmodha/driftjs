@@ -704,11 +704,77 @@ export class DriftClientVM {
    * only if an attribute value actually changed.
    */
   public patchItemAttributes(bodyMod: CompiledModule, childScope: Record<string, any>, rootNode: Node): void {
-    if (!rootNode || rootNode.nodeType !== 1) return;
-    const elem = rootNode as Element;
+    if (!rootNode || (rootNode.nodeType !== 1 && rootNode.nodeType !== 11)) return;
     const bytecode = bodyMod.bytecode;
     const constants = bodyMod.constants;
 
+    // Step 1: Scan bytecode to discover root register, APPEND_CHILD relationships, and map registers to DOM nodes.
+    let rootReg = 0;
+    const childrenOf = new Map<number, number[]>();
+
+    for (let pc = 0; pc < bytecode.length; ) {
+      const opcode = bytecode[pc]!;
+      switch (opcode) {
+        case Opcode.RETURN:
+          rootReg = bytecode[pc + 1] ?? 0;
+          pc += 2;
+          break;
+        case Opcode.CREATE_ELEMENT:
+        case Opcode.CREATE_TEXT:
+        case Opcode.CREATE_COMMENT:
+        case Opcode.INTERPOLATE_TEXT:
+          pc += 3;
+          break;
+        case Opcode.MOUNT_COMPONENT:
+          pc += 4;
+          break;
+        case Opcode.APPEND_CHILD: {
+          const parentReg = bytecode[pc + 1]!;
+          const childReg = bytecode[pc + 2]!;
+          if (!childrenOf.has(parentReg)) {
+            childrenOf.set(parentReg, []);
+          }
+          childrenOf.get(parentReg)!.push(childReg);
+          pc += 3;
+          break;
+        }
+        case Opcode.SET_ATTR:
+          pc += 5;
+          break;
+        case Opcode.CREATE_FRAGMENT:
+        case Opcode.EXEC_SCRIPT:
+          pc += 2;
+          break;
+        case Opcode.REACTIVE_IF:
+          pc += 6;
+          break;
+        case Opcode.REACTIVE_FOR:
+          pc += 8;
+          break;
+        default:
+          pc = bytecode.length;
+          break;
+      }
+    }
+
+    // Step 2: Map each register to its corresponding DOM node in the subtree
+    const regs = new Map<number, Node>();
+    regs.set(rootReg, rootNode);
+
+    const mapChildren = (parentReg: number, parentNode: Node) => {
+      const childRegs = childrenOf.get(parentReg);
+      if (!childRegs) return;
+      const childNodes = parentNode.childNodes;
+      for (let i = 0; i < childRegs.length && i < childNodes.length; i++) {
+        const cReg = childRegs[i]!;
+        const cNode = childNodes[i]!;
+        regs.set(cReg, cNode);
+        mapChildren(cReg, cNode);
+      }
+    };
+    mapChildren(rootReg, rootNode);
+
+    // Step 3: Iterate over SET_ATTR opcodes and patch attributes on the targeted DOM element
     for (let pc = 0; pc < bytecode.length; ) {
       const opcode = bytecode[pc]!;
       switch (opcode) {
@@ -727,13 +793,20 @@ export class DriftClientVM {
           pc += 3;
           break;
         case Opcode.SET_ATTR: {
+          const targetReg = bytecode[pc + 1]!;
           const attrName = String(constants[bytecode[pc + 2]!]);
           const rawVal = constants[bytecode[pc + 3]!];
           const isDynamic = bytecode[pc + 4]!;
-          if (isDynamic === 1) {
+
+          const targetNode = regs.get(targetReg) ?? (targetReg === rootReg ? rootNode : null);
+          if (targetNode && targetNode.nodeType === 1 && isDynamic === 1) {
+            const elem = targetNode as Element;
             let val = evaluateExpression(rawVal, childScope, this.declaredVars);
             if (attrName === 'style') {
               val = normalizeStyle(val);
+            }
+            if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
+              (elem as any)[attrName] = val ?? '';
             }
             const targetVal = val === true ? '' : val === false || val == null || (attrName === 'style' && val === '') ? null : String(val);
             const currentVal = elem.hasAttribute(attrName) ? elem.getAttribute(attrName) : null;

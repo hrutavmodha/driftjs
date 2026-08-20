@@ -1,8 +1,8 @@
 /**
  * Sets a variable in scope, updating parent scope if it exists higher in prototype chain.
  */
-export function setScopeValue(targetScope: Record<string, any>, name: string, val: any): void {
-  if (!targetScope || typeof targetScope !== 'object') return;
+export function setScopeValue<T = any>(targetScope: Record<string, any>, name: string, val: T): T {
+  if (!targetScope || typeof targetScope !== 'object') return val;
 
   let curr: any = targetScope;
   let setOn: any = null;
@@ -44,6 +44,8 @@ export function setScopeValue(targetScope: Record<string, any>, name: string, va
       // ignore errors
     }
   }
+
+  return val;
 }
 
 
