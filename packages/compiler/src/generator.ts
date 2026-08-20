@@ -1012,41 +1012,96 @@ export function astToJS(node: any, locals?: Set<string>): string {
       const newLocals = new Set(locals);
       if (node.init?.type === 'VariableDeclaration' && node.init.declarations) {
         for (const d of node.init.declarations) {
-          const varName = d.id?.name;
-          if (varName) newLocals.add(varName);
+          for (const varName of extractBindingNames(d.id)) {
+            newLocals.add(varName);
+          }
         }
       }
       let initJS = '';
       if (node.init?.type === 'VariableDeclaration' && node.init.declarations) {
-        initJS = 'let ' + node.init.declarations.map((d: any) => `${d.id.name} = ${d.init ? astToJS(d.init, newLocals) : 'undefined'}`).join(', ');
+        initJS = (node.init.kind || 'let') + ' ' + node.init.declarations.map((d: any) => {
+          const idJS = d.id?.type === 'Identifier' ? d.id.name : astToJS(d.id, newLocals);
+          return `${idJS}${d.init ? ` = ${astToJS(d.init, newLocals)}` : ''}`;
+        }).join(', ');
       } else if (node.init) {
         initJS = astToJS(node.init, newLocals);
       }
       const testJS = node.test ? astToJS(node.test, newLocals) : '';
       const updateJS = node.update ? astToJS(node.update, newLocals) : '';
-      const bodyJS = node.body ? astToJS(node.body, newLocals) : '';
-      return `(() => { for (${initJS}; ${testJS}; ${updateJS}) ${bodyJS}; })()`;
+      const bodyJS = node.body?.type === 'BlockStatement'
+        ? astToJS(node.body, newLocals)
+        : `{ ${node.body ? astToJS(node.body, newLocals) : ''}; }`;
+      return `for (${initJS}; ${testJS}; ${updateJS}) ${bodyJS}`;
     }
 
     case 'ForOfStatement': {
       const newLocals = new Set(locals);
-      const varName = node.left?.type === 'VariableDeclaration' ? node.left.declarations[0]?.id?.name : node.left?.name;
-      if (varName) newLocals.add(varName);
-      return `(() => { const _iter = (typeof resolveIterable === 'function' ? resolveIterable(${astToJS(node.right, locals)}) : (${astToJS(node.right, locals)} || [])); for (let ${varName} of _iter) { if (scope) scope[${JSON.stringify(varName)}] = ${varName}; ${astToJS(node.body, newLocals)}; } })()`;
+      let leftJS = '';
+      if (node.left?.type === 'VariableDeclaration') {
+        const kind = node.left.kind || 'let';
+        const decl = node.left.declarations?.[0];
+        if (decl) {
+          for (const varName of extractBindingNames(decl.id)) {
+            newLocals.add(varName);
+          }
+          const idJS = decl.id?.type === 'Identifier' ? decl.id.name : astToJS(decl.id, newLocals);
+          leftJS = `${kind} ${idJS}`;
+        }
+      } else if (node.left?.type === 'Identifier') {
+        newLocals.add(node.left.name);
+        leftJS = node.left.name;
+      } else if (node.left) {
+        leftJS = astToJS(node.left, newLocals);
+      }
+      const rightJS = `(typeof resolveIterable === 'function' ? resolveIterable(${astToJS(node.right, locals)}) : (${astToJS(node.right, locals)} || []))`;
+      const bodyJS = node.body?.type === 'BlockStatement'
+        ? astToJS(node.body, newLocals)
+        : `{ ${node.body ? astToJS(node.body, newLocals) : ''}; }`;
+      const awaitPrefix = node.await ? 'await ' : '';
+      return `for ${awaitPrefix}(${leftJS} of ${rightJS}) ${bodyJS}`;
     }
 
     case 'ForInStatement': {
       const newLocals = new Set(locals);
-      const varName = node.left?.type === 'VariableDeclaration' ? node.left.declarations[0]?.id?.name : node.left?.name;
-      if (varName) newLocals.add(varName);
-      return `(() => { const _obj = ${astToJS(node.right, locals)}; if (_obj) { for (let ${varName} in _obj) { if (scope) scope[${JSON.stringify(varName)}] = ${varName}; ${astToJS(node.body, newLocals)}; } } })()`;
+      let leftJS = '';
+      if (node.left?.type === 'VariableDeclaration') {
+        const kind = node.left.kind || 'let';
+        const decl = node.left.declarations?.[0];
+        if (decl) {
+          for (const varName of extractBindingNames(decl.id)) {
+            newLocals.add(varName);
+          }
+          const idJS = decl.id?.type === 'Identifier' ? decl.id.name : astToJS(decl.id, newLocals);
+          leftJS = `${kind} ${idJS}`;
+        }
+      } else if (node.left?.type === 'Identifier') {
+        newLocals.add(node.left.name);
+        leftJS = node.left.name;
+      } else if (node.left) {
+        leftJS = astToJS(node.left, newLocals);
+      }
+      const rightJS = astToJS(node.right, locals);
+      const bodyJS = node.body?.type === 'BlockStatement'
+        ? astToJS(node.body, newLocals)
+        : `{ ${node.body ? astToJS(node.body, newLocals) : ''}; }`;
+      return `for (${leftJS} in ${rightJS}) ${bodyJS}`;
     }
 
-    case 'WhileStatement':
-      return `(() => { while (${astToJS(node.test, locals)}) ${astToJS(node.body, locals)}; })()`;
+    case 'WhileStatement': {
+      const testJS = astToJS(node.test, locals);
+      const bodyJS = node.body?.type === 'BlockStatement'
+        ? astToJS(node.body, locals)
+        : `{ ${node.body ? astToJS(node.body, locals) : ''}; }`;
+      return `while (${testJS}) ${bodyJS}`;
+    }
 
-    case 'DoWhileStatement':
-      return `(() => { do ${astToJS(node.body, locals)} while (${astToJS(node.test, locals)}); })()`;
+    case 'DoWhileStatement': {
+      const testJS = astToJS(node.test, locals);
+      const bodyJS = node.body?.type === 'BlockStatement'
+        ? astToJS(node.body, locals)
+        : `{ ${node.body ? astToJS(node.body, locals) : ''}; }`;
+      return `do ${bodyJS} while (${testJS})`;
+    }
 
     case 'ArrayPattern': {
       const elemsJS = node.elements

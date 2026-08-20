@@ -128,7 +128,6 @@ export class DriftClientVM {
       DriftClientVM.globalDelegatedListeners.clear();
     }
 
-    DriftClientVM.eventHandlersMap = new WeakMap();
     this.registers.fill(null);
     this.pendingDirtyVars.clear();
     this.isUpdateScheduled = false;
