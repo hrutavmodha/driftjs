@@ -334,12 +334,13 @@ export function createMatcher(routes: readonly RouteRecordRaw[]): RouteMatcher {
         if (namedRecord) {
           targetPath = namedRecord.path;
           params = { ...(to.params || {}) };
-          // Interpolate params into targetPath
-          for (const key of Object.keys(params)) {
-            const val = params[key];
-            const strVal = Array.isArray(val) ? val.join('/') : String(val);
-            targetPath = targetPath.replace(`:${key}`, strVal);
-          }
+          targetPath = targetPath.replace(/:([a-zA-Z0-9_]+)(?:\([^)]*\))?[?*+]?/g, (_match, paramName) => {
+            if (paramName in params) {
+              const val = params[paramName];
+              return Array.isArray(val) ? val.join('/') : String(val);
+            }
+            return '';
+          });
         }
       } else if (to.path) {
         targetPath = to.path;

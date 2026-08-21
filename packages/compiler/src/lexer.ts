@@ -694,9 +694,15 @@ export class DriftLexer {
         } else if (ch === inStringQuote) {
           inStringQuote = null;
         } else if (inStringQuote === '`' && ch === '{' && expression.endsWith('${')) {
-          templateStack.push(braceDepth);
-          inStringQuote = null;
-          braceDepth++;
+          let backslashCount = 0;
+          for (let i = expression.length - 3; i >= 0 && expression[i] === '\\'; i--) {
+            backslashCount++;
+          }
+          if (backslashCount % 2 === 0) {
+            templateStack.push(braceDepth);
+            inStringQuote = null;
+            braceDepth++;
+          }
         }
         continue;
       }
