@@ -3,9 +3,8 @@ import { DriftClientVM, mount } from '../src/index.js';
 import { Opcode, type CompiledModule } from '../types/index.js';
 import { compile } from '../../compiler/src/index.js';
 
-describe('DriftClientVM (DOM Engine) - Reproduction Test Cases for Identified Bugs', () => {
-  // BUG-01: unmount() wipes global eventHandlersMap, disabling all event listeners across the entire app
-  it('BUG-01 [Critical Correctness]: unmounting one VM instance does not disable event listeners on other active VM instances', () => {
+describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
+  it('unmounting one VM instance does not disable event listeners on other active VM instances', () => {
     const doc = document;
     const container1 = doc.createElement('div');
     const container2 = doc.createElement('div');
@@ -41,7 +40,6 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases for Identified Bu
     const node2 = vm2.execute(comp2, { document: doc });
     container2.appendChild(node2!);
 
-    // Test that both handlers work initially
     const btn1 = container1.querySelector('button')!;
     const btn2 = container2.querySelector('button')!;
 
@@ -51,26 +49,18 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases for Identified Bu
     btn2.click();
     expect(handler2).toHaveBeenCalledTimes(1);
 
-    // Now unmount VM1 (e.g. a component or modal closes)
     vm1.unmount();
     container1.removeChild(node1!);
 
-    // Click on Button 2 on the still-active VM2
     btn2.click();
-
-    // Expected true behavior: handler2 on active VM2 is called again (total: 2)
-    // Buggy current behavior: unmount() wiped DriftClientVM.eventHandlersMap = new WeakMap(),
-    // so handler2 is permanently lost and not called!
     expect(handler2).toHaveBeenCalledTimes(2);
 
-    // Cleanup
     vm2.unmount();
     doc.body.removeChild(container1);
     doc.body.removeChild(container2);
   });
 
-  // BUG-05: patchItemAttributes fails to update DOM properties (value, checked, selected, disabled)
-  it('BUG-05 [Correctness]: patchItemAttributes updates input element "value" and "checked" DOM properties', () => {
+  it('patchItemAttributes updates input element "value" and "checked" DOM properties', () => {
     const doc = document;
     const vm = new DriftClientVM();
 
@@ -96,22 +86,17 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases for Identified Bu
     expect(inputNode.value).toBe('Initial Text');
     expect(inputNode.checked).toBe(false);
 
-    // Now user or state updates the item attributes via fast-path patchItemAttributes
     const updatedScope = { item: { text: 'Updated Text', done: true } };
     vm.patchItemAttributes(bodyMod, updatedScope, inputNode);
 
-    // Expected true behavior: inputNode.value is updated to 'Updated Text' and checked is true
-    // Buggy current behavior: only setAttribute('value', ...) is called, which does not update inputNode.value property
     expect(inputNode.value).toBe('Updated Text');
     expect(inputNode.checked).toBe(true);
   });
 
-  // BUG-06: patchItemAttributes corrupts root list elements with child element attribute values
-  it('BUG-06 [Correctness]: patchItemAttributes does not apply child element attributes onto the root element', () => {
+  it('patchItemAttributes does not apply child element attributes onto the root element', () => {
     const doc = document;
     const vm = new DriftClientVM();
 
-    // Template: <li class="row"><button class={item.btnClass}>Click</button></li>
     const bodyMod: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // r0 = createElement('li')
@@ -137,18 +122,13 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases for Identified Bu
     const btn = rootLi.querySelector('button')!;
     expect(btn.className).toBe('btn-danger');
 
-    // Run patchItemAttributes with new button class
     const updatedScope = { item: { btnClass: 'btn-success' } };
     vm.patchItemAttributes(bodyMod, updatedScope, rootLi);
 
-    // Expected true behavior: rootLi keeps class="row", button gets class="btn-success"
-    // Buggy current behavior: patchItemAttributes applies all SET_ATTR opcodes to rootLi,
-    // overwriting rootLi.className to 'btn-success'!
     expect(rootLi.className).toBe('row');
   });
 
-  // BUG-16: Non-bubbling events (focus, blur) are captured by event delegation
-  it('BUG-16 [Correctness]: event delegation captures non-bubbling events like "focus" and "blur"', () => {
+  it('event delegation captures non-bubbling events like "focus" and "blur"', () => {
     const doc = document;
     const container = doc.createElement('div');
     doc.body.appendChild(container);
@@ -167,19 +147,14 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases for Identified Bu
     const input = vm.execute(comp, { document: doc }) as HTMLInputElement;
     container.appendChild(input);
 
-    // Dispatch focus event (focus does not bubble by default in DOM)
     input.dispatchEvent(new Event('focus', { bubbles: false }));
-
-    // Expected true behavior: onFocus handler is called
-    // Buggy current behavior: event listener on document is added with useCapture: false, so non-bubbling focus event never reaches it
     expect(onFocus).toHaveBeenCalled();
 
     vm.unmount();
     doc.body.removeChild(container);
   });
 
-  // BUG-21: Unmounted child component VM instances are never cleaned up, leaking activeVMCount and memory
-  it('BUG-21 [Memory / Lifecycle]: unmounting parent or removing child component unmounts child VM and decrements activeVMCount', () => {
+  it('unmounting parent or removing child component unmounts child VM and decrements activeVMCount', () => {
     const doc = document;
     const container = doc.createElement('div');
     doc.body.appendChild(container);
@@ -209,13 +184,126 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases for Identified Bu
     const elem = parentVM.execute(parentComp, { document: doc }) as HTMLElement;
     container.appendChild(elem);
 
-    // Parent + Child = 2 VMs active above initial
     expect(DriftClientVM.activeVMCount).toBe(initialActiveVMCount + 2);
 
-    // Unmounting parent should recursively unmount child VM
     parentVM.unmount();
     expect(DriftClientVM.activeVMCount).toBe(initialActiveVMCount);
 
+    doc.body.removeChild(container);
+  });
+
+  it('child VM returning DocumentFragment is unmounted when parent unmounts subtree', () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+
+    const unmountCb = vi.fn();
+
+    const childComp: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_FRAGMENT, 0,
+        Opcode.CREATE_ELEMENT, 1, 0, // p
+        Opcode.CREATE_ELEMENT, 2, 1, // span
+        Opcode.APPEND_CHILD, 0, 1,
+        Opcode.APPEND_CHILD, 0, 2,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['p', 'span'],
+    };
+
+    const parentComp: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0, // div
+        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF, // ChildComp
+        Opcode.APPEND_CHILD, 0, 1,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['div', 'ChildComp'],
+      scope: { ChildComp: childComp },
+    };
+
+    const parentVM = new DriftClientVM();
+    const parentNode = parentVM.execute(parentComp, { document: doc }) as HTMLElement;
+    container.appendChild(parentNode);
+
+    const childEntry = (parentVM as any).mountedChildVMs.values().next().value;
+    expect(childEntry).toBeDefined();
+    childEntry.unmountCallbacks.push(unmountCb);
+
+    parentVM.unmountSubtree(parentNode);
+
+    expect(unmountCb).toHaveBeenCalledTimes(1);
+
+    parentVM.unmount();
+    doc.body.removeChild(container);
+  });
+
+  it('updates text interpolations depending on index when list is reordered', async () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+
+    const template = `
+      <script>
+        let items = [{ id: 'a', name: 'Item A' }, { id: 'b', name: 'Item B' }];
+      </script>
+      <ul>
+        @for (item, idx) in items key item.id {
+          <li>#{idx}: {item.name}</li>
+        }
+      </ul>
+    `;
+
+    const compiled = compile(template);
+    const vm = new DriftClientVM();
+    const node = vm.execute(compiled, { document: doc }) as HTMLElement;
+    container.appendChild(node);
+
+    const lisInitial = container.querySelectorAll('li');
+    expect(lisInitial[0]?.textContent).toBe('#0: Item A');
+    expect(lisInitial[1]?.textContent).toBe('#1: Item B');
+
+    vm.scope.items = [{ id: 'b', name: 'Item B' }, { id: 'a', name: 'Item A' }];
+    vm.markDirty('items');
+    await new Promise((r) => setTimeout(r, 10));
+
+    const lisUpdated = container.querySelectorAll('li');
+    expect(lisUpdated[0]?.textContent).toBe('#0: Item B');
+    expect(lisUpdated[1]?.textContent).toBe('#1: Item A');
+
+    vm.unmount();
+    doc.body.removeChild(container);
+  });
+
+  it('event handler receives target DOM element as "this" context', () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+
+    let capturedThis: any = null;
+
+    const handler = function (this: any, e: Event) {
+      capturedThis = this;
+    };
+
+    const comp: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0, // button
+        Opcode.SET_ATTR, 0, 1, 2, 0, // onclick
+        Opcode.RETURN, 0,
+      ],
+      constants: ['button', 'onclick', handler],
+    };
+
+    const vm = new DriftClientVM();
+    const btn = vm.execute(comp, { document: doc }) as HTMLButtonElement;
+    container.appendChild(btn);
+
+    btn.click();
+
+    expect(capturedThis).toBe(btn);
+
+    vm.unmount();
     doc.body.removeChild(container);
   });
 });

@@ -2,10 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { DriftServerVM, renderToString, serializeNode } from '../src/index.js';
 import { Opcode, type CompiledModule } from 'driftjs-compiler';
 
-describe('DriftServerVM (SSR Engine) - Reproduction Test Cases for Identified Bugs', () => {
-  // BUG-07: Parent scope variables overwrite child component props during Server-Side Rendering
-  it('BUG-07 [Correctness]: child component props take precedence over parent scope variables of the same name', () => {
-    // Child component that renders <span>{props.title}</span>
+describe('DriftServerVM (SSR Engine) - Reproduction Test Cases', () => {
+  it('child component props take precedence over parent scope variables of the same name', () => {
     const childModule: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // span
@@ -19,7 +17,6 @@ describe('DriftServerVM (SSR Engine) - Reproduction Test Cases for Identified Bu
       ],
     };
 
-    // Parent component has title = "ParentTitle" in scope, but passes title="CustomChildTitle" as prop
     const parentModule: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // div
@@ -34,20 +31,15 @@ describe('DriftServerVM (SSR Engine) - Reproduction Test Cases for Identified Bu
       ],
       scope: {
         Child: childModule,
-        title: 'ParentTitle', // Same variable name in parent scope
+        title: 'ParentTitle',
       },
     };
 
     const html = renderToString(parentModule);
-
-    // Expected true behavior: Child receives prop 'CustomChildTitle' and renders <span>CustomChildTitle</span>
-    // Buggy current behavior: { props: propsObj, ...propsObj, ...this.scope } spreads parent scope AFTER propsObj,
-    // overwriting child's title with 'ParentTitle' -> <span>ParentTitle</span>
     expect(html).toBe('<div><span>CustomChildTitle</span></div>');
   });
 
-  // BUG-08: HTML entity escaping in SSR corrupts <script> JavaScript and <style> CSS blocks
-  it('BUG-08 [Correctness]: serializeNode does not escape HTML entities inside <script> and <style> tags', () => {
+  it('serializeNode does not escape HTML entities inside <script> and <style> tags', () => {
     const scriptModule: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // script
@@ -71,14 +63,11 @@ describe('DriftServerVM (SSR Engine) - Reproduction Test Cases for Identified Bu
     const scriptHtml = renderToString(scriptModule);
     const styleHtml = renderToString(styleModule);
 
-    // Expected true behavior: raw JavaScript and CSS without HTML entity escaping
-    // Buggy current behavior: &lt;, &gt;, &amp; are emitted, which breaks browser JS and CSS engines
     expect(scriptHtml).toBe('<script>if (a < b && c > d) {}</script>');
     expect(styleHtml).toBe('<style>div > span { color: red; }</style>');
   });
 
-  // BUG-18: Unsanitized attribute names in SSR HTML serialization allow attribute injection
-  it('BUG-18 [Security]: serializeNode validates or escapes attribute names to prevent tag breakout', () => {
+  it('serializeNode validates or escapes attribute names to prevent tag breakout', () => {
     const maliciousNode: any = {
       type: 'element',
       tag: 'div',
@@ -89,9 +78,33 @@ describe('DriftServerVM (SSR Engine) - Reproduction Test Cases for Identified Bu
     };
 
     const html = serializeNode(maliciousNode);
-
-    // Expected true behavior: invalid/malicious attribute names with quotes are not injected directly into HTML
-    // Buggy current behavior: <div test" onclick="alert(1)"="value"></div> allows attribute injection / XSS
     expect(html).not.toContain('onclick="alert(1)"');
+  });
+
+  it('serializeNode escapes </script> and </style> sequences inside raw text blocks to prevent XSS breakout', () => {
+    const maliciousScriptModule: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0, // script
+        Opcode.CREATE_TEXT, 1, 1,    // payload
+        Opcode.APPEND_CHILD, 0, 1,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['script', 'const data = "</script><script>alert(document.domain)</script>";'],
+    };
+
+    const html = renderToString(maliciousScriptModule);
+    expect(html).not.toContain('</script><script>alert');
+  });
+
+  it('serializeNode validates tag names against invalid characters to prevent HTML tag injection', () => {
+    const maliciousNode: any = {
+      type: 'element',
+      tag: 'div onclick=alert(1)',
+      attrs: new Map(),
+      children: [],
+    };
+
+    const html = serializeNode(maliciousNode);
+    expect(html).not.toContain('onclick=alert(1)');
   });
 });

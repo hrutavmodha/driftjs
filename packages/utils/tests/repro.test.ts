@@ -1,25 +1,31 @@
-import { describe, it, expect } from 'vitest';
-import { setScopeValue, evaluateExpression, executePrecompiledFn } from '../src/index.js';
+import { describe, it, expect, vi } from 'vitest';
+import { setScopeValue, evaluateExpression, executePrecompiledFn, onUnmount } from '../src/index.js';
 
-describe('DriftJS Shared / Utils - Reproduction Test Cases for Identified Bugs', () => {
-  // BUG-04: setScopeValue returns void instead of the assigned value
-  it('BUG-04 [Correctness]: setScopeValue returns the assigned value for expression assignment evaluation', () => {
+describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
+  it('setScopeValue returns the assigned value for expression assignment evaluation', () => {
     const scope = { count: 10 };
 
     const result = setScopeValue(scope, 'count', 25);
 
-    // Expected true behavior: setScopeValue returns 25 (the assigned value)
-    // Buggy current behavior: setScopeValue returns undefined (void)
     expect(result).toBe(25);
     expect(scope.count).toBe(25);
   });
 
-  // BUG-17: CSP compliance in executePrecompiledFn
-  it('BUG-17 [Security / CSP]: executePrecompiledFn executes pre-compiled function closures without invoking new Function()', () => {
+  it('executePrecompiledFn executes pre-compiled function closures without invoking new Function()', () => {
     const fnClosure = (scope: any) => scope.value * 2;
     const node = { __drift_fn__: fnClosure };
 
     const result = executePrecompiledFn(node, { value: 21 });
     expect(result).toBe(42);
+  });
+
+  it('setScopeValue rejects dangerous prototype keys like "__proto__", "constructor", "prototype"', () => {
+    const scope = {};
+    const maliciousPayload = { polluted: true };
+
+    setScopeValue(scope, '__proto__', maliciousPayload);
+
+    expect((Object.prototype as any).polluted).toBeUndefined();
+    expect(({} as any).polluted).toBeUndefined();
   });
 });

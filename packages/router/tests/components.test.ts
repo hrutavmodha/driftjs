@@ -356,7 +356,7 @@ describe('Router Components (.drift SFC & VM Integration)', () => {
     expect(container.querySelector('.docs-layout')).toBeNull();
   });
 
-  it('BUG-19 [Memory / Lifecycle]: RouterView unsubscribes from router when unmounted', async () => {
+  it('RouterView unsubscribes from router when unmounted', async () => {
     const history = createMemoryHistory('/');
     const router = createRouter({
       history,
