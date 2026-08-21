@@ -315,15 +315,27 @@ export class DriftServerVM {
 }
 
 
+function sanitizeRawContent(content: string, rawTag?: string): string {
+  if (!rawTag) return content;
+  const lower = rawTag.toLowerCase();
+  if (lower === 'script') {
+    return content.replace(/<\/script/gi, '<\\/script');
+  }
+  if (lower === 'style') {
+    return content.replace(/<\/style/gi, '<\\/style');
+  }
+  return content;
+}
+
 /**
  * Serializes a ServerNode tree directly into an HTML string.
  */
-export function serializeNode(node: ServerNode | string, isRawText = false): string {
-  if (typeof node === 'string') return isRawText ? node : escapeHtml(node);
-  if (node.type === 'text') return isRawText ? (node.content ?? '') : escapeHtml(node.content ?? '');
+export function serializeNode(node: ServerNode | string, isRawText = false, rawTag?: string): string {
+  if (typeof node === 'string') return isRawText ? sanitizeRawContent(node, rawTag) : escapeHtml(node);
+  if (node.type === 'text') return isRawText ? sanitizeRawContent(node.content ?? '', rawTag) : escapeHtml(node.content ?? '');
   if (node.type === 'comment') return `<!--${node.content ?? ''}-->`;
   if (node.type === 'fragment') {
-    return node.children.map((c) => serializeNode(c, isRawText)).join('');
+    return node.children.map((c) => serializeNode(c, isRawText, rawTag)).join('');
   }
   if (node.type === 'element') {
     const tag = node.tag!;
@@ -348,7 +360,7 @@ export function serializeNode(node: ServerNode | string, isRawText = false): str
     if (selfClosing) {
       return `<${tag}${attrsStr} />`;
     }
-    const childrenStr = node.children.map((c) => serializeNode(c, isRaw)).join('');
+    const childrenStr = node.children.map((c) => serializeNode(c, isRaw, isRaw ? tag : undefined)).join('');
     return `<${tag}${attrsStr}>${childrenStr}</${tag}>`;
   }
   return '';

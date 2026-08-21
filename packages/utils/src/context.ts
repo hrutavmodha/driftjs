@@ -106,5 +106,7 @@ export function onUnmount(callback: () => void): void {
       vm.unmountCallbacks = [];
     }
     vm.unmountCallbacks.push(callback);
+  } else {
+    console.warn('[DriftJS] onUnmount() was called outside a component execution context. Lifecycle hooks must be called synchronously during component setup.');
   }
 }
