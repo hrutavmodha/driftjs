@@ -16,10 +16,12 @@
 
   function computeClass() {
     if (!router) return customClass;
-    if (router.currentRoute.path === router.resolve(to).path) {
+    const targetPath = router.resolve(to).path;
+    const currentPath = router.currentRoute.path;
+    if (currentPath === targetPath) {
       return (customClass ? customClass + ' ' : '') + ((props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active') + ' ' + (props.exactActiveClass || (router.options && router.options.linkExactActiveClass) || 'router-link-exact-active'));
     }
-    if (router.resolve(to).path !== '/' && router.currentRoute.path.startsWith(router.resolve(to).path)) {
+    if (targetPath !== '/' && (currentPath.startsWith(targetPath.endsWith('/') ? targetPath : targetPath + '/'))) {
       return (customClass ? customClass + ' ' : '') + (props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active');
     }
     return customClass;

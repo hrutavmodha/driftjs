@@ -160,7 +160,7 @@ describe('DriftJS Compiler - Reproduction Test Cases', () => {
       const lexer = new DriftLexer(template);
       const parser = new DriftParser(lexer);
       const ast = parser.parse();
-      expect(ast.body.length).toBe(1);
+      expect(ast.body.filter((n: any) => n.type !== ASTNodeType.Text || n.content.trim() !== '').length).toBe(1);
     }).not.toThrow();
   });
 

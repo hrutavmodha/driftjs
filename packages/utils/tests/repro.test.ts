@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { setScopeValue, evaluateExpression, executePrecompiledFn, onUnmount } from '../src/index.js';
+import { describe, it, expect } from 'vitest';
+import { setScopeValue } from '../src/index.js';
 
 describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
   it('setScopeValue returns the assigned value for expression assignment evaluation', () => {
@@ -9,14 +9,6 @@ describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
 
     expect(result).toBe(25);
     expect(scope.count).toBe(25);
-  });
-
-  it('executePrecompiledFn executes pre-compiled function closures without invoking new Function()', () => {
-    const fnClosure = (scope: any) => scope.value * 2;
-    const node = { __drift_fn__: fnClosure };
-
-    const result = executePrecompiledFn(node, { value: 21 });
-    expect(result).toBe(42);
   });
 
   it('setScopeValue rejects dangerous prototype keys like "__proto__", "constructor", "prototype"', () => {

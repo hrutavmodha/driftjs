@@ -66,7 +66,7 @@ function clearBetweenAnchors(startAnchor: Node, endAnchor: Node, vm?: DriftClien
 export class DriftClientVM {
   private static readonly MAX_REGISTERS = 256;
   public static activeVMCount = 0;
-  private static globalDelegatedListeners = new Map<string, (e: Event) => void>();
+  private static globalDelegatedListeners = new Map<Document, Map<string, { listener: (e: Event) => void; useCapture: boolean }>>();
 
   private readonly registers: (Node | any)[] = new Array(DriftClientVM.MAX_REGISTERS);
   public scope: Record<string, any> = {};
@@ -95,8 +95,10 @@ export class DriftClientVM {
     if (!node) return;
     const entry = this.childVMs.get(node);
     if (entry) {
-      this.mountedChildVMs.delete(entry.vm);
-      entry.vm.unmount();
+      if (this.mountedChildVMs.has(entry.vm)) {
+        this.mountedChildVMs.delete(entry.vm);
+        entry.vm.unmount();
+      }
       this.childVMs.delete(node);
     }
     const children = (node as any).childNodes;
@@ -161,10 +163,9 @@ export class DriftClientVM {
     this.reactiveRegionsIndex.clear();
 
     if (DriftClientVM.activeVMCount === 0 && DriftClientVM.globalDelegatedListeners.size > 0) {
-      const root = this.doc || (typeof document !== 'undefined' ? document : null);
-      if (root) {
-        for (const [eventName, listener] of DriftClientVM.globalDelegatedListeners.entries()) {
-          root.removeEventListener(eventName, listener);
+      for (const [docRoot, listenersMap] of DriftClientVM.globalDelegatedListeners.entries()) {
+        for (const [eventName, { listener, useCapture }] of listenersMap.entries()) {
+          docRoot.removeEventListener(eventName, listener, useCapture);
         }
       }
       DriftClientVM.globalDelegatedListeners.clear();
@@ -237,14 +238,20 @@ export class DriftClientVM {
     const root = this.doc || (typeof document !== 'undefined' ? document : null);
     if (!root) return;
 
-    if (!DriftClientVM.globalDelegatedListeners.has(eventName)) {
+    let docListeners = DriftClientVM.globalDelegatedListeners.get(root);
+    if (!docListeners) {
+      docListeners = new Map();
+      DriftClientVM.globalDelegatedListeners.set(root, docListeners);
+    }
+
+    if (!docListeners.has(eventName)) {
       const listener = (e: Event) => {
         let curr = e.target as Node | null;
         while (curr && curr !== root) {
           if (curr.nodeType === 1) {
             const handlers = DriftClientVM.eventHandlersMap.get(curr);
             if (handlers && handlers[eventName]) {
-              handlers[eventName](e);
+              handlers[eventName].call(curr, e);
               break;
             }
           }
@@ -253,7 +260,7 @@ export class DriftClientVM {
       };
       const useCapture = NON_BUBBLING_EVENTS.has(eventName);
       root.addEventListener(eventName, listener, useCapture);
-      DriftClientVM.globalDelegatedListeners.set(eventName, listener);
+      docListeners.set(eventName, { listener, useCapture });
     }
   }
 
@@ -347,7 +354,13 @@ export class DriftClientVM {
             const compNode = childVM.execute(compMod, { scope: propsScope, document: doc });
             this.updateChildComponentProps(childVM.scope, childVM, propsObj);
             if (compNode) {
-              this.childVMs.set(compNode, { vm: childVM, scope: childVM.scope, propsSpec });
+              const childEntry = { vm: childVM, scope: childVM.scope, propsSpec };
+              this.childVMs.set(compNode, childEntry);
+              if (compNode.nodeType === 11) {
+                for (let i = 0; i < compNode.childNodes.length; i++) {
+                  this.childVMs.set(compNode.childNodes[i]!, childEntry);
+                }
+              }
               this.mountedChildVMs.add(childVM);
               this.setRegister(dstReg, compNode);
             }
@@ -670,7 +683,7 @@ export class DriftClientVM {
                 childScope[itemName] = itemVal;
                 if (indexName) childScope[indexName] = indexVal;
 
-                if (itemsEqual(record.itemVal, itemVal)) {
+                if (itemsEqual(record.itemVal, itemVal) && (!indexName || record.indexVal === indexVal)) {
                   record.indexVal = indexVal;
                   if (record.nodes.length > 0) {
                     vm.patchItemAttributes(bodyMod, childScope, record.nodes[0]);

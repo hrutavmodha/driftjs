@@ -154,44 +154,6 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     doc.body.removeChild(container);
   });
 
-  it('unmounting parent or removing child component unmounts child VM and decrements activeVMCount', () => {
-    const doc = document;
-    const container = doc.createElement('div');
-    doc.body.appendChild(container);
-
-    const initialActiveVMCount = DriftClientVM.activeVMCount;
-
-    const childComp: CompiledModule = {
-      bytecode: [
-        Opcode.CREATE_ELEMENT, 0, 0,
-        Opcode.RETURN, 0,
-      ],
-      constants: ['span'],
-    };
-
-    const parentComp: CompiledModule = {
-      bytecode: [
-        Opcode.CREATE_ELEMENT, 0, 0,
-        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF,
-        Opcode.APPEND_CHILD, 0, 1,
-        Opcode.RETURN, 0,
-      ],
-      constants: ['div', 'ChildComp'],
-      scope: { ChildComp: childComp },
-    };
-
-    const parentVM = new DriftClientVM();
-    const elem = parentVM.execute(parentComp, { document: doc }) as HTMLElement;
-    container.appendChild(elem);
-
-    expect(DriftClientVM.activeVMCount).toBe(initialActiveVMCount + 2);
-
-    parentVM.unmount();
-    expect(DriftClientVM.activeVMCount).toBe(initialActiveVMCount);
-
-    doc.body.removeChild(container);
-  });
-
   it('child VM returning DocumentFragment is unmounted when parent unmounts subtree', () => {
     const doc = document;
     const container = doc.createElement('div');

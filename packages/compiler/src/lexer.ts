@@ -81,6 +81,11 @@ export function isRawTextTagName(tagName: string): tagName is RawTextTagName {
 
 const KNOWN_DIRECTIVES = new Set(['if', 'else', 'for', 'switch', 'case', 'default']);
 
+const VOID_ELEMENTS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+  'link', 'meta', 'param', 'source', 'track', 'wbr'
+]);
+
 
 /**
  * Stateful on-demand lexer for Drift templates.
@@ -99,6 +104,8 @@ export class DriftLexer {
   private eofToken: Token | null = null;
   private state: DriftLexerState = { kind: LexerStateKind.Data };
   private blockDepth = 0;
+  private elementDepth = 0;
+  private blockElementDepthStack: number[] = [];
 
   constructor(source: string) {
     this.source = source;
@@ -185,9 +192,14 @@ export class DriftLexer {
       return this.readInterpolationToken(startLoc, 'content', null);
     }
 
-    if (this.peek() === '}' && this.blockDepth > 0) {
+    const isAtDirectiveBlockLevel = this.blockDepth > 0 &&
+      this.blockElementDepthStack.length > 0 &&
+      this.elementDepth === this.blockElementDepthStack[this.blockElementDepthStack.length - 1];
+
+    if (this.peek() === '}' && isAtDirectiveBlockLevel) {
       this.advance();
       this.blockDepth--;
+      this.blockElementDepthStack.pop();
       return this.createToken(TokenType.BlockClose, '}', startLoc);
     }
 
@@ -225,6 +237,7 @@ export class DriftLexer {
       if (this.peek() === '{') {
         this.advance();
         this.blockDepth++;
+        this.blockElementDepthStack.push(this.elementDepth);
         return this.createToken(TokenType.DirectiveElse, '', startLoc);
       }
       throw new DriftLexerError(
@@ -244,6 +257,7 @@ export class DriftLexer {
       if (this.peek() === '{') {
         this.advance();
         this.blockDepth++;
+        this.blockElementDepthStack.push(this.elementDepth);
       }
       return this.createToken(TokenType.DirectiveDefault, '', startLoc);
     }
@@ -341,6 +355,7 @@ export class DriftLexer {
 
       if (ch === '{' && parenDepth === 0) {
         this.blockDepth++;
+        this.blockElementDepthStack.push(this.elementDepth);
         return this.createToken(type, headerContent.trim(), startLoc);
       }
 
@@ -412,6 +427,9 @@ export class DriftLexer {
       }
 
       this.advance();
+      if (this.elementDepth > 0) {
+        this.elementDepth--;
+      }
       this.transitionTo({ kind: LexerStateKind.Data });
       return this.createToken(TokenType.TagClose, '>', startLoc);
     }
@@ -437,6 +455,9 @@ export class DriftLexer {
 
     if (this.peek() === '>') {
       this.advance();
+      if (!VOID_ELEMENTS.has(state.tagName.toLowerCase())) {
+        this.elementDepth++;
+      }
       if (state.entersRawText && isRawTextTagName(state.tagName)) {
         this.transitionTo({
           kind: LexerStateKind.RawText,
@@ -788,9 +809,15 @@ export class DriftLexer {
     const startLoc = this.getLocation();
     let text = '';
 
+    const isAtDirectiveBlockLevel = () => (
+      this.blockDepth > 0 &&
+      this.blockElementDepthStack.length > 0 &&
+      this.elementDepth === this.blockElementDepthStack[this.blockElementDepthStack.length - 1]
+    );
+
     while (!this.isAtEnd()) {
       const ch = this.peek();
-      if (ch === '<' || ch === '{' || ch === '@' || (ch === '}' && this.blockDepth > 0)) {
+      if (ch === '<' || ch === '{' || ch === '@' || (ch === '}' && isAtDirectiveBlockLevel())) {
         break;
       }
       text += this.advance();

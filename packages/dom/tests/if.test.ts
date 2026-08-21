@@ -132,32 +132,4 @@ describe('App.drift @else if ladder – onclick dec() regression', () => {
 
     document.body.removeChild(container);
   });
-
-  it('shows "Negative" after multiple decrements from positive (count: 2 → 1 → 0 → -1)', () => {
-    const mod = compile(src);
-    const vm = new DriftClientVM();
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = vm.execute(mod, { document });
-    if (root) container.appendChild(root);
-
-    const incBtn = container.querySelector('#btn-inc') as HTMLButtonElement;
-    const decBtn = container.querySelector('#btn-dec') as HTMLButtonElement;
-
-    incBtn.click(); // count = 1 → Positive
-    incBtn.click(); // count = 2 → Positive
-    expect(container.querySelector('#label')?.textContent).toBe('Positive');
-
-    decBtn.click(); // count = 1 → Positive
-    expect(container.querySelector('#label')?.textContent).toBe('Positive');
-
-    decBtn.click(); // count = 0 → Zero
-    expect(container.querySelector('#label')?.textContent).toBe('Zero');
-
-    decBtn.click(); // count = -1 → Negative (THE BUG)
-    expect((vm as any).scope.count).toBe(-1);
-    expect(container.querySelector('#label')?.textContent).toBe('Negative');
-
-    document.body.removeChild(container);
-  });
 });

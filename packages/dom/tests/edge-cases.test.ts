@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DriftClientVM } from '../src/index.js';
 import { Opcode, type CompiledModule } from '../types/index.js';
 import { compile } from '../../compiler/src/index.js';
@@ -358,5 +358,49 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
     expect(lis[0]?.textContent).toBe('Item 4');
     expect(lis[1]?.textContent).toBe('Item 1');
     expect(lis[2]?.textContent).toBe('Item 3');
+  });
+
+  it('event delegation works across separate Document contexts (e.g. iframes)', () => {
+    const doc1 = document;
+    const doc2 = document.implementation.createHTMLDocument('iframe-doc');
+
+    const fn1 = vi.fn();
+    const fn2 = vi.fn();
+
+    const comp1: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0, // button
+        Opcode.SET_ATTR, 0, 1, 2, 0, // onclick
+        Opcode.RETURN, 0,
+      ],
+      constants: ['button', 'onclick', fn1],
+    };
+
+    const comp2: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0, // button
+        Opcode.SET_ATTR, 0, 1, 2, 0, // onclick
+        Opcode.RETURN, 0,
+      ],
+      constants: ['button', 'onclick', fn2],
+    };
+
+    const vm1 = new DriftClientVM();
+    const btn1 = vm1.execute(comp1, { document: doc1 }) as HTMLButtonElement;
+    doc1.body.appendChild(btn1);
+
+    const vm2 = new DriftClientVM();
+    const btn2 = vm2.execute(comp2, { document: doc2 }) as HTMLButtonElement;
+    doc2.body.appendChild(btn2);
+
+    btn1.click();
+    expect(fn1).toHaveBeenCalledTimes(1);
+
+    btn2.click();
+    expect(fn2).toHaveBeenCalledTimes(1);
+
+    vm1.unmount();
+    vm2.unmount();
+    doc1.body.removeChild(btn1);
   });
 });
