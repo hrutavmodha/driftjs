@@ -355,4 +355,38 @@ describe('Router Components (.drift SFC & VM Integration)', () => {
     expect(container.querySelector('.home')).not.toBeNull();
     expect(container.querySelector('.docs-layout')).toBeNull();
   });
+
+  it('BUG-19 [Memory / Lifecycle]: RouterView unsubscribes from router when unmounted', async () => {
+    const history = createMemoryHistory('/');
+    const router = createRouter({
+      history,
+      routes: [
+        { path: '/', component: Home },
+        { path: '/about', component: About },
+      ],
+    });
+    await router.isReady();
+
+    let subCount = 0;
+    const originalSubscribe = router.subscribe.bind(router);
+    router.subscribe = (cb: any) => {
+      subCount++;
+      const unsub = originalSubscribe(cb);
+      return () => {
+        subCount--;
+        unsub();
+      };
+    };
+
+    const vm = new DriftClientVM();
+    vm.contextMap.set(RouterContext.id, router);
+    const node = vm.execute(RouterView, { scope: { router, RouterContext }, document }) as HTMLElement;
+    if (node) container.appendChild(node);
+
+    expect(subCount).toBe(1);
+
+    // Unmount VM
+    vm.unmount();
+    expect(subCount).toBe(0);
+  });
 });

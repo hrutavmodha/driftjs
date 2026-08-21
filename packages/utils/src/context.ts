@@ -95,3 +95,16 @@ export function injectContext<T>(context: Context<T>, fallback?: T): T {
 // Functional aliases matching provide / inject syntax
 export const provide = provideContext;
 export const inject = injectContext;
+
+/**
+ * Registers a callback to be executed when the currently active component VM is unmounted.
+ */
+export function onUnmount(callback: () => void): void {
+  const vm = getActiveVM();
+  if (vm) {
+    if (!vm.unmountCallbacks) {
+      vm.unmountCallbacks = [];
+    }
+    vm.unmountCallbacks.push(callback);
+  }
+}

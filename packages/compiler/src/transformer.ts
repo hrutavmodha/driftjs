@@ -133,6 +133,8 @@ export class DriftTransformer {
     return node;
   }
 
+  private switchCounter = 0;
+
   /**
    * Transforms @switch node into a reactive @if / @else if / @else chain.
    */
@@ -140,6 +142,10 @@ export class DriftTransformer {
     const discAst = typeof node.discriminant === 'string'
       ? acorn.parseExpressionAt(node.discriminant, 0, { ecmaVersion: 'latest' })
       : node.discriminant;
+
+    const isSimple = (discAst as any).type === 'Identifier' || (discAst as any).type === 'Literal';
+    const discVarName = `__drift_sw_${this.switchCounter++}`;
+    let isFirstCase = true;
 
     const buildIfChain = (index: number): TemplateChildNode | TemplateChildNode[] | null => {
       const c = node.cases[index];
@@ -180,10 +186,37 @@ export class DriftTransformer {
         ? acorn.parseExpressionAt(c.expression, 0, { ecmaVersion: 'latest' })
         : c.expression;
 
+      let leftNode: acorn.Node;
+      if (isSimple) {
+        leftNode = cloneAstNode(discAst);
+      } else if (isFirstCase) {
+        isFirstCase = false;
+        leftNode = {
+          type: 'AssignmentExpression',
+          operator: '=',
+          left: {
+            type: 'Identifier',
+            name: discVarName,
+            start: 0,
+            end: 0,
+          },
+          right: cloneAstNode(discAst),
+          start: 0,
+          end: 0,
+        } as any;
+      } else {
+        leftNode = {
+          type: 'Identifier',
+          name: discVarName,
+          start: 0,
+          end: 0,
+        } as any;
+      }
+
       const parsedTest: acorn.Node = {
         type: 'BinaryExpression',
         operator: '===',
-        left: cloneAstNode(discAst) as any,
+        left: leftNode as any,
         right: caseAst as any,
         start: 0,
         end: 0,

@@ -1,5 +1,6 @@
 <script>
   import { RouterContext, RouterDepthContext } from '../router.js';
+  import { onUnmount } from 'driftjs-shared';
 
   const router = RouterContext.inject();
   const depth = RouterDepthContext.inject(0);
@@ -22,9 +23,14 @@
   updateCurrentComponent();
 
   if (router && typeof router.subscribe === 'function') {
-    router.subscribe(() => {
+    const unsubscribe = router.subscribe(() => {
       updateCurrentComponent();
     });
+    if (typeof onUnmount === 'function') {
+      onUnmount(() => {
+        unsubscribe();
+      });
+    }
   }
 </script>
 

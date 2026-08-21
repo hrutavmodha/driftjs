@@ -152,4 +152,44 @@ describe('DriftJS @switch Directive Integration Suite', () => {
 
     document.body.removeChild(container);
   });
+
+  it('evaluates expression with side effects in @switch discriminant exactly once across all cases', () => {
+    let callCount = 0;
+    const src = `
+      <script>
+        function computeStatus() {
+          callCount++;
+          return 'third';
+        }
+      </script>
+      <div>
+        @switch computeStatus() {
+          @case 'first' {
+            <span id="res">First</span>
+          }
+          @case 'second' {
+            <span id="res">Second</span>
+          }
+          @case 'third' {
+            <span id="res">Third</span>
+          }
+          @default {
+            <span id="res">Default</span>
+          }
+        }
+      </div>
+    `;
+
+    const mod = compile(src);
+    const vm = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = vm.execute(mod, { scope: { get callCount() { return callCount; }, set callCount(v) { callCount = v; } }, document });
+    if (root) container.appendChild(root);
+
+    expect(container.querySelector('#res')?.textContent).toBe('Third');
+    expect(callCount).toBe(1);
+
+    document.body.removeChild(container);
+  });
 });

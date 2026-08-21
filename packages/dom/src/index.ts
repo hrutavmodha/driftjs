@@ -81,6 +81,7 @@ export class DriftClientVM {
 
   public parentVM: DriftClientVM | null = null;
   public contextMap = new Map<symbol | string, any>();
+  public unmountCallbacks: (() => void)[] = [];
 
   constructor() {
     DriftClientVM.activeVMCount++;
@@ -139,6 +140,17 @@ export class DriftClientVM {
         }
       }
       DriftClientVM.globalDelegatedListeners.clear();
+    }
+
+    if (this.unmountCallbacks && this.unmountCallbacks.length > 0) {
+      for (const cb of this.unmountCallbacks) {
+        try {
+          cb();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      this.unmountCallbacks = [];
     }
 
     this.registers.fill(null);
