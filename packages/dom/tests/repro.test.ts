@@ -177,4 +177,45 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases for Identified Bu
     vm.unmount();
     doc.body.removeChild(container);
   });
+
+  // BUG-21: Unmounted child component VM instances are never cleaned up, leaking activeVMCount and memory
+  it('BUG-21 [Memory / Lifecycle]: unmounting parent or removing child component unmounts child VM and decrements activeVMCount', () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+
+    const initialActiveVMCount = DriftClientVM.activeVMCount;
+
+    const childComp: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['span'],
+    };
+
+    const parentComp: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF,
+        Opcode.APPEND_CHILD, 0, 1,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['div', 'ChildComp'],
+      scope: { ChildComp: childComp },
+    };
+
+    const parentVM = new DriftClientVM();
+    const elem = parentVM.execute(parentComp, { document: doc }) as HTMLElement;
+    container.appendChild(elem);
+
+    // Parent + Child = 2 VMs active above initial
+    expect(DriftClientVM.activeVMCount).toBe(initialActiveVMCount + 2);
+
+    // Unmounting parent should recursively unmount child VM
+    parentVM.unmount();
+    expect(DriftClientVM.activeVMCount).toBe(initialActiveVMCount);
+
+    doc.body.removeChild(container);
+  });
 });

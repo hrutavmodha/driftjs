@@ -43,13 +43,16 @@ const NON_BUBBLING_EVENTS = new Set([
 /**
  * Removes all DOM nodes situated strictly between startAnchor and endAnchor comments.
  */
-function clearBetweenAnchors(startAnchor: Node, endAnchor: Node): void {
+function clearBetweenAnchors(startAnchor: Node, endAnchor: Node, vm?: DriftClientVM): void {
   const parent = startAnchor.parentNode;
   if (!parent) return;
   let curr = startAnchor.nextSibling;
   while (curr && curr !== endAnchor) {
     const next = curr ? curr.nextSibling : null;
     if (curr && curr.parentNode === parent) {
+      if (vm) {
+        vm.unmountSubtree(curr);
+      }
       parent.removeChild(curr);
     }
     curr = next;
@@ -62,7 +65,7 @@ function clearBetweenAnchors(startAnchor: Node, endAnchor: Node): void {
  */
 export class DriftClientVM {
   private static readonly MAX_REGISTERS = 256;
-  private static activeVMCount = 0;
+  public static activeVMCount = 0;
   private static globalDelegatedListeners = new Map<string, (e: Event) => void>();
 
   private readonly registers: (Node | any)[] = new Array(DriftClientVM.MAX_REGISTERS);
@@ -76,6 +79,7 @@ export class DriftClientVM {
   private static eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
   private cursor: HydrationCursor | null = null;
   private childVMs = new WeakMap<Node, { vm: DriftClientVM; scope: Record<string, any>; propsSpec: any }>();
+  private mountedChildVMs = new Set<DriftClientVM>();
   private pendingDirtyVars = new Set<string>();
   private isUpdateScheduled = false;
 
@@ -85,6 +89,25 @@ export class DriftClientVM {
 
   constructor() {
     DriftClientVM.activeVMCount++;
+  }
+
+  public unmountSubtree(node: Node | null): void {
+    if (!node) return;
+    const entry = this.childVMs.get(node);
+    if (entry) {
+      this.mountedChildVMs.delete(entry.vm);
+      entry.vm.unmount();
+      this.childVMs.delete(node);
+    }
+    const children = (node as any).childNodes;
+    if (children) {
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (child) {
+          this.unmountSubtree(child);
+        }
+      }
+    }
   }
 
   public registerRegion(region: ReactiveRegion): void {
@@ -125,6 +148,11 @@ export class DriftClientVM {
     if (DriftClientVM.activeVMCount > 0) {
       DriftClientVM.activeVMCount--;
     }
+
+    for (const childVM of Array.from(this.mountedChildVMs)) {
+      childVM.unmount();
+    }
+    this.mountedChildVMs.clear();
 
     for (const region of [...this.reactiveRegions]) {
       this.removeRegion(region);
@@ -320,6 +348,7 @@ export class DriftClientVM {
             this.updateChildComponentProps(childVM.scope, childVM, propsObj);
             if (compNode) {
               this.childVMs.set(compNode, { vm: childVM, scope: childVM.scope, propsSpec });
+              this.mountedChildVMs.add(childVM);
               this.setRegister(dstReg, compNode);
             }
           }
@@ -481,7 +510,7 @@ export class DriftClientVM {
             }
             childRegions = [];
             if (actualEndAnchor && startAnchor.parentNode) {
-              clearBetweenAnchors(startAnchor, actualEndAnchor);
+              clearBetweenAnchors(startAnchor, actualEndAnchor, vm);
             }
             const before = vm.reactiveRegions.length;
             const cond = evaluateExpression(condExpr, scope, vm.declaredVars);
@@ -559,6 +588,11 @@ export class DriftClientVM {
                 vm.removeRegion(r);
               }
               record.childRegions = [];
+            }
+            if (record.nodes) {
+              for (const node of record.nodes) {
+                vm.unmountSubtree(node);
+              }
             }
           };
 
@@ -674,6 +708,7 @@ export class DriftClientVM {
                       elem.setAttribute(attr.name, attr.value);
                     }
                     while (elem.firstChild) {
+                      vm.unmountSubtree(elem.firstChild);
                       elem.removeChild(elem.firstChild);
                     }
                     while (newElem.firstChild) {
@@ -685,6 +720,7 @@ export class DriftClientVM {
                     parent.insertBefore(frag, rootNode);
                     for (const oldNode of record.nodes) {
                       if (oldNode.parentNode === parent) {
+                        vm.unmountSubtree(oldNode);
                         parent.removeChild(oldNode);
                       }
                     }
