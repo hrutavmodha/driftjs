@@ -606,6 +606,7 @@ export class DriftLexer {
   private isRegexStart(expr: string): boolean {
     const trimmed = expr.trimEnd();
     if (trimmed.length === 0) return true;
+    if (trimmed.endsWith('++') || trimmed.endsWith('--')) return false;
     const lastChar = trimmed[trimmed.length - 1];
     if ('=(,:;!&|?[{}+-*%<>~^'.includes(lastChar!)) return true;
     const lastWord = trimmed.split(/\s+/).pop();

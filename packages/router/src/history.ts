@@ -58,17 +58,30 @@ export function createWebHistory(base: string = ''): RouterHistory {
   };
 
   let currentLocation = getLocation();
-  let currentState: HistoryState = (typeof window !== 'undefined' && window.history.state) || null;
+  let currentPos = (typeof window !== 'undefined' && window.history.state && typeof window.history.state.__drift_pos === 'number')
+    ? window.history.state.__drift_pos
+    : 0;
 
-  const popstateListener = (_event: PopStateEvent) => {
+  if (typeof window !== 'undefined' && (window.history.state == null || typeof window.history.state.__drift_pos !== 'number')) {
+    const existing = window.history.state || {};
+    window.history.replaceState({ ...existing, __drift_pos: currentPos }, '', createHref(normalizedBase, currentLocation));
+  }
+
+  const popstateListener = (event: PopStateEvent) => {
     const from = currentLocation;
     const to = getLocation();
     currentLocation = to;
-    currentState = (typeof window !== 'undefined' && window.history.state) || null;
+
+    const state = (typeof window !== 'undefined' && window.history.state) || event.state || null;
+    const newPos = (state && typeof state.__drift_pos === 'number') ? state.__drift_pos : currentPos;
+    const delta = newPos - currentPos;
+    currentPos = newPos;
+
+    const direction: NavigationDirection = delta > 0 ? 'forward' : delta < 0 ? 'back' : 'unknown';
 
     const info: NavigationInformation = {
-      direction: 'unknown',
-      delta: 0,
+      direction,
+      delta,
       type: 'pop',
     };
 
@@ -89,7 +102,11 @@ export function createWebHistory(base: string = ''): RouterHistory {
       return getLocation();
     },
     get state(): HistoryState {
-      return currentState;
+      if (typeof window === 'undefined') return null;
+      const s = window.history.state;
+      if (!s || typeof s !== 'object') return s ?? null;
+      const { __drift_pos, __drift_has_data, ...rest } = s;
+      return (Object.keys(rest).length > 0 || __drift_has_data) ? rest : null;
     },
     listen(callback: NavigationCallback): () => void {
       listeners.push(callback);
@@ -100,19 +117,18 @@ export function createWebHistory(base: string = ''): RouterHistory {
     },
     push(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
+      currentPos++;
       const href = createHref(normalizedBase, to);
-      const stateObj = data || {};
+      const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
       window.history.pushState(stateObj, '', href);
       currentLocation = to;
-      currentState = stateObj;
     },
     replace(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
       const href = createHref(normalizedBase, to);
-      const stateObj = data || {};
+      const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
       window.history.replaceState(stateObj, '', href);
       currentLocation = to;
-      currentState = stateObj;
     },
     go(delta: number): void {
       if (typeof window !== 'undefined') {
@@ -143,19 +159,37 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
     return raw.startsWith('/') ? raw : '/' + raw;
   };
 
+  const formatHashHref = (location: string): string => {
+    const cleanLoc = location.startsWith('/') ? location : '/' + location;
+    return (normalizedBase ? normalizedBase : '') + '#' + cleanLoc;
+  };
+
   let currentLocation = getHashLocation();
-  let currentState: HistoryState = (typeof window !== 'undefined' && window.history.state) || null;
+  let currentPos = (typeof window !== 'undefined' && window.history.state && typeof window.history.state.__drift_pos === 'number')
+    ? window.history.state.__drift_pos
+    : 0;
+
+  if (typeof window !== 'undefined' && (window.history.state == null || typeof window.history.state.__drift_pos !== 'number')) {
+    const existing = window.history.state || {};
+    window.history.replaceState({ ...existing, __drift_pos: currentPos }, '', formatHashHref(currentLocation));
+  }
 
   const changeListener = (_event: Event) => {
     const to = getHashLocation();
     if (to === currentLocation) return;
     const from = currentLocation;
     currentLocation = to;
-    currentState = (typeof window !== 'undefined' && window.history.state) || null;
+
+    const state = (typeof window !== 'undefined' && window.history.state) || null;
+    const newPos = (state && typeof state.__drift_pos === 'number') ? state.__drift_pos : currentPos;
+    const delta = newPos - currentPos;
+    currentPos = newPos;
+
+    const direction: NavigationDirection = delta > 0 ? 'forward' : delta < 0 ? 'back' : 'unknown';
 
     const info: NavigationInformation = {
-      direction: 'unknown',
-      delta: 0,
+      direction,
+      delta,
       type: 'pop',
     };
 
@@ -169,11 +203,6 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
     window.addEventListener('hashchange', changeListener);
   }
 
-  const formatHashHref = (location: string): string => {
-    const cleanLoc = location.startsWith('/') ? location : '/' + location;
-    return (normalizedBase ? normalizedBase : '') + '#' + cleanLoc;
-  };
-
   return {
     get base(): string {
       return normalizedBase;
@@ -182,7 +211,11 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
       return getHashLocation();
     },
     get state(): HistoryState {
-      return currentState;
+      if (typeof window === 'undefined') return null;
+      const s = window.history.state;
+      if (!s || typeof s !== 'object') return s ?? null;
+      const { __drift_pos, __drift_has_data, ...rest } = s;
+      return (Object.keys(rest).length > 0 || __drift_has_data) ? rest : null;
     },
     listen(callback: NavigationCallback): () => void {
       listeners.push(callback);
@@ -193,19 +226,18 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
     },
     push(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
+      currentPos++;
       const href = formatHashHref(to);
-      const stateObj = data || {};
+      const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
       window.history.pushState(stateObj, '', href);
       currentLocation = to;
-      currentState = stateObj;
     },
     replace(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
       const href = formatHashHref(to);
-      const stateObj = data || {};
+      const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
       window.history.replaceState(stateObj, '', href);
       currentLocation = to;
-      currentState = stateObj;
     },
     go(delta: number): void {
       if (typeof window !== 'undefined') {

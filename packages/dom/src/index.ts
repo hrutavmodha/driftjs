@@ -27,6 +27,19 @@ import {
 } from "driftjs-shared";
 
 
+const NON_BUBBLING_EVENTS = new Set([
+  'focus',
+  'blur',
+  'mouseenter',
+  'mouseleave',
+  'scroll',
+  'load',
+  'unload',
+  'error',
+  'pointerenter',
+  'pointerleave',
+]);
+
 /**
  * Removes all DOM nodes situated strictly between startAnchor and endAnchor comments.
  */
@@ -198,7 +211,8 @@ export class DriftClientVM {
           curr = curr.parentNode;
         }
       };
-      root.addEventListener(eventName, listener);
+      const useCapture = NON_BUBBLING_EVENTS.has(eventName);
+      root.addEventListener(eventName, listener, useCapture);
       DriftClientVM.globalDelegatedListeners.set(eventName, listener);
     }
   }

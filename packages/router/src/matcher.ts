@@ -255,6 +255,7 @@ export interface RouteMatcher {
 export function createMatcher(routes: readonly RouteRecordRaw[]): RouteMatcher {
   let normalizedRoutes: RouteRecordNormalized[] = [];
   const nameMap = new Map<string, RouteRecordNormalized>();
+  const rootRecordList: RouteRecordNormalized[] = [];
 
   function flattenRoutes(record: RouteRecordNormalized, list: RouteRecordNormalized[]) {
     list.push(record);
@@ -269,9 +270,8 @@ export function createMatcher(routes: readonly RouteRecordRaw[]): RouteMatcher {
   function rebuildIndex() {
     nameMap.clear();
     const flattened: RouteRecordNormalized[] = [];
-    for (const raw of routes) {
-      const norm = normalizeRouteRecord(raw);
-      flattenRoutes(norm, flattened);
+    for (const rootRecord of rootRecordList) {
+      flattenRoutes(rootRecord, flattened);
     }
     // Sort routes by score descending so more specific routes match first
     normalizedRoutes = flattened.sort((a, b) => {
@@ -281,6 +281,9 @@ export function createMatcher(routes: readonly RouteRecordRaw[]): RouteMatcher {
     });
   }
 
+  for (const raw of routes) {
+    rootRecordList.push(normalizeRouteRecord(raw));
+  }
   rebuildIndex();
 
   function matchPath(path: string): { record: RouteRecordNormalized | null; params: RouteParams } {
@@ -403,17 +406,13 @@ export function createMatcher(routes: readonly RouteRecordRaw[]): RouteMatcher {
         }
       } else if (typeof parentOrRoute === 'object') {
         const norm = normalizeRouteRecord(parentOrRoute);
-        const flattened: RouteRecordNormalized[] = [];
-        flattenRoutes(norm, flattened);
-        for (const item of flattened) {
-          normalizedRoutes.push(item);
-        }
-        normalizedRoutes.sort((a, b) => compilePathToRegex(b.path).score - compilePathToRegex(a.path).score);
+        rootRecordList.push(norm);
+        rebuildIndex();
         return () => {
-          for (const item of flattened) {
-            const idx = normalizedRoutes.indexOf(item);
-            if (idx !== -1) normalizedRoutes.splice(idx, 1);
-            if (item.name) nameMap.delete(item.name);
+          const idx = rootRecordList.indexOf(norm);
+          if (idx !== -1) {
+            rootRecordList.splice(idx, 1);
+            rebuildIndex();
           }
         };
       }
@@ -422,9 +421,14 @@ export function createMatcher(routes: readonly RouteRecordRaw[]): RouteMatcher {
     removeRoute(name: string): void {
       const record = nameMap.get(name);
       if (record) {
-        nameMap.delete(name);
-        const idx = normalizedRoutes.indexOf(record);
-        if (idx !== -1) normalizedRoutes.splice(idx, 1);
+        if (record.parent) {
+          const idx = record.parent.children.indexOf(record);
+          if (idx !== -1) record.parent.children.splice(idx, 1);
+        } else {
+          const idx = rootRecordList.indexOf(record);
+          if (idx !== -1) rootRecordList.splice(idx, 1);
+        }
+        rebuildIndex();
       }
     },
     hasRoute(name: string): boolean {

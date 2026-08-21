@@ -42,6 +42,8 @@ const VOID_ELEMENTS = new Set([
   'link', 'meta', 'param', 'source', 'track', 'wbr'
 ]);
 
+const VALID_ATTR_NAME_REGEX = /^[a-zA-Z_:][a-zA-Z0-9_.:-]*$/;
+
 /**
  * Register-based Virtual Machine for Server-Side Rendering (SSR) in DriftJS.
  * Executes bytecode without DOM dependencies and serializes directly to HTML string.
@@ -329,6 +331,9 @@ export function serializeNode(node: ServerNode | string, isRawText = false): str
     let attrsStr = '';
     if (node.attrs && node.attrs.size > 0) {
       for (const [k, v] of node.attrs.entries()) {
+        if (!VALID_ATTR_NAME_REGEX.test(k)) {
+          continue;
+        }
         if (k === 'style' && (v === '' || v == null || v === false)) {
           continue;
         }
