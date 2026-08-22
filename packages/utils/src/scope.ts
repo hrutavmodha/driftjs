@@ -76,7 +76,7 @@ export function getScopeValue(scope: any, name: string): any {
   if (scope && inScopeChain(scope, name)) {
     return scope[name];
   }
-  if (typeof globalThis !== 'undefined' && globalThis && name in globalThis) {
+  if (typeof globalThis !== 'undefined' && globalThis && Object.prototype.hasOwnProperty.call(globalThis, name)) {
     return (globalThis as any)[name];
   }
   return undefined;
