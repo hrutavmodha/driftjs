@@ -3,6 +3,9 @@
  */
 export function setScopeValue<T = any>(targetScope: Record<string, any>, name: string, val: T): T {
   if (!targetScope || typeof targetScope !== 'object') return val;
+  if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+    return val;
+  }
 
   let curr: any = targetScope;
   let setOn: any = null;

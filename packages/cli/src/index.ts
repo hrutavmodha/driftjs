@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync, spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import type { ScaffoldOptions } from '../types/index.js';
 
 export * from '../types/index.js';
+
+const ALLOWED_PACKAGE_MANAGERS = new Set<string>(['npm', 'pnpm', 'yarn', 'bun']);
 
 /**
  * Scaffolds a new DriftJS project by copying the starter template.
@@ -55,6 +57,9 @@ export function scaffoldProject(options: ScaffoldOptions): void {
   }
 
   const pm = options.packageManager || detectPackageManager();
+  if (!ALLOWED_PACKAGE_MANAGERS.has(pm)) {
+    throw new Error(`Unsupported or invalid package manager: "${pm}". Allowed package managers: npm, pnpm, yarn, bun`);
+  }
 
   if (options.autoInstall) {
     installDependencies(targetDir, pm);
@@ -85,14 +90,20 @@ export function detectPackageManager(): 'pnpm' | 'npm' | 'yarn' | 'bun' {
 }
 
 export function installDependencies(targetDir: string, pm: string): void {
+  if (!ALLOWED_PACKAGE_MANAGERS.has(pm)) {
+    throw new Error(`Unsupported or invalid package manager: "${pm}". Allowed package managers: npm, pnpm, yarn, bun`);
+  }
   console.log(`\n📦 \x1b[36mInstalling dependencies with ${pm}...\x1b[0m\n`);
-  execSync(`${pm} install`, {
+  execFileSync(pm, ['install'], {
     cwd: targetDir,
     stdio: 'inherit',
   });
 }
 
 export function startDevServer(targetDir: string, pm: string): void {
+  if (!ALLOWED_PACKAGE_MANAGERS.has(pm)) {
+    throw new Error(`Unsupported or invalid package manager: "${pm}". Allowed package managers: npm, pnpm, yarn, bun`);
+  }
   console.log(`\n⚡ \x1b[32mStarting DriftJS Vite dev server with ${pm} dev...\x1b[0m\n`);
   const args = pm === 'npm' ? ['run', 'dev'] : ['dev'];
 
