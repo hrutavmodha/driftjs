@@ -101,6 +101,39 @@ export function normalizePath(path: string): string {
   return norm;
 }
 
+function interpolatePathParams(path: string, params: Record<string, any>): string {
+  const segments = path.split('/');
+  const interpolatedSegments = segments.map((segment) => {
+    if (segment === '*' || segment === '/*') {
+      if ('pathMatch' in params) {
+        const val = params['pathMatch'];
+        return Array.isArray(val) ? val.join('/') : String(val);
+      }
+      return '';
+    }
+    if (!segment.startsWith(':')) {
+      return segment;
+    }
+    let rest = segment.slice(1);
+    const isOptional = rest.endsWith('?');
+    const isRepeatable = rest.endsWith('*') || rest.endsWith('+');
+    if (isOptional || isRepeatable) {
+      rest = rest.slice(0, -1);
+    }
+    let paramName = rest;
+    const parenIdx = rest.indexOf('(');
+    if (parenIdx !== -1 && rest.endsWith(')')) {
+      paramName = rest.slice(0, parenIdx);
+    }
+    if (paramName in params) {
+      const val = params[paramName];
+      return Array.isArray(val) ? val.join('/') : String(val);
+    }
+    return '';
+  });
+  return interpolatedSegments.join('/');
+}
+
 interface PathTokens {
   regex: RegExp;
   paramNames: string[];
@@ -335,13 +368,7 @@ export function createMatcher(routes: readonly RouteRecordRaw[]): RouteMatcher {
         if (namedRecord) {
           targetPath = namedRecord.path;
           params = { ...(to.params || {}) };
-          targetPath = targetPath.replace(/:([a-zA-Z0-9_]+)(?:\([^)]*\))?[?*+]?/g, (_match, paramName) => {
-            if (paramName in params) {
-              const val = params[paramName];
-              return Array.isArray(val) ? val.join('/') : String(val);
-            }
-            return '';
-          });
+          targetPath = interpolatePathParams(targetPath, params);
         }
       } else if (to.path) {
         targetPath = to.path;

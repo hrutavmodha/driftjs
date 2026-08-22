@@ -259,7 +259,9 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
  */
 export function createMemoryHistory(initialLocation: string = '/', base: string = ''): RouterHistory {
   const normalizedBase = normalizeBase(base);
-  const entries: string[] = [initialLocation.startsWith('/') ? initialLocation : '/' + initialLocation];
+  const rawInitial = initialLocation.startsWith('/') ? initialLocation : '/' + initialLocation;
+  const initial = stripBase(rawInitial, normalizedBase) || '/';
+  const entries: string[] = [initial];
   const states: HistoryState[] = [null];
   let index = 0;
   const listeners: NavigationCallback[] = [];
