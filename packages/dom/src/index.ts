@@ -418,25 +418,36 @@ export class DriftClientVM {
             if (attrName.startsWith('on') && typeof val === 'function') {
               const eventName = attrName.slice(2).toLowerCase();
 
-              const vm = this;
-              const wrappedHandler = function (this: any, ...args: any[]) {
-                const scopeSnapshot: Record<string, any> = { ...vm.scope };
-                const result = val.apply(this, args);
-                const changedVars = new Set<string>();
-                for (const key of vm.declaredVars) {
-                  if (vm.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
-                }
-                if (changedVars.size > 0) vm.triggerUpdates(changedVars);
-                if (vm.pendingDirtyVars.size > 0) vm.flushUpdates();
-                return result;
-              };
-
               let handlers = DriftClientVM.eventHandlersMap.get(elem);
               if (!handlers) {
                 handlers = {};
                 DriftClientVM.eventHandlersMap.set(elem, handlers);
               }
-              handlers[eventName] = wrappedHandler;
+
+              const existingHandler = handlers[eventName];
+              if (existingHandler && (existingHandler as any)._fn) {
+                (existingHandler as any)._fn = val;
+                (existingHandler as any)._vm = this;
+              } else {
+                const vm = this;
+                const wrappedHandler = function (this: any, ...args: any[]) {
+                  const targetVM = (wrappedHandler as any)._vm || vm;
+                  const currentFn = (wrappedHandler as any)._fn;
+                  if (typeof currentFn !== 'function') return;
+                  const scopeSnapshot: Record<string, any> = { ...targetVM.scope };
+                  const result = currentFn.apply(this, args);
+                  const changedVars = new Set<string>();
+                  for (const key of targetVM.declaredVars) {
+                    if (targetVM.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
+                  }
+                  if (changedVars.size > 0) targetVM.triggerUpdates(changedVars);
+                  if (targetVM.pendingDirtyVars.size > 0) targetVM.flushUpdates();
+                  return result;
+                };
+                (wrappedHandler as any)._fn = val;
+                (wrappedHandler as any)._vm = this;
+                handlers[eventName] = wrappedHandler;
+              }
               this.ensureEventDelegated(eventName);
             } else {
               if (attrName === 'style') {

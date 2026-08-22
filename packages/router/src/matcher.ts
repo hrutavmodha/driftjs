@@ -198,7 +198,7 @@ export function normalizeRouteRecord(
     fullPath = normalizePath(raw.path);
   }
 
-  const { regex, paramNames } = compilePathToRegex(fullPath);
+  const { regex, paramNames, score } = compilePathToRegex(fullPath);
 
   const components: Record<string, RouteComponent> = {};
   if (raw.components) {
@@ -231,6 +231,7 @@ export function normalizeRouteRecord(
     parent,
     regex,
     paramNames,
+    score,
     redirect: raw.redirect,
   };
 
@@ -273,10 +274,10 @@ export function createMatcher(routes: readonly RouteRecordRaw[]): RouteMatcher {
     for (const rootRecord of rootRecordList) {
       flattenRoutes(rootRecord, flattened);
     }
-    // Sort routes by score descending so more specific routes match first
+    // Sort routes by pre-computed score descending so more specific routes match first
     normalizedRoutes = flattened.sort((a, b) => {
-      const scoreA = compilePathToRegex(a.path).score;
-      const scoreB = compilePathToRegex(b.path).score;
+      const scoreA = a.score ?? 0;
+      const scoreB = b.score ?? 0;
       return scoreB - scoreA;
     });
   }

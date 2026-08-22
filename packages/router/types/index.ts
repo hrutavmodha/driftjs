@@ -49,6 +49,7 @@ export interface RouteRecordNormalized {
   parent?: RouteRecordNormalized | undefined;
   regex: RegExp;
   paramNames: string[];
+  score?: number | undefined;
   redirect?: string | RouteLocationRaw | ((to: RouteLocation) => string | RouteLocationRaw) | undefined;
 }
 
