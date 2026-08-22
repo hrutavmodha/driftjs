@@ -43,6 +43,7 @@ const VOID_ELEMENTS = new Set([
 ]);
 
 const VALID_ATTR_NAME_REGEX = /^[a-zA-Z_:][a-zA-Z0-9_.:-]*$/;
+const VALID_TAG_NAME_REGEX = /^[a-zA-Z_:][a-zA-Z0-9_.:-]*$/;
 
 /**
  * Register-based Virtual Machine for Server-Side Rendering (SSR) in DriftJS.
@@ -339,6 +340,9 @@ export function serializeNode(node: ServerNode | string, isRawText = false, rawT
   }
   if (node.type === 'element') {
     const tag = node.tag!;
+    if (!tag || !VALID_TAG_NAME_REGEX.test(tag)) {
+      return '';
+    }
     const isRaw = tag.toLowerCase() === 'script' || tag.toLowerCase() === 'style';
     let attrsStr = '';
     if (node.attrs && node.attrs.size > 0) {

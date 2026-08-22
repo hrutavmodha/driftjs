@@ -68,3 +68,22 @@ export function inScopeChain(scope: any, name: string): boolean {
   }
   return false;
 }
+
+/**
+ * Safely gets a variable value from the scope chain, or falls back to globalThis.
+ */
+export function getScopeValue(scope: any, name: string): any {
+  if (scope && inScopeChain(scope, name)) {
+    return scope[name];
+  }
+  if (typeof globalThis !== 'undefined' && globalThis && name in globalThis) {
+    return (globalThis as any)[name];
+  }
+  return undefined;
+}
+
+export const _get = getScopeValue;
+
+if (typeof globalThis !== 'undefined' && !(globalThis as any)._get) {
+  (globalThis as any)._get = getScopeValue;
+}
