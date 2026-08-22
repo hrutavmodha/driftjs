@@ -201,4 +201,104 @@ describe('DriftJS Compiler - Reproduction Test Cases', () => {
     expect(scope.b).toBe(2);
     expect(scope.c).toBe(3);
   });
+
+  it('extracts computed member expression identifiers as reactive dependencies', () => {
+    const template = `
+      <script>
+        let items = ['zero', 'one', 'two'];
+        let selectedIdx = 1;
+      </script>
+      <div>{items[selectedIdx]}</div>
+    `;
+    const compiled = compile(template);
+    const selectedBinding = compiled.reactiveBindings?.find((b) => b.variable === 'selectedIdx');
+    expect(selectedBinding).toBeDefined();
+    expect(selectedBinding?.positions.length).toBeGreaterThan(0);
+  });
+
+  it('destructuring with default value applies default when property is explicitly undefined', () => {
+    const template = `
+      <script>
+        const { val = 'defaultVal' } = { val: undefined };
+      </script>
+      <div>{val}</div>
+    `;
+    const compiled = compile(template);
+    const scope: Record<string, any> = {};
+    const scriptAst = compiled.constants[0];
+    if (typeof scriptAst === 'object' && scriptAst.__drift_fn__) {
+      const fn = new Function('return (' + scriptAst.__drift_fn__ + ')')();
+      fn(scope, null, (s: any, k: string, v: any) => { s[k] = v; return v; });
+    }
+    expect(scope.val).toBe('defaultVal');
+  });
+
+  it('destructuring with computed property name evaluates dynamic property key', () => {
+    const template = `
+      <script>
+        let dynamicKey = 'customProp';
+        let sourceObj = { customProp: 'hello world' };
+        const { [dynamicKey]: extracted } = sourceObj;
+      </script>
+      <div>{extracted}</div>
+    `;
+    const compiled = compile(template);
+    const scope: Record<string, any> = {};
+    const scriptAst = compiled.constants[0];
+    if (typeof scriptAst === 'object' && scriptAst.__drift_fn__) {
+      const fn = new Function('return (' + scriptAst.__drift_fn__ + ')')();
+      fn(scope, null, (s: any, k: string, v: any) => { s[k] = v; return v; }, (s: any, k: string) => k in s);
+    }
+    expect(scope.extracted).toBe('hello world');
+  });
+
+  it('switch on dynamic discriminant tracks reactive dependencies for alternate branches', () => {
+    const template = `
+      <script>
+        let state = { mode: 'dark' };
+      </script>
+      @switch state.mode {
+        @case 'light' {
+          <span>Light Mode</span>
+        }
+        @case 'dark' {
+          <span>Dark Mode</span>
+        }
+        @default {
+          <span>Default Mode</span>
+        }
+      }
+    `;
+    const ast = new DriftParser(new DriftLexer(template)).parse();
+    const transformed = new DriftTransformer(ast).transform();
+    const generator = new DriftGenerator(transformed);
+    const compiled = generator.generate();
+
+    const reactiveIfConsts = compiled.constants.filter((c) => c && typeof c === 'object' && c.bytecode);
+    for (const mod of reactiveIfConsts) {
+      if (mod.constants) {
+        const depsArray = mod.constants.find((c: any) => Array.isArray(c) && c.includes('state'));
+        expect(depsArray).toBeDefined();
+      }
+    }
+  });
+
+  it('ArrayPattern destructuring assignment resolves iterables', () => {
+    const template = `
+      <script>
+        let a, b;
+        [a, b] = new Set(['first', 'second']);
+      </script>
+      <div>{a}, {b}</div>
+    `;
+    const compiled = compile(template);
+    const scope: Record<string, any> = {};
+    const scriptAst = compiled.constants[0];
+    if (typeof scriptAst === 'object' && scriptAst.__drift_fn__) {
+      const fn = new Function('return (' + scriptAst.__drift_fn__ + ')')();
+      fn(scope, null, (s: any, k: string, v: any) => { s[k] = v; return v; }, null, (iter: any) => Array.from(iter));
+    }
+    expect(scope.a).toBe('first');
+    expect(scope.b).toBe('second');
+  });
 });

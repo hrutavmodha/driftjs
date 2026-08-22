@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { setScopeValue } from '../src/index.js';
+import { setScopeValue, getScopeValue } from '../src/index.js';
 
 describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
   it('setScopeValue returns the assigned value for expression assignment evaluation', () => {
@@ -19,5 +19,16 @@ describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
 
     expect((Object.prototype as any).polluted).toBeUndefined();
     expect(({} as any).polluted).toBeUndefined();
+  });
+
+  it('getScopeValue returns undefined for Object.prototype properties when not defined on scope or own globalThis', () => {
+    const scope = {};
+    const constructorVal = getScopeValue(scope, 'constructor');
+    const toStringVal = getScopeValue(scope, 'toString');
+    const valueOfVal = getScopeValue(scope, 'valueOf');
+
+    expect(constructorVal).toBeUndefined();
+    expect(toStringVal).toBeUndefined();
+    expect(valueOfVal).toBeUndefined();
   });
 });

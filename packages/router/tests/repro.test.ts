@@ -102,4 +102,62 @@ describe('DriftJS Router - Reproduction Test Cases', () => {
 
     expect(resolved.path).toBe('/user/123');
   });
+
+  it('RouterLink updates active class when route changes after initial render', async () => {
+    const history = createMemoryHistory('/');
+    const router = createRouter({
+      history,
+      routes: [
+        { path: '/', name: 'home', component: { bytecode: [], constants: [] } },
+        { path: '/about', name: 'about', component: { bytecode: [], constants: [] } },
+      ],
+    });
+    await router.isReady();
+
+    const container = document.createElement('div');
+    const vm = new DriftClientVM();
+    vm.contextMap.set(RouterContext.id, router);
+
+    const node = vm.execute(RouterLink, {
+      scope: {
+        router,
+        RouterContext,
+        props: { to: '/about', label: 'About Page' },
+      },
+      document,
+    }) as HTMLElement;
+    container.appendChild(node);
+
+    const link = container.querySelector('a')!;
+    expect(link.classList.contains('router-link-active')).toBe(false);
+
+    // Navigate to /about
+    await router.push('/about');
+
+    expect(link.classList.contains('router-link-active')).toBe(true);
+
+    vm.unmount();
+  });
+
+  it('createMemoryHistory strips normalized base from initialLocation', () => {
+    const history = createMemoryHistory('/app/dashboard', '/app');
+    expect(history.location).toBe('/dashboard');
+  });
+
+  it('resolve() correctly interpolates route params with nested regex groups', () => {
+    const matcher = createMatcher([
+      {
+        path: '/order/:id((a|b)+)',
+        name: 'order-detail',
+        component: { bytecode: [], constants: [] },
+      },
+    ]);
+
+    const resolved = matcher.resolve({
+      name: 'order-detail',
+      params: { id: 'aba' },
+    });
+
+    expect(resolved.path).toBe('/order/aba');
+  });
 });

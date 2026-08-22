@@ -268,4 +268,91 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     vm.unmount();
     doc.body.removeChild(container);
   });
+
+  it('delegated event listener supports event bubbling through ancestor handlers', () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+
+    const parentHandler = vi.fn();
+    const childHandler = vi.fn();
+
+    const template = `
+      <div id="parent" onclick={onParentClick}>
+        <button id="child" onclick={onChildClick}>Click Me</button>
+      </div>
+    `;
+
+    const compiled = compile(template);
+    const vm = new DriftClientVM();
+    const node = vm.execute(compiled, {
+      document: doc,
+      scope: { onParentClick: parentHandler, onChildClick: childHandler },
+    }) as HTMLElement;
+    container.appendChild(node);
+
+    const childBtn = container.querySelector('#child') as HTMLButtonElement;
+    childBtn.click();
+
+    expect(childHandler).toHaveBeenCalledTimes(1);
+    expect(parentHandler).toHaveBeenCalledTimes(1);
+
+    vm.unmount();
+    doc.body.removeChild(container);
+  });
+
+  it('fast-path row re-render updates event handlers on reused root element', async () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+
+    let clickedItem: any = null;
+
+    const template = `
+      <script>
+        let items = [{ id: 1, text: 'Old Text' }];
+        let clickedItem = null;
+        function handleItemClick(it) {
+          clickedItem = it.text;
+        }
+      </script>
+      <ul>
+        @for item in items key item.id {
+          <li onclick={() => handleItemClick(item)}>{item.text}</li>
+        }
+      </ul>
+    `;
+
+    const compiled = compile(template);
+    const vm = new DriftClientVM();
+    const node = vm.execute(compiled, { document: doc }) as HTMLElement;
+    container.appendChild(node);
+
+    const li = container.querySelector('li') as HTMLLIElement;
+    li.click();
+    expect(vm.scope.clickedItem).toBe('Old Text');
+
+    // Update item text in place (same key, mutated object)
+    vm.scope.items = [{ id: 1, text: 'New Text' }];
+    vm.markDirty('items');
+    await new Promise((r) => setTimeout(r, 10));
+
+    const updatedLi = container.querySelector('li') as HTMLLIElement;
+    updatedLi.click();
+    expect(vm.scope.clickedItem).toBe('New Text');
+
+    vm.unmount();
+    doc.body.removeChild(container);
+  });
+
+  it('markDirty on unmounted VM does not schedule microtasks or flush updates', async () => {
+    const vm = new DriftClientVM();
+    const flushSpy = vi.spyOn(vm as any, 'flushUpdates');
+    vm.unmount();
+
+    vm.markDirty('someVar');
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(flushSpy).not.toHaveBeenCalled();
+  });
 });

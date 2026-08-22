@@ -490,6 +490,9 @@ export class DriftGenerator {
         break;
       case 'MemberExpression':
         for (const id of this.extractIdentifiers(node.object)) ids.add(id);
+        if (node.computed && node.property) {
+          for (const id of this.extractIdentifiers(node.property)) ids.add(id);
+        }
         break;
       case 'CallExpression':
         for (const id of this.extractIdentifiers(node.callee)) ids.add(id);

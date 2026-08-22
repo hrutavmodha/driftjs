@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DriftServerVM, renderToString, serializeNode } from '../src/index.js';
-import { Opcode, type CompiledModule } from 'driftjs-compiler';
+import { Opcode, type CompiledModule, compile } from 'driftjs-compiler';
 
 describe('DriftServerVM (SSR Engine) - Reproduction Test Cases', () => {
   it('child component props take precedence over parent scope variables of the same name', () => {
@@ -106,5 +106,41 @@ describe('DriftServerVM (SSR Engine) - Reproduction Test Cases', () => {
 
     const html = serializeNode(maliciousNode);
     expect(html).not.toContain('onclick=alert(1)');
+  });
+
+  it('serializeNode escapes or sanitizes "-->" sequences inside comments to prevent XSS breakout', () => {
+    const maliciousCommentModule: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_COMMENT, 0, 0,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['--> <script>alert("XSS")</script> <!--'],
+    };
+
+    const html = renderToString(maliciousCommentModule);
+    expect(html).not.toContain('--> <script>alert("XSS")</script>');
+  });
+
+  it('sub-module execution in REACTIVE_IF does not pollute parent VM scope during SSR', () => {
+    const template = `
+      <script>
+        let parentVar = 'initial';
+      </script>
+      <div>
+        @if (true) {
+          <script>
+            let subVar = 'created in sub';
+          </script>
+          <span>{subVar}</span>
+        }
+        <span>{parentVar}</span>
+      </div>
+    `;
+
+    const compiled = compile(template);
+    const vm = new DriftServerVM();
+    vm.execute(compiled);
+
+    expect((vm as any).scope.subVar).toBeUndefined();
   });
 });

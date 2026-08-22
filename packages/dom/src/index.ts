@@ -252,7 +252,9 @@ export class DriftClientVM {
             const handlers = DriftClientVM.eventHandlersMap.get(curr);
             if (handlers && handlers[eventName]) {
               handlers[eventName].call(curr, e);
-              break;
+              if (e.cancelBubble || (NON_BUBBLING_EVENTS.has(eventName) && !e.bubbles)) {
+                break;
+              }
             }
           }
           curr = curr.parentNode;
