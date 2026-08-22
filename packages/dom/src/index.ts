@@ -73,7 +73,7 @@ export class DriftClientVM {
   private module: CompiledModule | null = null;
   private declaredVars: Set<string> = new Set();
   private doc: Document | null = null;
-  private reactiveRegions: ReactiveRegion[] = [];
+  private reactiveRegions = new Set<ReactiveRegion>();
   private reactiveRegionsIndex = new Map<string, Set<ReactiveRegion>>();
   private delegatedEvents = new Set<string>();
   private static eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
@@ -113,7 +113,7 @@ export class DriftClientVM {
   }
 
   public registerRegion(region: ReactiveRegion): void {
-    this.reactiveRegions.push(region);
+    this.reactiveRegions.add(region);
     for (const dep of region.deps) {
       let set = this.reactiveRegionsIndex.get(dep);
       if (!set) {
@@ -140,10 +140,7 @@ export class DriftClientVM {
       }
     }
 
-    const idx = this.reactiveRegions.indexOf(region);
-    if (idx !== -1) {
-      this.reactiveRegions.splice(idx, 1);
-    }
+    this.reactiveRegions.delete(region);
   }
 
   public unmount(): void {
@@ -156,10 +153,10 @@ export class DriftClientVM {
     }
     this.mountedChildVMs.clear();
 
-    for (const region of [...this.reactiveRegions]) {
+    for (const region of Array.from(this.reactiveRegions)) {
       this.removeRegion(region);
     }
-    this.reactiveRegions = [];
+    this.reactiveRegions.clear();
     this.reactiveRegionsIndex.clear();
 
     if (DriftClientVM.activeVMCount === 0 && DriftClientVM.globalDelegatedListeners.size > 0) {
@@ -192,6 +189,7 @@ export class DriftClientVM {
   }
 
   public markDirty(varName: string): void {
+    if (!this.module) return;
     this.pendingDirtyVars.add(varName);
     if (!this.isUpdateScheduled) {
       this.isUpdateScheduled = true;
@@ -201,7 +199,7 @@ export class DriftClientVM {
 
   private flushUpdates(): void {
     this.isUpdateScheduled = false;
-    if (this.pendingDirtyVars.size === 0) return;
+    if (!this.module || this.pendingDirtyVars.size === 0) return;
     const dirty = new Set(this.pendingDirtyVars);
     this.pendingDirtyVars.clear();
     this.triggerUpdates(dirty);
@@ -538,7 +536,7 @@ export class DriftClientVM {
             if (actualEndAnchor && startAnchor.parentNode) {
               clearBetweenAnchors(startAnchor, actualEndAnchor, vm);
             }
-            const before = vm.reactiveRegions.length;
+            const before = vm.reactiveRegions.size;
             const cond = evaluateExpression(condExpr, scope, vm.declaredVars);
             const subMod = cond ? consMod : altMod;
             if (subMod) {
@@ -551,7 +549,7 @@ export class DriftClientVM {
                 }
               }
             }
-            childRegions = vm.reactiveRegions.slice(before);
+            childRegions = Array.from(vm.reactiveRegions).slice(before);
             if (ifRegion) {
               ifRegion.childRegions = childRegions;
             }
@@ -649,14 +647,14 @@ export class DriftClientVM {
                 childScope[itemName] = itemVal;
                 if (indexName) childScope[indexName] = indexVal;
 
-                const before = vm.reactiveRegions.length;
+                const before = vm.reactiveRegions.size;
                 const frag = vm.runSubModule(bodyMod, childScope);
                 const nodes: Node[] = frag
                   ? frag.nodeType === 11
                     ? Array.from(frag.childNodes)
                     : [frag]
                   : [];
-                const childRegions = vm.reactiveRegions.slice(before);
+                const childRegions = Array.from(vm.reactiveRegions).slice(before);
 
                 if (frag) {
                   if (refNode && refNode.parentNode) {
@@ -713,9 +711,9 @@ export class DriftClientVM {
                   }
                 }
 
-                const before = vm.reactiveRegions.length;
+                const before = vm.reactiveRegions.size;
                 const frag = vm.runSubModule(bodyMod, childScope);
-                record.childRegions = vm.reactiveRegions.slice(before);
+                record.childRegions = Array.from(vm.reactiveRegions).slice(before);
 
                 if (frag && record.nodes.length > 0) {
                   const rootNode = record.nodes[0];
@@ -939,7 +937,7 @@ export class DriftClientVM {
     }
 
     this.doc = doc;
-    this.reactiveRegions = [];
+    this.reactiveRegions.clear();
 
     if (options.hydrate && options.container) {
       this.cursor = new HydrationCursor(options.container, doc);
@@ -1079,7 +1077,7 @@ export class DriftClientVM {
     }
 
     for (const region of candidateRegions) {
-      if (this.reactiveRegions.includes(region)) {
+      if (this.reactiveRegions.has(region)) {
         region.reRender();
       }
     }

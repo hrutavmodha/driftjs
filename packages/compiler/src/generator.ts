@@ -807,11 +807,28 @@ export function astToJS(node: any, locals?: Set<string>): string {
           if (el?.type === 'Identifier') {
             const varName = el.name;
             if (!locals || !locals.has(varName)) {
-              setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, _val[${i}]);`);
+              setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, _val[${i}]); else (scope || {})[${JSON.stringify(varName)}] = _val[${i}];`);
+            }
+          } else if (el?.type === 'AssignmentPattern') {
+            const varName = el.left?.name || astToJS(el.left, locals);
+            const defaultValJS = astToJS(el.right, locals);
+            if (varName) {
+              const expr = `(_val[${i}] !== undefined ? _val[${i}] : ${defaultValJS})`;
+              if (!locals || !locals.has(varName)) {
+                setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
+              }
+            }
+          } else if (el?.type === 'RestElement') {
+            const varName = el.argument?.name || astToJS(el.argument, locals);
+            if (varName) {
+              const expr = `((_val && typeof _val.slice === 'function') ? _val.slice(${i}) : [])`;
+              if (!locals || !locals.has(varName)) {
+                setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
+              }
             }
           }
         }
-        return `(() => { const _val = ${valJS} || []; ${setCalls.join(' ')} return _val; })()`;
+        return `(() => { const _raw = ${valJS}; const _val = (typeof resolveIterable === 'function' ? resolveIterable : (x) => Array.isArray(x) ? x : (x && typeof x[Symbol.iterator] === 'function' ? Array.from(x) : []))(_raw) || []; ${setCalls.join(' ')} return _raw; })()`;
       }
       if (node.left?.type === 'ObjectPattern') {
         const setCalls: string[] = [];
