@@ -1,5 +1,6 @@
 <script>
   import { RouterContext } from '../router.js';
+  import { onUnmount } from 'driftjs-shared';
 
   const router = RouterContext.inject();
   let to = props.to || '/';
@@ -8,23 +9,38 @@
   let rel = props.rel || '';
   let customClass = props.class || '';
   let label = props.label || props.title || '';
+  let activeClass = '';
+  let href = '';
 
-  function computeHref() {
-    if (!router) return typeof to === 'string' ? to : (to && to.path ? to.path : '#');
-    return router.resolve(to).href;
-  }
-
-  function computeClass() {
-    if (!router) return customClass;
+  function updateLink() {
+    if (!router) {
+      href = typeof to === 'string' ? to : (to && to.path ? to.path : '#');
+      activeClass = customClass;
+      return;
+    }
+    href = router.resolve(to).href;
     const targetPath = router.resolve(to).path;
     const currentPath = router.currentRoute.path;
     if (currentPath === targetPath) {
-      return (customClass ? customClass + ' ' : '') + ((props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active') + ' ' + (props.exactActiveClass || (router.options && router.options.linkExactActiveClass) || 'router-link-exact-active'));
+      activeClass = (customClass ? customClass + ' ' : '') + ((props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active') + ' ' + (props.exactActiveClass || (router.options && router.options.linkExactActiveClass) || 'router-link-exact-active'));
+    } else if (targetPath !== '/' && (currentPath.startsWith(targetPath.endsWith('/') ? targetPath : targetPath + '/'))) {
+      activeClass = (customClass ? customClass + ' ' : '') + (props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active');
+    } else {
+      activeClass = customClass;
     }
-    if (targetPath !== '/' && (currentPath.startsWith(targetPath.endsWith('/') ? targetPath : targetPath + '/'))) {
-      return (customClass ? customClass + ' ' : '') + (props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active');
+  }
+
+  updateLink();
+
+  if (router && typeof router.subscribe === 'function') {
+    const unsubscribe = router.subscribe(() => {
+      updateLink();
+    });
+    if (typeof onUnmount === 'function') {
+      onUnmount(() => {
+        unsubscribe();
+      });
     }
-    return customClass;
   }
 
   function handleClick(e) {
@@ -43,6 +59,6 @@
   }
 </script>
 
-<a href={computeHref()} class={computeClass()} target={target} rel={rel} onclick={handleClick}>
+<a href={href} class={activeClass} target={target} rel={rel} onclick={handleClick}>
   {label}
 </a>

@@ -727,6 +727,12 @@ export class DriftClientVM {
                   ) {
                     const newElem = frag.childNodes[0] as Element;
                     const elem = rootNode as Element;
+                    const newHandlers = DriftClientVM.eventHandlersMap.get(newElem);
+                    if (newHandlers) {
+                      DriftClientVM.eventHandlersMap.set(elem, newHandlers);
+                    } else {
+                      DriftClientVM.eventHandlersMap.delete(elem);
+                    }
                     for (const attr of Array.from(elem.attributes)) {
                       elem.removeAttribute(attr.name);
                     }
