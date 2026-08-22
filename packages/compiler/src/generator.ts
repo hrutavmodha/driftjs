@@ -325,8 +325,17 @@ export class DriftGenerator {
       altIdx = this.addConstant(altMod);
     }
 
-    // Deps = union of both branches' reactive vars + condition identifiers
+    // Deps = union of both branches' reactive vars + condition identifiers + optional extraDeps
     const depsSet = new Set<string>(this.collectDepsFromSubModule(consMod, node.test));
+    if ((node as any).extraDeps) {
+      for (const name of this.extractIdentifiers((node as any).extraDeps)) {
+        if (this.declaredVars.has(name)) depsSet.add(name);
+      }
+      const depsArr = Array.from(depsSet);
+      if (consMod.constants && !consMod.constants.some((c: any) => Array.isArray(c))) {
+        consMod.constants.push(depsArr);
+      }
+    }
     if (altMod) {
       for (const dep of this.collectDepsFromSubModule(altMod)) {
         depsSet.add(dep);

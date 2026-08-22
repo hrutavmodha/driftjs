@@ -49,6 +49,7 @@ export interface IfNode extends BaseASTNode {
   readonly test: string | AcornNode;
   readonly consequent: readonly TemplateChildNode[];
   readonly alternate: readonly TemplateChildNode[] | IfNode | null;
+  readonly extraDeps?: any;
 }
 
 export interface ForNode extends BaseASTNode {

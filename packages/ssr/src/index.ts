@@ -256,9 +256,10 @@ export class DriftServerVM {
 
           parentNode.children.push({ type: 'comment', content: 'if', children: [] });
           if (subMod) {
+            const childScope = Object.create(this.scope);
             const subVm = new DriftServerVM();
             subVm.parentVM = this;
-            const subResult = subVm.execute(subMod, { scope: this.scope });
+            const subResult = subVm.execute(subMod, { scope: childScope });
             if (subResult) parentNode.children.push(subResult);
           }
           parentNode.children.push({ type: 'comment', content: '/if', children: [] });

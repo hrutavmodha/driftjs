@@ -237,6 +237,7 @@ export class DriftTransformer {
         test: parsedTest,
         consequent,
         alternate,
+        extraDeps: !isSimple ? cloneAstNode(discAst) : undefined,
         loc: c.loc,
       };
     };
