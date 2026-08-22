@@ -1154,7 +1154,14 @@ export function astToJS(node: any, locals?: Set<string>): string {
             const setCalls: string[] = [];
             for (const prop of (d.id.properties || [])) {
               if (prop.type === 'Property') {
-                const propKey = prop.key?.name || (typeof prop.key?.value === 'string' ? prop.key.value : astToJS(prop.key, locals));
+                const isComputed = Boolean(prop.computed);
+                const keyExpr = isComputed
+                  ? astToJS(prop.key, locals)
+                  : (prop.key?.name !== undefined
+                      ? JSON.stringify(prop.key.name)
+                      : (typeof prop.key?.value === 'string' || typeof prop.key?.value === 'number'
+                          ? JSON.stringify(prop.key.value)
+                          : astToJS(prop.key, locals)));
                 let varName = prop.value?.name;
                 let defaultValJS: string | null = null;
                 if (prop.value?.type === 'AssignmentPattern') {
@@ -1164,7 +1171,9 @@ export function astToJS(node: any, locals?: Set<string>): string {
                   varName = astToJS(prop.value, locals);
                 }
                 if (varName) {
-                  const expr = `((_obj && (${JSON.stringify(propKey)} in _obj)) ? _obj[${JSON.stringify(propKey)}] : ${defaultValJS ?? 'undefined'})`;
+                  const expr = defaultValJS !== null
+                    ? `((_obj && _obj[${keyExpr}] !== undefined) ? _obj[${keyExpr}] : ${defaultValJS})`
+                    : `(_obj ? _obj[${keyExpr}] : undefined)`;
                   setCalls.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
                 }
               } else if (prop.type === 'RestElement') {
