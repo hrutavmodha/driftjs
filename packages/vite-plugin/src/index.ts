@@ -14,8 +14,16 @@ export type { DriftPluginOptions, DriftModule } from '../types/index.js';
 /**
  * Serializes constant values to JavaScript code literals.
  */
-function serializeValueToJS(val: unknown): string {
+export function serializeValueToJS(val: unknown): string {
   if (val === null || val === undefined) return String(val);
+  if (typeof val === 'number') {
+    if (Number.isNaN(val)) return 'NaN';
+    if (val === Infinity) return 'Infinity';
+    if (val === -Infinity) return '-Infinity';
+    if (Object.is(val, -0)) return '-0';
+    return String(val);
+  }
+  if (typeof val === 'bigint') return `${val.toString()}n`;
   if (typeof val === 'function') return val.toString();
   if (typeof val === 'object') {
     if ('__drift_fn__' in (val as any)) {
@@ -33,7 +41,7 @@ function serializeValueToJS(val: unknown): string {
   return JSON.stringify(val);
 }
 
-function serializeConstants(constants: readonly unknown[]): string {
+export function serializeConstants(constants: readonly unknown[]): string {
   return `[\n    ${constants.map(serializeValueToJS).join(',\n    ')}\n  ]`;
 }
 

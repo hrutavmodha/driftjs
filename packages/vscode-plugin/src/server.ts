@@ -16,21 +16,28 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { compile } from 'driftjs-compiler';
 
-const connection = createConnection(ProposedFeatures.all);
+let connection: ReturnType<typeof createConnection> | null = null;
+try {
+  connection = createConnection(ProposedFeatures.all);
+} catch {
+  // Ignored in test environment
+}
 const documents = new TextDocuments(TextDocument);
 
-connection.onInitialize(() => {
-  return {
-    capabilities: {
-      textDocumentSync: TextDocumentSyncKind.Incremental,
-      completionProvider: {
-        triggerCharacters: ['@', '<', '{', '.', ' ', '(', '"', '\''],
-        resolveProvider: true,
+if (connection) {
+  connection.onInitialize(() => {
+    return {
+      capabilities: {
+        textDocumentSync: TextDocumentSyncKind.Incremental,
+        completionProvider: {
+          triggerCharacters: ['@', '<', '{', '.', ' ', '(', '"', '\''],
+          resolveProvider: true,
+        },
+        hoverProvider: true,
       },
-      hoverProvider: true,
-    },
-  };
-});
+    };
+  });
+}
 
 function validateTextDocument(textDocument: TextDocument): void {
   const text = textDocument.getText();
@@ -61,39 +68,55 @@ function validateTextDocument(textDocument: TextDocument): void {
     }
   }
 
-  connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
+  if (connection) {
+    connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
+  }
 }
 
-documents.onDidChangeContent((change) => {
-  validateTextDocument(change.document);
-});
+if (connection) {
+  documents.onDidChangeContent((change) => {
+    validateTextDocument(change.document);
+  });
+}
 
 /**
  * Extracts declared variable and function names from SFC <script> block.
  */
-function extractScriptVars(docText: string): CompletionItem[] {
+export function extractScriptVars(docText: string): CompletionItem[] {
   const scriptMatch = docText.match(/<script[^>]*>([\s\S]*?)(?:<\/script>|$)/i);
   if (!scriptMatch || !scriptMatch[1]) return [];
 
   const scriptBody = scriptMatch[1];
   const items: CompletionItem[] = [];
+  const seen = new Set<string>();
 
-  // Match: let x, const y, var z, function foo()
-  const declRegex = /(?:let|const|var)\s+([a-zA-Z0-9_$]+)|function\s+([a-zA-Z0-9_$]+)/g;
-  let match: RegExpExecArray | null;
+  // 1. First extract using compiler declaredVars if available
+  try {
+    const compiled = compile(docText);
+    if (compiled.declaredVars && Array.isArray(compiled.declaredVars)) {
+      for (const v of compiled.declaredVars) {
+        if (!seen.has(v)) {
+          seen.add(v);
+          items.push({
+            label: v,
+            kind: CompletionItemKind.Variable,
+            detail: 'Reactive Component State Variable',
+            documentation: `Declared state variable '${v}' in <script> block.`,
+          });
+        }
+      }
+    }
+  } catch {
+    // Compiler may fail while user is typing in-progress template
+  }
 
-  while ((match = declRegex.exec(scriptBody)) !== null) {
-    const varName = match[1];
-    const fnName = match[2];
-
-    if (varName) {
-      items.push({
-        label: varName,
-        kind: CompletionItemKind.Variable,
-        detail: 'Reactive Component State Variable',
-        documentation: `Declared state variable '${varName}' in <script> block.`,
-      });
-    } else if (fnName) {
+  // 2. Extract function declarations: function foo()
+  const fnRegex = /function\s+([a-zA-Z0-9_$]+)\s*\(/g;
+  let fnMatch: RegExpExecArray | null;
+  while ((fnMatch = fnRegex.exec(scriptBody)) !== null) {
+    const fnName = fnMatch[1];
+    if (fnName && !seen.has(fnName)) {
+      seen.add(fnName);
       items.push({
         label: fnName,
         kind: CompletionItemKind.Function,
@@ -104,10 +127,34 @@ function extractScriptVars(docText: string): CompletionItem[] {
     }
   }
 
+  // 3. Fallback regex to capture comma-separated & destructuring variable declarations
+  const declBlockRegex = /(?:let|const|var)\s+([^;]+)(?:;|$)/gm;
+  let declBlock: RegExpExecArray | null;
+  const reserved = new Set(['let', 'const', 'var', 'true', 'false', 'null', 'undefined', 'new', 'function', 'return', 'typeof', 'instanceof', 'in', 'of']);
+  while ((declBlock = declBlockRegex.exec(scriptBody)) !== null) {
+    const declContent = declBlock[1];
+    if (!declContent) continue;
+    const idRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
+    let idMatch: RegExpExecArray | null;
+    while ((idMatch = idRegex.exec(declContent)) !== null) {
+      const name = idMatch[0];
+      if (!reserved.has(name) && !seen.has(name)) {
+        seen.add(name);
+        items.push({
+          label: name,
+          kind: CompletionItemKind.Variable,
+          detail: 'Reactive Component State Variable',
+          documentation: `Declared state variable '${name}' in <script> block.`,
+        });
+      }
+    }
+  }
+
   return items;
 }
 
-connection.onCompletion((params): CompletionItem[] => {
+if (connection) {
+  connection.onCompletion((params): CompletionItem[] => {
   const doc = documents.get(params.textDocument.uri);
   if (!doc) return [];
 
@@ -369,58 +416,59 @@ connection.onCompletion((params): CompletionItem[] => {
   ];
 });
 
-connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
-  return item;
-});
+  connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
+    return item;
+  });
 
-connection.onHover((params): Hover | null => {
-  const doc = documents.get(params.textDocument.uri);
-  if (!doc) return null;
+  connection.onHover((params): Hover | null => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return null;
 
-  const text = doc.getText();
-  const offset = doc.offsetAt(params.position);
+    const text = doc.getText();
+    const offset = doc.offsetAt(params.position);
 
-  const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
-  const lineEnd = text.indexOf('\n', offset);
-  const lineText = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
-  const charInLine = params.position.character;
+    const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+    const lineEnd = text.indexOf('\n', offset);
+    const lineText = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
+    const charInLine = params.position.character;
 
-  // Match `@if`, `@for`, `@switch`, `@else` directives ONLY when explicitly prefixed with `@`
-  const directiveMatch = lineText.match(/@(if|else\s+if|else|for|switch|case|default)\b/);
-  if (directiveMatch) {
-    const dirIdx = lineText.indexOf(directiveMatch[0]);
-    if (charInLine >= dirIdx && charInLine <= dirIdx + directiveMatch[0].length) {
-      return {
-        contents: {
-          kind: MarkupKind.Markdown,
-          value: `**DriftJS Directive \`${directiveMatch[0]}\`**\n\nReactive AOT directive compiled into 32-bit register VM bytecode.`,
-        },
-      };
-    }
-  }
-
-  // Check state variable hover under cursor
-  const words = Array.from(lineText.matchAll(/([a-zA-Z0-9_$]+)/g));
-  for (const w of words) {
-    const start = w.index ?? 0;
-    const end = start + w[0].length;
-    if (charInLine >= start && charInLine <= end) {
-      const word = w[0];
-      const scriptVars = extractScriptVars(text);
-      const matchedVar = scriptVars.find((v) => v.label === word);
-      if (matchedVar) {
+    // Match `@if`, `@for`, `@switch`, `@else` directives ONLY when explicitly prefixed with `@`
+    const directiveMatch = lineText.match(/@(if|else\s+if|else|for|switch|case|default)\b/);
+    if (directiveMatch) {
+      const dirIdx = lineText.indexOf(directiveMatch[0]);
+      if (charInLine >= dirIdx && charInLine <= dirIdx + directiveMatch[0].length) {
         return {
           contents: {
             kind: MarkupKind.Markdown,
-            value: `**${matchedVar.detail}**\n\n${matchedVar.documentation}`,
+            value: `**DriftJS Directive \`${directiveMatch[0]}\`**\n\nReactive AOT directive compiled into 32-bit register VM bytecode.`,
           },
         };
       }
     }
-  }
 
-  return null;
-});
+    // Check state variable hover under cursor
+    const words = Array.from(lineText.matchAll(/([a-zA-Z0-9_$]+)/g));
+    for (const w of words) {
+      const start = w.index ?? 0;
+      const end = start + w[0].length;
+      if (charInLine >= start && charInLine <= end) {
+        const word = w[0];
+        const scriptVars = extractScriptVars(text);
+        const matchedVar = scriptVars.find((v) => v.label === word);
+        if (matchedVar) {
+          return {
+            contents: {
+              kind: MarkupKind.Markdown,
+              value: `**${matchedVar.detail}**\n\n${matchedVar.documentation}`,
+            },
+          };
+        }
+      }
+    }
 
-documents.listen(connection);
-connection.listen();
+    return null;
+  });
+
+  documents.listen(connection);
+  connection.listen();
+}

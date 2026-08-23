@@ -472,5 +472,97 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     expect(passedDirtyVars.has('disabled')).toBe(true);
     expect(passedDirtyVars.has('title')).toBe(true);
   });
+
+  it('preserves boolean false on aria-* and data-* attributes on client DOM', () => {
+    const doc = document;
+    const vm = new DriftClientVM();
+
+    const comp: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.SET_ATTR, 0, 1, 2, 1, // aria-hidden={false}
+        Opcode.SET_ATTR, 0, 3, 4, 1, // data-active={false}
+        Opcode.SET_ATTR, 0, 5, 6, 1, // disabled={false}
+        Opcode.RETURN, 0,
+      ],
+      constants: [
+        'div',
+        'aria-hidden',
+        { __drift_fn__: '() => false' },
+        'data-active',
+        { __drift_fn__: '() => false' },
+        'disabled',
+        { __drift_fn__: '() => false' },
+      ],
+    };
+
+    const elem = vm.execute(comp, { document: doc }) as HTMLElement;
+    expect(elem.getAttribute('aria-hidden')).toBe('false');
+    expect(elem.getAttribute('data-active')).toBe('false');
+    expect(elem.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('event handler scope snapshotting does not trigger false positive updates for prototype-inherited variables', () => {
+    const doc = document;
+    const vm = new DriftClientVM();
+    const triggerSpy = vi.spyOn(vm, 'triggerUpdates');
+
+    const parentScope = { parentCount: 10 };
+    const childScope = Object.create(parentScope);
+
+    const comp: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.SET_ATTR, 0, 1, 2, 0, // onclick
+        Opcode.RETURN, 0,
+      ],
+      constants: [
+        'button',
+        'click',
+        () => {
+          // No-op event handler that does not modify state
+        },
+      ],
+      declaredVars: ['parentCount'],
+    };
+
+    const elem = vm.execute(comp, { document: doc, scope: childScope }) as HTMLElement;
+    doc.body.appendChild(elem);
+
+    elem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    // Because parentCount on prototype was not changed, triggerUpdates should not be called with parentCount
+    expect(triggerSpy).not.toHaveBeenCalled();
+    vm.unmount();
+    if (elem.parentNode) elem.parentNode.removeChild(elem);
+  });
+
+  it('mount() returns DriftClientVM instance allowing clean unmounting', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    const comp: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['span'],
+    };
+
+    const initialActiveCount = DriftClientVM.activeVMCount;
+    const mountedVM = mount(comp, container);
+    expect(mountedVM).toBeInstanceOf(DriftClientVM);
+    expect(container.querySelector('span')).not.toBeNull();
+    expect(DriftClientVM.activeVMCount).toBe(initialActiveCount + 1);
+
+    const unmountSpy = vi.fn();
+    mountedVM.unmountCallbacks.push(unmountSpy);
+
+    mountedVM.unmount();
+    expect(unmountSpy).toHaveBeenCalledTimes(1);
+    expect(DriftClientVM.activeVMCount).toBe(initialActiveCount);
+
+    if (container.parentNode) container.parentNode.removeChild(container);
+  });
 });
 

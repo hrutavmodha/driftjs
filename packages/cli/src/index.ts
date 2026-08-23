@@ -72,11 +72,18 @@ export function scaffoldProject(options: ScaffoldOptions): void {
 
 export function sanitizeDependencies(deps?: Record<string, string>, targetVersion: string = '^0.0.7'): void {
   if (!deps) return;
-  const specifier = targetVersion.startsWith('^') ? targetVersion : `^${targetVersion}`;
+  const bareVersion = targetVersion.replace(/^[\^~]/, '');
+  const defaultCaret = targetVersion.startsWith('^') ? targetVersion : `^${bareVersion}`;
   for (const [key, value] of Object.entries(deps)) {
     if (typeof value === 'string' && value.startsWith('workspace:')) {
       const cleanVersion = value.replace('workspace:', '').trim();
-      deps[key] = cleanVersion === '*' ? specifier : cleanVersion;
+      if (cleanVersion === '*' || cleanVersion === '^' || cleanVersion === '') {
+        deps[key] = defaultCaret;
+      } else if (cleanVersion === '~') {
+        deps[key] = `~${bareVersion}`;
+      } else {
+        deps[key] = cleanVersion;
+      }
     }
   }
 }

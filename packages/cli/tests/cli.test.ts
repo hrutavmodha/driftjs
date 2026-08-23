@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scaffoldProject, detectPackageManager } from '../src/index.js';
+import { scaffoldProject, detectPackageManager, sanitizeDependencies } from '../src/index.js';
 
 describe('DriftJS CLI Scaffolder', () => {
   const testDir = path.resolve(process.cwd(), 'scratch/cli-test-temp');
@@ -187,5 +187,20 @@ describe('DriftJS CLI Scaffolder', () => {
 
     expect(fs.existsSync(path.join(targetDir, 'custom-config.json'))).toBe(true);
     expect(fs.existsSync(path.join(targetDir, 'index.html'))).toBe(true);
+  });
+
+  it('should sanitize workspace:^, workspace:~, and workspace:* range specifiers', () => {
+    const deps = {
+      'driftjs-dom': 'workspace:*',
+      'driftjs-compiler': 'workspace:^',
+      'driftjs-shared': 'workspace:~',
+      'driftjs-router': 'workspace:^0.0.5',
+    };
+    sanitizeDependencies(deps, '^0.0.7');
+
+    expect(deps['driftjs-dom']).toBe('^0.0.7');
+    expect(deps['driftjs-compiler']).toBe('^0.0.7');
+    expect(deps['driftjs-shared']).toBe('~0.0.7');
+    expect(deps['driftjs-router']).toBe('^0.0.5');
   });
 });

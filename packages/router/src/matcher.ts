@@ -23,7 +23,7 @@ function safeDecode(str: string): string {
  * Parses a search query string into a RouteQuery object.
  */
 export function parseQuery(search: string): RouteQuery {
-  const query: RouteQuery = {};
+  const query: RouteQuery = Object.create(null);
   if (!search) return query;
 
   const raw = search.startsWith('?') ? search.slice(1) : search;
@@ -44,7 +44,9 @@ export function parseQuery(search: string): RouteQuery {
       val = safeDecode(pair.slice(eqIdx + 1));
     }
 
-    if (key in query) {
+    if (key === '__proto__') continue;
+
+    if (Object.prototype.hasOwnProperty.call(query, key)) {
       const existing = query[key];
       if (Array.isArray(existing)) {
         (existing as (string | null)[]).push(val);

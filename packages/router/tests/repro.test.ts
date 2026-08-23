@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createRouter, createMemoryHistory, createMatcher, Link, RouterContext } from '../src/index.js';
+import { createRouter, createMemoryHistory, createMatcher, parseQuery, Link, RouterContext } from '../src/index.js';
 import type { RouteRecordRaw } from '../types/index.js';
 import { DriftClientVM } from 'driftjs-dom';
 
@@ -231,6 +231,14 @@ describe('DriftJS Router - Reproduction Test Cases', () => {
 
     expect(link.getAttribute('href')).toBe('/page-2');
     expect(link.textContent?.trim()).toBe('Updated Page');
+  });
+
+  it('parseQuery handles Object.prototype keys without collisions or prototype pollution', () => {
+    const parsed = parseQuery('?toString=custom&valueOf=123&__proto__=polluted&normal=ok');
+    expect(parsed.toString).toBe('custom');
+    expect(parsed.valueOf).toBe('123');
+    expect(parsed.normal).toBe('ok');
+    expect(({} as any).polluted).toBeUndefined();
   });
 });
 

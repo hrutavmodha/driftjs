@@ -471,11 +471,18 @@ export class DriftClientVM {
                   const targetVM = (wrappedHandler as any)._vm || vm;
                   const currentFn = (wrappedHandler as any)._fn;
                   if (typeof currentFn !== 'function') return;
-                  const scopeSnapshot: Record<string, any> = { ...targetVM.scope };
+                  const scopeSnapshot = new Map<string, any>();
+                  if (targetVM.declaredVars) {
+                    for (const key of targetVM.declaredVars) {
+                      scopeSnapshot.set(key, targetVM.scope[key]);
+                    }
+                  }
                   const result = currentFn.apply(this, args);
                   const changedVars = new Set<string>();
-                  for (const key of targetVM.declaredVars) {
-                    if (targetVM.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
+                  if (targetVM.declaredVars) {
+                    for (const key of targetVM.declaredVars) {
+                      if (targetVM.scope[key] !== scopeSnapshot.get(key)) changedVars.add(key);
+                    }
                   }
                   for (const dirtyVar of targetVM.pendingDirtyVars) {
                     changedVars.add(dirtyVar);
@@ -501,9 +508,16 @@ export class DriftClientVM {
                 (elem as any)[attrName] = val ?? '';
               }
               if (typeof elem.setAttribute === 'function') {
+                const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
                 if (val === true) {
-                  elem.setAttribute(attrName, '');
-                } else if (val === false || val == null || (attrName === 'style' && val === '')) {
+                  elem.setAttribute(attrName, isAriaOrData ? 'true' : '');
+                } else if (val === false) {
+                  if (isAriaOrData) {
+                    elem.setAttribute(attrName, 'false');
+                  } else if (typeof elem.removeAttribute === 'function') {
+                    elem.removeAttribute(attrName);
+                  }
+                } else if (val == null || (attrName === 'style' && val === '')) {
                   if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
                 } else {
                   elem.setAttribute(attrName, String(val));
@@ -993,7 +1007,17 @@ export class DriftClientVM {
             if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
               (elem as any)[attrName] = val ?? '';
             }
-            const targetVal = val === true ? '' : val === false || val == null || (attrName === 'style' && val === '') ? null : String(val);
+            const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
+            let targetVal: string | null = null;
+            if (val === true) {
+              targetVal = isAriaOrData ? 'true' : '';
+            } else if (val === false) {
+              targetVal = isAriaOrData ? 'false' : null;
+            } else if (val == null || (attrName === 'style' && val === '')) {
+              targetVal = null;
+            } else {
+              targetVal = String(val);
+            }
             const currentVal = elem.hasAttribute(attrName) ? elem.getAttribute(attrName) : null;
             if (targetVal !== currentVal) {
               if (targetVal === null) {
@@ -1106,9 +1130,16 @@ export class DriftClientVM {
             (elem as any)[attrName] = val ?? '';
           }
           if (typeof elem.setAttribute === 'function') {
+            const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
             if (val === true) {
-              elem.setAttribute(attrName, '');
-            } else if (val === false || val == null || (attrName === 'style' && val === '')) {
+              elem.setAttribute(attrName, isAriaOrData ? 'true' : '');
+            } else if (val === false) {
+              if (isAriaOrData) {
+                elem.setAttribute(attrName, 'false');
+              } else if (typeof elem.removeAttribute === 'function') {
+                elem.removeAttribute(attrName);
+              }
+            } else if (val == null || (attrName === 'style' && val === '')) {
               if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
             } else {
               elem.setAttribute(attrName, String(val));
@@ -1180,12 +1211,13 @@ export class DriftClientVM {
 /**
  * Mounts a compiled Drift component into an HTMLElement container.
  */
-export function mount(component: CompiledModule, container: HTMLElement): void {
+export function mount(component: CompiledModule, container: HTMLElement, options: VMExecutionOptions = {}): DriftClientVM {
   const vm = new DriftClientVM();
-  const node = vm.execute(component);
+  const node = vm.execute(component, options);
   if (node != null) {
     container.appendChild(node);
   }
+  return vm;
 }
 
 /**

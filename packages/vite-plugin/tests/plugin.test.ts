@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { driftPlugin } from '../src/index.js';
+import { driftPlugin, serializeValueToJS, serializeConstants } from '../src/index.js';
 import type { Plugin } from 'vite';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -166,5 +166,20 @@ describe('driftPlugin – HMR', () => {
     const hook = plugin.handleHotUpdate as (arg: any) => void;
     hook(ctx as any);
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('serializes NaN, Infinity, -Infinity, and negative zero as valid JS literals rather than null', () => {
+    expect(serializeValueToJS(NaN)).toBe('NaN');
+    expect(serializeValueToJS(Infinity)).toBe('Infinity');
+    expect(serializeValueToJS(-Infinity)).toBe('-Infinity');
+    expect(serializeValueToJS(-0)).toBe('-0');
+    expect(serializeValueToJS(123n)).toBe('123n');
+
+    const serialized = serializeConstants([NaN, Infinity, -Infinity, -0, 'text']);
+    expect(serialized).toContain('NaN');
+    expect(serialized).toContain('Infinity');
+    expect(serialized).toContain('-Infinity');
+    expect(serialized).toContain('-0');
+    expect(serialized).not.toContain('null');
   });
 });

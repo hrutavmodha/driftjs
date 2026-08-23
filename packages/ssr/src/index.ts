@@ -337,7 +337,9 @@ export function serializeNode(node: ServerNode | string, isRawText = false, rawT
   if (typeof node === 'string') return isRawText ? sanitizeRawContent(node, rawTag) : escapeHtml(node);
   if (node.type === 'text') return isRawText ? sanitizeRawContent(node.content ?? '', rawTag) : escapeHtml(node.content ?? '');
   if (node.type === 'comment') {
-    const safeContent = String(node.content ?? '').replace(/-->/g, '-- >');
+    const safeContent = String(node.content ?? '')
+      .replace(/-->/g, '-- >')
+      .replace(/--!>/g, '--! >');
     return `<!--${safeContent}-->`;
   }
   if (node.type === 'fragment') {
@@ -358,12 +360,16 @@ export function serializeNode(node: ServerNode | string, isRawText = false, rawT
         if (k === 'style' && (v === '' || v == null || v === false)) {
           continue;
         }
+        const isAriaOrData = k.startsWith('aria-') || k.startsWith('data-');
         if (v === true) {
-          attrsStr += ` ${k}`;
-        } else if (v !== null && v !== undefined && v !== false) {
+          attrsStr += isAriaOrData ? ` ${k}="true"` : ` ${k}`;
+        } else if (v === false) {
+          if (isAriaOrData) {
+            attrsStr += ` ${k}="false"`;
+          }
+        } else if (v !== null && v !== undefined) {
           attrsStr += ` ${k}="${escapeHtml(String(v))}"`;
         }
-
       }
     }
     const selfClosing = VOID_ELEMENTS.has(tag.toLowerCase());

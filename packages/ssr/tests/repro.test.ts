@@ -158,5 +158,36 @@ describe('DriftServerVM (SSR Engine) - Reproduction Test Cases', () => {
     const html = serializeNode(node);
     expect(html).toBe('<img src="/logo.png" alt="" />');
   });
+
+  it('serializeNode sanitizes "--!>" HTML5 comment bang delimiter to prevent comment breakout', () => {
+    const maliciousComment: any = {
+      type: 'comment',
+      content: '--!><script>alert("XSS")</script>',
+    };
+    const html = serializeNode(maliciousComment);
+    expect(html).not.toContain('--!><script>');
+    expect(html).toContain('--! >');
+  });
+
+  it('serializeNode preserves boolean false and true on aria-* and data-* attributes', () => {
+    const node: any = {
+      type: 'element',
+      tag: 'div',
+      attrs: new Map([
+        ['aria-hidden', false],
+        ['aria-expanded', true],
+        ['data-active', false],
+        ['disabled', false],
+        ['readonly', true],
+      ]),
+      children: [],
+    };
+    const html = serializeNode(node);
+    expect(html).toContain('aria-hidden="false"');
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('data-active="false"');
+    expect(html).not.toContain('disabled');
+    expect(html).toContain(' readonly');
+  });
 });
 
