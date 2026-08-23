@@ -240,5 +240,22 @@ describe('DriftJS Router - Reproduction Test Cases', () => {
     expect(parsed.normal).toBe('ok');
     expect(({} as any).polluted).toBeUndefined();
   });
+
+  it('circular route redirects abort with NavigationFailure without throwing Maximum call stack size exceeded (BUG-013)', async () => {
+    const history = createMemoryHistory('/');
+    const router = createRouter({
+      history,
+      routes: [
+        { path: '/', component: { bytecode: [], constants: [] } },
+        { path: '/a', redirect: '/b', component: { bytecode: [], constants: [] } },
+        { path: '/b', redirect: '/a', component: { bytecode: [], constants: [] } },
+      ],
+    });
+    await router.isReady();
+
+    const failure = await router.push('/a');
+    expect(failure).toBeDefined();
+    expect((failure as any).type).toBeDefined();
+  });
 });
 

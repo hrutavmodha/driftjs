@@ -27,4 +27,9 @@ describe('create-drift (CLI) - Reproduction Test Cases', () => {
       installDependencies(targetDir, maliciousPm);
     }).toThrow();
   });
+
+  it('emptyDirectory rejects root or home directory to prevent accidental destruction (BUG-015)', async () => {
+    const { emptyDirectory } = await import('../src/index.js');
+    expect(() => emptyDirectory('/')).toThrow();
+  });
 });

@@ -128,7 +128,7 @@ export function extractScriptVars(docText: string): CompletionItem[] {
   }
 
   // 3. Fallback regex to capture comma-separated & destructuring variable declarations
-  const declBlockRegex = /(?:let|const|var)\s+([^;]+)(?:;|$)/gm;
+  const declBlockRegex = /(?:let|const|var)\s+([^;\r\n]+)(?:;|$)/g;
   let declBlock: RegExpExecArray | null;
   const reserved = new Set(['let', 'const', 'var', 'true', 'false', 'null', 'undefined', 'new', 'function', 'return', 'typeof', 'instanceof', 'in', 'of']);
   while ((declBlock = declBlockRegex.exec(scriptBody)) !== null) {
@@ -433,14 +433,14 @@ if (connection) {
     const charInLine = params.position.character;
 
     // Match `@if`, `@for`, `@switch`, `@else` directives ONLY when explicitly prefixed with `@`
-    const directiveMatch = lineText.match(/@(if|else\s+if|else|for|switch|case|default)\b/);
-    if (directiveMatch) {
-      const dirIdx = lineText.indexOf(directiveMatch[0]);
-      if (charInLine >= dirIdx && charInLine <= dirIdx + directiveMatch[0].length) {
+    const directiveMatches = Array.from(lineText.matchAll(/@(if|else\s+if|else|for|switch|case|default)\b/g));
+    for (const dm of directiveMatches) {
+      const dirIdx = dm.index ?? 0;
+      if (charInLine >= dirIdx && charInLine <= dirIdx + dm[0].length) {
         return {
           contents: {
             kind: MarkupKind.Markdown,
-            value: `**DriftJS Directive \`${directiveMatch[0]}\`**\n\nReactive AOT directive compiled into 32-bit register VM bytecode.`,
+            value: `**DriftJS Directive \`${dm[0]}\`**\n\nReactive AOT directive compiled into 32-bit register VM bytecode.`,
           },
         };
       }

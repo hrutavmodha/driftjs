@@ -423,6 +423,39 @@ describe('DriftJS Compiler - Reproduction Test Cases', () => {
     expect(counter.increment()).toBe(6);
     expect(counter.val).toBe(6);
   });
+
+  it('extractIdentifiers does not fall through into ChainExpression for SequenceExpression (BUG-003)', () => {
+    const template = `
+      <script>
+        let a = 1, b = 2;
+        let c = (a++, b++);
+      </script>
+      <div>{c}</div>
+    `;
+    const compiled = compile(template);
+    expect(compiled.reactiveBindings).toBeDefined();
+  });
+
+  it('function parameter default expressions correctly resolve earlier parameters (BUG-005)', () => {
+    const template = `
+      <script>
+        function greet(name, greeting = 'Hello, ' + name) {
+          return greeting;
+        }
+      </script>
+      <div>{greet('World')}</div>
+    `;
+    const compiled = compile(template);
+    const scope: Record<string, any> = {};
+    const scriptAst = compiled.constants[0];
+    if (typeof scriptAst === 'object' && scriptAst.__drift_fn__) {
+      const fn = new Function('return (' + scriptAst.__drift_fn__ + ')')();
+      fn(scope);
+    }
+    expect(scope.greet).toBeDefined();
+    expect(scope.greet('World')).toBe('Hello, World');
+    expect(scope.greet('Drift', 'Welcome to Drift')).toBe('Welcome to Drift');
+  });
 });
 
 

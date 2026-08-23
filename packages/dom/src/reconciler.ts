@@ -8,9 +8,8 @@ function getSequence(arr: Int32Array): number[] {
   for (let i = 0; i < len; i++) {
     const arrI = arr[i]!;
     if (arrI !== -1) {
-      const lastIdx = result[result.length - 1]!;
-      if (result.length === 0 || arr[lastIdx]! < arrI) {
-        p[i] = result.length > 0 ? lastIdx : -1;
+      if (result.length === 0 || arr[result[result.length - 1]!]! < arrI) {
+        p[i] = result.length > 0 ? result[result.length - 1]! : -1;
         result.push(i);
         continue;
       }

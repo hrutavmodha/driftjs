@@ -564,5 +564,48 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
 
     if (container.parentNode) container.parentNode.removeChild(container);
   });
+
+  it('dynamic event handler updating to null or undefined detaches listener (BUG-007)', () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+
+    const handler = vi.fn();
+    const vm = new DriftClientVM();
+
+    const comp: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0, // button
+        Opcode.SET_ATTR, 0, 1, 2, 1, // onclick = eval(handleClick)
+        Opcode.RETURN, 0,
+      ],
+      constants: [
+        'button',
+        'onclick',
+        { __drift_fn__: '(scope) => scope.handleClick' },
+      ],
+      reactiveBindings: [
+        { variable: 'handleClick', positions: [{ opcode: Opcode.SET_ATTR, pc: 3 }] },
+      ],
+      declaredVars: ['handleClick'],
+    };
+
+    const node = vm.execute(comp, { document: doc, scope: { handleClick: handler } }) as HTMLButtonElement;
+    container.appendChild(node);
+
+    node.click();
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    // Update handleClick to null
+    vm.scope.handleClick = null;
+    (vm as any).updateAt(3, comp, { scope: vm.scope });
+
+    node.click();
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(node.getAttribute('onclick')).toBeNull();
+
+    vm.unmount();
+    doc.body.removeChild(container);
+  });
 });
 

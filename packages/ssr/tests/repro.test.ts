@@ -189,5 +189,28 @@ describe('DriftServerVM (SSR Engine) - Reproduction Test Cases', () => {
     expect(html).not.toContain('disabled');
     expect(html).toContain(' readonly');
   });
+
+  it('serializeNode safely handles null and undefined nodes without throwing (BUG-001)', () => {
+    expect(serializeNode(null as any)).toBe('');
+    expect(serializeNode(undefined as any)).toBe('');
+  });
+
+  it('execute creates prototypal scope isolation and does not mutate caller options.scope (BUG-002)', () => {
+    const callerScope: Record<string, any> = { globalUser: 'Alice' };
+    const componentModule: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['div'],
+      scope: { componentLocal: 'Secret' },
+    };
+
+    const vm = new DriftServerVM();
+    vm.execute(componentModule, { scope: callerScope });
+
+    expect(callerScope.componentLocal).toBeUndefined();
+    expect(callerScope.globalUser).toBe('Alice');
+  });
 });
 

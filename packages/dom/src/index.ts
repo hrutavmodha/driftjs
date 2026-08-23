@@ -452,54 +452,62 @@ export class DriftClientVM {
           let val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
 
           if (elem) {
-            if (attrName.startsWith('on') && typeof val === 'function') {
+            if (attrName.startsWith('on')) {
               const eventName = attrName.slice(2).toLowerCase();
+              if (typeof val === 'function') {
+                let handlers = DriftClientVM.eventHandlersMap.get(elem);
+                if (!handlers) {
+                  handlers = {};
+                  DriftClientVM.eventHandlersMap.set(elem, handlers);
+                }
 
-              let handlers = DriftClientVM.eventHandlersMap.get(elem);
-              if (!handlers) {
-                handlers = {};
-                DriftClientVM.eventHandlersMap.set(elem, handlers);
-              }
-
-              const existingHandler = handlers[eventName];
-              if (existingHandler && (existingHandler as any)._fn) {
-                (existingHandler as any)._fn = val;
-                (existingHandler as any)._vm = this;
+                const existingHandler = handlers[eventName];
+                if (existingHandler && (existingHandler as any)._fn) {
+                  (existingHandler as any)._fn = val;
+                  (existingHandler as any)._vm = this;
+                } else {
+                  const vm = this;
+                  const wrappedHandler = function (this: any, ...args: any[]) {
+                    const targetVM = (wrappedHandler as any)._vm || vm;
+                    const currentFn = (wrappedHandler as any)._fn;
+                    if (typeof currentFn !== 'function') return;
+                    const scopeSnapshot = new Map<string, any>();
+                    if (targetVM.declaredVars) {
+                      for (const key of targetVM.declaredVars) {
+                        scopeSnapshot.set(key, targetVM.scope[key]);
+                      }
+                    }
+                    const result = currentFn.apply(this, args);
+                    const changedVars = new Set<string>();
+                    if (targetVM.declaredVars) {
+                      for (const key of targetVM.declaredVars) {
+                        if (targetVM.scope[key] !== scopeSnapshot.get(key)) changedVars.add(key);
+                      }
+                    }
+                    for (const dirtyVar of targetVM.pendingDirtyVars) {
+                      changedVars.add(dirtyVar);
+                    }
+                    if (changedVars.size > 0) {
+                      targetVM.pendingDirtyVars.clear();
+                      targetVM.triggerUpdates(changedVars);
+                    }
+                    if (targetVM.pendingDirtyVars.size > 0) targetVM.flushUpdates();
+                    return result;
+                  };
+                  (wrappedHandler as any)._fn = val;
+                  (wrappedHandler as any)._vm = this;
+                  handlers[eventName] = wrappedHandler;
+                }
+                this.ensureEventDelegated(eventName);
               } else {
-                const vm = this;
-                const wrappedHandler = function (this: any, ...args: any[]) {
-                  const targetVM = (wrappedHandler as any)._vm || vm;
-                  const currentFn = (wrappedHandler as any)._fn;
-                  if (typeof currentFn !== 'function') return;
-                  const scopeSnapshot = new Map<string, any>();
-                  if (targetVM.declaredVars) {
-                    for (const key of targetVM.declaredVars) {
-                      scopeSnapshot.set(key, targetVM.scope[key]);
-                    }
-                  }
-                  const result = currentFn.apply(this, args);
-                  const changedVars = new Set<string>();
-                  if (targetVM.declaredVars) {
-                    for (const key of targetVM.declaredVars) {
-                      if (targetVM.scope[key] !== scopeSnapshot.get(key)) changedVars.add(key);
-                    }
-                  }
-                  for (const dirtyVar of targetVM.pendingDirtyVars) {
-                    changedVars.add(dirtyVar);
-                  }
-                  if (changedVars.size > 0) {
-                    targetVM.pendingDirtyVars.clear();
-                    targetVM.triggerUpdates(changedVars);
-                  }
-                  if (targetVM.pendingDirtyVars.size > 0) targetVM.flushUpdates();
-                  return result;
-
-                };
-                (wrappedHandler as any)._fn = val;
-                (wrappedHandler as any)._vm = this;
-                handlers[eventName] = wrappedHandler;
+                const handlers = DriftClientVM.eventHandlersMap.get(elem);
+                if (handlers && handlers[eventName]) {
+                  delete handlers[eventName];
+                }
+                if (typeof elem.removeAttribute === 'function') {
+                  elem.removeAttribute(attrName);
+                }
               }
-              this.ensureEventDelegated(eventName);
             } else {
               if (attrName === 'style') {
                 val = normalizeStyle(val);
@@ -1123,26 +1131,84 @@ export class DriftClientVM {
         let val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
 
         if (elem) {
-          if (attrName === 'style') {
-            val = normalizeStyle(val);
-          }
-          if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
-            (elem as any)[attrName] = val ?? '';
-          }
-          if (typeof elem.setAttribute === 'function') {
-            const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
-            if (val === true) {
-              elem.setAttribute(attrName, isAriaOrData ? 'true' : '');
-            } else if (val === false) {
-              if (isAriaOrData) {
-                elem.setAttribute(attrName, 'false');
-              } else if (typeof elem.removeAttribute === 'function') {
+          if (attrName.startsWith('on')) {
+            const eventName = attrName.slice(2).toLowerCase();
+            if (typeof val === 'function') {
+              let handlers = DriftClientVM.eventHandlersMap.get(elem);
+              if (!handlers) {
+                handlers = {};
+                DriftClientVM.eventHandlersMap.set(elem, handlers);
+              }
+
+              const existingHandler = handlers[eventName];
+              if (existingHandler && (existingHandler as any)._fn) {
+                (existingHandler as any)._fn = val;
+                (existingHandler as any)._vm = this;
+              } else {
+                const vm = this;
+                const wrappedHandler = function (this: any, ...args: any[]) {
+                  const targetVM = (wrappedHandler as any)._vm || vm;
+                  const currentFn = (wrappedHandler as any)._fn;
+                  if (typeof currentFn !== 'function') return;
+                  const scopeSnapshot = new Map<string, any>();
+                  if (targetVM.declaredVars) {
+                    for (const key of targetVM.declaredVars) {
+                      scopeSnapshot.set(key, targetVM.scope[key]);
+                    }
+                  }
+                  const result = currentFn.apply(this, args);
+                  const changedVars = new Set<string>();
+                  if (targetVM.declaredVars) {
+                    for (const key of targetVM.declaredVars) {
+                      if (targetVM.scope[key] !== scopeSnapshot.get(key)) changedVars.add(key);
+                    }
+                  }
+                  for (const dirtyVar of targetVM.pendingDirtyVars) {
+                    changedVars.add(dirtyVar);
+                  }
+                  if (changedVars.size > 0) {
+                    targetVM.pendingDirtyVars.clear();
+                    targetVM.triggerUpdates(changedVars);
+                  }
+                  if (targetVM.pendingDirtyVars.size > 0) targetVM.flushUpdates();
+                  return result;
+                };
+                (wrappedHandler as any)._fn = val;
+                (wrappedHandler as any)._vm = this;
+                handlers[eventName] = wrappedHandler;
+              }
+              this.ensureEventDelegated(eventName);
+            } else {
+              const handlers = DriftClientVM.eventHandlersMap.get(elem);
+              if (handlers && handlers[eventName]) {
+                delete handlers[eventName];
+              }
+              if (typeof elem.removeAttribute === 'function') {
                 elem.removeAttribute(attrName);
               }
-            } else if (val == null || (attrName === 'style' && val === '')) {
-              if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
-            } else {
-              elem.setAttribute(attrName, String(val));
+            }
+          } else {
+            if (attrName === 'style') {
+              val = normalizeStyle(val);
+            }
+            if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
+              (elem as any)[attrName] = val ?? '';
+            }
+            if (typeof elem.setAttribute === 'function') {
+              const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
+              if (val === true) {
+                elem.setAttribute(attrName, isAriaOrData ? 'true' : '');
+              } else if (val === false) {
+                if (isAriaOrData) {
+                  elem.setAttribute(attrName, 'false');
+                } else if (typeof elem.removeAttribute === 'function') {
+                  elem.removeAttribute(attrName);
+                }
+              } else if (val == null || (attrName === 'style' && val === '')) {
+                if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
+              } else {
+                elem.setAttribute(attrName, String(val));
+              }
             }
           }
         }

@@ -207,11 +207,25 @@ export function createRouter(options: RouterOptions): Router {
     }
   }
 
+  const MAX_REDIRECTS = 20;
+
   async function pushWithGuards(
     to: RouteLocationRaw,
     isReplace: boolean = false,
-    isPop: boolean = false
+    isPop: boolean = false,
+    redirectCount: number = 0
   ): Promise<NavigationFailure | void | undefined> {
+    if (redirectCount > MAX_REDIRECTS) {
+      const targetRoute = matcher.resolve(to, currentRoute);
+      const failure = createNavigationFailure(
+        NavigationFailureType.aborted,
+        currentRoute,
+        targetRoute,
+        'Infinite redirect loop detected'
+      );
+      return failure;
+    }
+
     const targetRoute = matcher.resolve(to, currentRoute);
     const fromRoute = currentRoute;
 
@@ -221,7 +235,7 @@ export function createRouter(options: RouterOptions): Router {
       if (leaf.redirect) {
         const redirectTarget =
           typeof leaf.redirect === 'function' ? leaf.redirect(targetRoute) : leaf.redirect;
-        return pushWithGuards(redirectTarget, true, isPop);
+        return pushWithGuards(redirectTarget, true, isPop, redirectCount + 1);
       }
     }
 
@@ -260,7 +274,7 @@ export function createRouter(options: RouterOptions): Router {
     }
 
     if (typeof guardRes === 'string' || (typeof guardRes === 'object' && guardRes !== null)) {
-      return pushWithGuards(guardRes, isReplace, isPop);
+      return pushWithGuards(guardRes, isReplace, isPop, redirectCount + 1);
     }
 
     // 3. Resolve async components
@@ -289,7 +303,7 @@ export function createRouter(options: RouterOptions): Router {
         return createNavigationFailure(NavigationFailureType.aborted, fromRoute, targetRoute, resolveGuardRes.message);
       }
       if (typeof resolveGuardRes === 'string' || (typeof resolveGuardRes === 'object' && resolveGuardRes !== null)) {
-        return pushWithGuards(resolveGuardRes, isReplace, isPop);
+        return pushWithGuards(resolveGuardRes, isReplace, isPop, redirectCount + 1);
       }
     }
 

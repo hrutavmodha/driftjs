@@ -78,14 +78,11 @@ export class DriftServerVM {
 
   public execute(rawModule: CompiledModule, options: SSRExecutionOptions = {}): ServerNode | null {
     const module = (resolveComponentModule(rawModule) || rawModule) as CompiledModule;
-    this.scope = options.scope ? options.scope : { ...module.scope };
-    if (module.scope) {
-      for (const k of Object.keys(module.scope)) {
-        if (!Object.prototype.hasOwnProperty.call(this.scope, k)) {
-          this.scope[k] = module.scope[k];
-        }
-      }
-    }
+    const parentScope = options.scope || null;
+    this.scope = Object.assign(
+      Object.create(parentScope),
+      module.scope
+    );
     this.declaredVars = new Set(module.declaredVars ?? []);
     this.registers.fill(null as any);
 
@@ -131,7 +128,8 @@ export class DriftServerVM {
               const propsObj = evaluatePropsSpec(propsSpec, this.scope, this.declaredVars);
               const subVm = new DriftServerVM();
               subVm.parentVM = this;
-              const compNode = subVm.execute(compMod, { scope: { ...this.scope, ...propsObj, props: propsObj } });
+              const propsScope = Object.assign(Object.create(this.scope), { props: propsObj }, propsObj);
+              const compNode = subVm.execute(compMod, { scope: propsScope });
               if (compNode) this.setRegister(dstReg, compNode);
             }
             pc += 4;
@@ -333,7 +331,8 @@ function sanitizeRawContent(content: string, rawTag?: string): string {
 /**
  * Serializes a ServerNode tree directly into an HTML string.
  */
-export function serializeNode(node: ServerNode | string, isRawText = false, rawTag?: string): string {
+export function serializeNode(node: ServerNode | string | null | undefined, isRawText = false, rawTag?: string): string {
+  if (!node) return '';
   if (typeof node === 'string') return isRawText ? sanitizeRawContent(node, rawTag) : escapeHtml(node);
   if (node.type === 'text') return isRawText ? sanitizeRawContent(node.content ?? '', rawTag) : escapeHtml(node.content ?? '');
   if (node.type === 'comment') {

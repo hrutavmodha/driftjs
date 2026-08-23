@@ -1,550 +1,463 @@
-# DriftJS Codebase Bug Audit Report
+# DriftJS Bug Audit & Defect Report
 
-This document contains a comprehensive security, correctness, and efficiency evaluation of the **DriftJS** monorepo codebase. All findings have been audited and verified directly against the latest source code across all packages (`driftjs-compiler`, `driftjs-dom`, `driftjs-ssr`, `driftjs-shared`, `driftjs-router`, `driftjs-vite-plugin`, `create-drift`, and `drift-vscode`).
+This document records the comprehensive defect audit of the **DriftJS** codebase across all monorepo packages (`driftjs-compiler`, `driftjs-dom`, `driftjs-ssr`, `driftjs-shared`, `driftjs-router`, `driftjs-vite-plugin`, `create-drift`, and `drift-vscode`).
 
----
+Every bug is evaluated and categorized under three primary criteria:
+1. **Correctness** (runtime logic errors, edge cases, state synchronization, specification non-conformance)
+2. **Security** (XSS, prototype pollution, state contamination, path traversal, ReDoS)
+3. **Efficiency** (redundant microtask dispatching, memory leaks, uncollected regions, unneeded DOM thrashing)
 
-## 📊 Bug Inventory & Evaluation Matrix
-
-Total Identified Defects: **17**
-
-| Bug ID                                                                                        | Category              |     Severity     | Package                           | Target File                                                  | Summary                                                                                                               |
-| :-------------------------------------------------------------------------------------------- | :-------------------- | :--------------: | :-------------------------------- | :----------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
-| [`BUG-01`](#bug-01-html-entity-decoding-corrupts-script-and-style-contents)                  | **Correctness** |  **High**  | `driftjs-compiler`              | `packages/compiler/src/parser.ts`                          | Parser applies HTML entity decoding to raw`<script>` and `<style>` blocks                                         |
-| [`BUG-02`](#bug-02-missing-chainexpression-support-in-reactive-dependency-extraction)        | **Correctness** |  **High**  | `driftjs-compiler`              | `packages/compiler/src/generator.ts`                       | Missing`ChainExpression` in `extractIdentifiers` breaks optional chaining reactivity (`?.`)                     |
-| [`BUG-03`](#bug-03-lexer-string-scanner-fails-on-escaped-quotes-in-attribute-literals)       | **Correctness** |  **High**  | `driftjs-compiler`              | `packages/compiler/src/lexer.ts`                           | Quoted attribute value scanner does not handle escaped quotes (`\"`, `\'`)                                        |
-| [`BUG-04`](#bug-04-destructuring-aliasing-and-defaults-ignored-in-for-item-scope)            | **Correctness** |  **High**  | `driftjs-shared`                | `packages/utils/src/scope.ts`                              | `@for` loop item destructuring assigns property names instead of alias variables                                    |
-| [`BUG-05`](#bug-05-transpiler-unconditionally-rewrites-this-to-scope-in-classes-and-methods) | **Correctness** |  **High**  | `driftjs-compiler`              | `packages/compiler/src/generator.ts`                       | `astToJS` transpiler unconditionally rewrites `this` to `'scope'`, breaking classes & OOP methods               |
-| [`BUG-06`](#bug-06-multi-root-for-items-fail-fast-path-attribute-patching)                   | **Correctness** |  **High**  | `driftjs-dom`                   | `packages/dom/src/index.ts`                                | `patchItemAttributes` only inspects first root node, ignoring sibling elements in multi-root list items             |
-| [`BUG-07`](#bug-07-child-component-prop-updates-fail-to-unset-removed-props)                 | **Correctness** | **Medium** | `driftjs-dom`                   | `packages/dom/src/index.ts`                                | `updateChildComponentProps` never clears props removed from parent prop bindings                                    |
-| [`BUG-08`](#bug-08-named-route-parameter-interpolation-stringifies-undefined-as-undefined)   | **Correctness** | **Medium** | `driftjs-router`                | `packages/router/src/matcher.ts`                           | `interpolatePathParams` stringifies `{ id: undefined }` as literal `"/undefined"`                               |
-| [`BUG-09`](#bug-09-routerlink-and-link-fail-to-react-to-dynamic-prop-changes)                | **Correctness** | **Medium** | `driftjs-router`                | `packages/router/src/components/RouterLink.drift`          | `RouterLink` and `Link` only update on history navigation, ignoring dynamic `to` prop updates                   |
-| [`BUG-10`](#bug-10-vite-plugin-serializes-nan-and-infinity-as-null)                          | **Correctness** | **Medium** | `driftjs-vite-plugin`           | `packages/vite-plugin/src/index.ts`                        | `serializeValueToJS` uses `JSON.stringify`, converting `NaN` and `Infinity`, constants to `null`            |
-| [`BUG-11`](#bug-11-sanitizedependencies-fails-on-workspace-range-protocols)                  | **Correctness** | **Medium** | `create-drift`                  | `packages/cli/src/index.ts`                                | `sanitizeDependencies` does not sanitize `workspace:^` or `workspace:~`, generating invalid npm versions        |
-| [`BUG-12`](#bug-12-language-server-misses-multi-variable-and-destructuring-declarations)     | **Correctness** |  **Low**  | `drift-vscode`                  | `packages/vscode-plugin/src/server.ts`                     | Language server regex only captures first variable in comma-separated`let` declarations                             |
-| [`BUG-13`](#bug-13-prototype-pollution-and-key-collision-in-route-query-parser)              | **Security**    |  **High**  | `driftjs-router`                | `packages/router/src/matcher.ts`                           | `parseQuery` uses standard Object `{}` and `in` operator, allowing `Object.prototype` key collisions          |
-| [`BUG-14`](#bug-14-ssr-comment-sanitization-bypass-via-html5-bang-delimiter)                 | **Security**    |  **High**  | `driftjs-ssr`                   | `packages/ssr/src/index.ts`                                | `serializeNode` only replaces `-->`, allowing HTML comment breakout and XSS via `--!>`                          |
-| [`BUG-15`](#bug-15-inconsistent-aria-and-data-boolean-attribute-stripping)                   | **Security**    | **Medium** | `driftjs-ssr` / `driftjs-dom` | `packages/ssr/src/index.ts`, `packages/dom/src/index.ts` | Attributes like`aria-hidden={false}` are completely stripped instead of serializing as string `"false"`           |
-| [`BUG-16`](#bug-16-event-handler-scope-snapshotting-triggers-redundant-reactive-updates)     | **Efficiency**  |  **High**  | `driftjs-dom`                   | `packages/dom/src/index.ts`                                | Shallow spread`{ ...targetVM.scope }` causes all prototype-inherited variables to trigger re-renders on every event |
-| [`BUG-17`](#bug-17-mount-does-not-return-unmount-handle-causing-event-listener-leaks)        | **Efficiency**  | **Medium** | `driftjs-dom`                   | `packages/dom/src/index.ts`                                | `mount()` returns `void`, preventing caller cleanup and causing `activeVMCount` and global listeners to leak    |
+All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
 
 ---
 
-## 🔍 Detailed Bug Reports
+## 📊 Summary Matrix
 
-### BUG-01: HTML Entity Decoding Corrupts `<script>` and `<style>` Contents
+| Bug ID | Title | Category | Severity | Affected Package / Subsystem | Status |
+| :--- | :--- | :--- | :---: | :--- | :---: |
+| [`BUG-001`](#bug-001-typeerror-crash-in-serializenode-on-null--undefined-children) | `TypeError` Crash in `serializeNode` on Null / Undefined Children | Correctness | **High** | `driftjs-ssr` | **Resolved** |
+| [`BUG-002`](#bug-002-cross-request-state-contamination-via-optionsscope-mutation) | Cross-Request State Contamination via `options.scope` Mutation | Security / Correctness | **High** | `driftjs-ssr` | **Resolved** |
+| [`BUG-003`](#bug-003-missing-break-in-sequenceexpression-ast-identifier-extraction) | Missing `break;` in `SequenceExpression` AST Identifier Extraction | Correctness | **Medium** | `driftjs-compiler` | **Resolved** |
+| [`BUG-004`](#bug-004-nested-objectarray-pattern-destructuring-generates-invalid-scope-variables) | Nested Object/Array Pattern Destructuring Generates Invalid Scope Variables | Correctness | **High** | `driftjs-compiler` | Open |
+| [`BUG-005`](#bug-005-function-parameter-defaults-use-outer-locals-breaking-inter-parameter-references) | Function Parameter Defaults Use Outer Locals Breaking Inter-Parameter References | Correctness | **Medium** | `driftjs-compiler` | **Resolved** |
+| [`BUG-006`](#bug-006-switch-transformation-pollutes-scope-with-synthetic-discriminant-variables) | `@switch` Transformation Pollutes Scope with Synthetic Discriminant Variables | Efficiency / Correctness | **Medium** | `driftjs-compiler` | Open |
+| [`BUG-007`](#bug-007-dynamic-event-handlers-updating-to-nullundefined-fail-to-detach-listeners) | Dynamic Event Handlers Updating to `null`/`undefined` Fail to Detach Listeners | Correctness | **High** | `driftjs-dom` | **Resolved** |
+| [`BUG-008`](#bug-008-unmountsubtree-fails-to-unregister-active-reactiveregions) | `unmountSubtree` Fails to Unregister Active `ReactiveRegion`s | Efficiency / Memory Leak | **Medium** | `driftjs-dom` | Open |
+| [`BUG-009`](#bug-009-out-of-bounds-negative-index-access-in-lis-reconciler-getsequence) | Out-of-Bounds Negative Index Access in LIS Reconciler `getSequence` | Correctness | **Low** | `driftjs-dom` | **Resolved** |
+| [`BUG-010`](#bug-010-hydrationcursor-permanently-discards-intermediate-nodes-on-type-mismatch) | `HydrationCursor` Permanently Discards Intermediate Nodes on Type Mismatch | Correctness | **High** | `driftjs-dom` | Open |
+| [`BUG-011`](#bug-011-prototype-pollution-vulnerability-in-evaluatepropsspec) | Prototype Pollution Vulnerability in `evaluatePropsSpec` | Security | **High** | `driftjs-shared` | **Resolved** |
+| [`BUG-012`](#bug-012-populateitemscope-drops-default-values-on-nullish-items-and-splits-commas-naively) | `populateItemScope` Drops Default Values on Nullish Items & Splits Commas Naively | Correctness | **Medium** | `driftjs-shared` | Open |
+| [`BUG-013`](#bug-013-uncontrolled-recursive-redirects-cause-call-stack-overflow-in-router) | Uncontrolled Recursive Redirects Cause Call Stack Overflow in Router | Correctness / Efficiency | **Critical** | `driftjs-router` | **Resolved** |
+| [`BUG-014`](#bug-014-router-guard-pipeline-prematurely-resolves-async-callback-guards) | Router Guard Pipeline Prematurely Resolves Async Callback Guards | Correctness | **High** | `driftjs-router` | Open |
+| [`BUG-015`](#bug-015-arbitrary-directory-deletion-risk-in-cli-emptydirectory) | Arbitrary Directory Deletion Risk in CLI `emptyDirectory` | Security | **Critical** | `create-drift` | **Resolved** |
+| [`BUG-016`](#bug-016-catastrophic-backtracking-redos-in-language-server-extractscriptvars) | Catastrophic Backtracking (ReDoS) in Language Server `extractScriptVars` | Security / Efficiency | **Medium** | `drift-vscode` | **Resolved** |
+| [`BUG-017`](#bug-017-hover-provider-calculates-wrong-range-when-multiple-directives-occur-on-same-line) | Hover Provider Calculates Wrong Range When Multiple Directives Occur on Same Line | Correctness | **Low** | `drift-vscode` | **Resolved** |
 
-- **Category:** Correctness
+---
+
+## 🔍 Detailed Bug Findings
+
+### BUG-001: `TypeError` Crash in `serializeNode` on Null / Undefined Children
+
+- **Criteria:** Correctness
 - **Severity:** High
-- **Package:** `driftjs-compiler`
-- **File:** [`packages/compiler/src/parser.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/parser.ts#L184-L191)
-
-#### Description & Root Cause
-
-In `DriftParser.parseChild()`, all `TokenType.Text` tokens are processed through `decodeHTMLEntities(token.value)`. When the lexer consumes `<script>` or `<style>` tags, their body content is emitted as `TokenType.Text`. Consequently, any HTML character references inside script or style blocks (such as `&amp;`, `&quot;`, `&apos;`, `&lt;`, `&gt;`, `&copy;`, etc.) are decoded before being passed to Acorn.
-For example, a script line like `const message = "Tom &amp; Jerry";` is transformed into `const message = "Tom & Jerry";`. Worse, `const json = "&quot;hello&quot;";` is transformed into `const json = ""hello"";`, resulting in an unrecoverable Acorn JavaScript syntax parse error.
-
-#### Impact
-
-Breaks valid JavaScript and CSS embedded in Single File Components whenever entity sequences or string literals containing ampersands appear.
-
-#### Remediation
-
-In `parseElement()`, check if `isRawTextTagName(tagName)` is true (i.e. `script` or `style`). If so, consume the text node directly without invoking `decodeHTMLEntities()`.
-
----
-
-### BUG-02: Missing `ChainExpression` Support in Reactive Dependency Extraction
-
-- **Category:** Correctness
-- **Severity:** High
-- **Package:** `driftjs-compiler`
-- **File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L441-L594)
-
-#### Description & Root Cause
-
-`DriftGenerator.extractIdentifiers()` recursively traverses Acorn AST nodes to detect variable dependencies for reactive binding registration and `@if` / `@for` region subscriptions. Acorn generates AST nodes of type `ChainExpression` for optional chaining expressions (e.g. `user?.name`, `list?.items`, `state?.count`).
-However, `extractIdentifiers()` lacks a `case 'ChainExpression':` branch in its `switch (node.type)` statement. When evaluating expressions with optional chaining, `extractIdentifiers()` falls through to `default` and returns an empty `Set()`.
-
-#### Impact
-
-Variables accessed using optional chaining (`?.`) are not recorded in `CompiledModule.reactiveBindings` or region dependencies. Subsequent mutations to those variables fail to trigger in-place DOM updates or reactive region re-renders.
-
-#### Remediation
-
-Add `case 'ChainExpression':` to `extractIdentifiers()`:
-
-```ts
-case 'ChainExpression':
-  for (const id of this.extractIdentifiers(node.expression)) ids.add(id);
-  break;
-```
-
----
-
-### BUG-03: Lexer String Scanner Fails on Escaped Quotes in Attribute Literals
-
-- **Category:** Correctness
-- **Severity:** High
-- **Package:** `driftjs-compiler`
-- **File:** [`packages/compiler/src/lexer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/lexer.ts#L876-L904)
-
-#### Description & Root Cause
-
-In `DriftLexer.readQuotedStringToken()`, the scanner terminates the string token as soon as `this.peek() === quote` without checking whether the quote character is escaped with a preceding backslash `\`.
-For attributes containing escaped quotes (e.g. `<input placeholder="He said \"hello\"" />` or `<div title='It\'s ready'>`), the scanner exits at the first inner quote, causing the remaining string content and backslash to be parsed as tag attributes, throwing `DriftLexerError: Unexpected character '\' inside tag`.
-
-#### Impact
-
-Developers cannot use escaped quotes inside static attribute strings.
-
-#### Remediation
-
-Track backslash escape state in `readQuotedStringToken()`:
-
-```ts
-let isEscaped = false;
-while (!this.isAtEnd()) {
-  const ch = this.peek();
-  if (isEscaped) {
-    isEscaped = false;
-    value += this.advance();
-    continue;
-  }
-  if (ch === '\\') {
-    isEscaped = true;
-    value += this.advance();
-    continue;
-  }
-  if (ch === quote) {
-    this.advance();
+- **Component:** `driftjs-ssr`
+- **Affected File:** [`packages/ssr/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L336-L345)
+- **Description:**
+  In `packages/ssr/src/index.ts`, [`serializeNode()`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L336-L383) serializes a virtual `ServerNode` tree into an HTML string. However, it lacks a guard for `null` or `undefined` input nodes at entry:
+  ```ts
+  export function serializeNode(node: ServerNode | string, isRawText = false, rawTag?: string): string {
+    if (typeof node === 'string') return isRawText ? sanitizeRawContent(node, rawTag) : escapeHtml(node);
+    if (node.type === 'text') return isRawText ? sanitizeRawContent(node.content ?? '', rawTag) : escapeHtml(node.content ?? '');
     ...
-  }
-}
-```
+  ```
+  If a child component is missing from scope, fails compilation, or an unassigned register is appended via `APPEND_CHILD`, `parentNode.children` contains `null` or `undefined`. Calling `serializeNode(null)` immediately crashes with:
+  `TypeError: Cannot read properties of null (reading 'type')`.
+- **Impact:** Entire server render fails unexpectedly with an unhandled exception instead of gracefully emitting an empty string or partial DOM tree.
+- **Remediation:**
+  Add a nullish guard at the start of `serializeNode`:
+  ```ts
+  if (!node) return '';
+  ```
 
 ---
 
-### BUG-04: Destructuring Aliasing and Defaults Ignored in `@for` Item Scope
+### BUG-002: Cross-Request State Contamination via `options.scope` Mutation
 
-- **Category:** Correctness
+- **Criteria:** Security & Correctness
 - **Severity:** High
-- **Package:** `driftjs-shared`
-- **File:** [`packages/utils/src/scope.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L103-L129)
-
-#### Description & Root Cause
-
-`populateItemScope()` provides destructuring support for `@for` items. For object destructuring:
-
-```ts
-if (itemName.startsWith('{') && itemName.endsWith('}')) {
-  if (itemVal && typeof itemVal === 'object') {
-    const keys = itemName.slice(1, -1).split(',').map((s) => s.trim().split(':')[0]?.trim() || '');
-    for (const k of keys) {
-      if (k) scope[k] = (itemVal as any)[k];
+- **Component:** `driftjs-ssr`
+- **Affected File:** [`packages/ssr/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L81-L88)
+- **Description:**
+  In [`DriftServerVM.execute()`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L79-L90), when an existing `options.scope` is passed into `execute()`, the server VM binds `this.scope` directly to the `options.scope` reference:
+  ```ts
+  this.scope = options.scope ? options.scope : { ...module.scope };
+  if (module.scope) {
+    for (const k of Object.keys(module.scope)) {
+      if (!Object.prototype.hasOwnProperty.call(this.scope, k)) {
+        this.scope[k] = module.scope[k];
+      }
     }
   }
-}
-```
-
-When a user writes `@for { id: userId, name } in users`, `split(':')[0]` takes the object property name (`id`), and sets `scope['id'] = itemVal['id']`. The intended alias variable `userId` is completely ignored and remains `undefined` in scope.
-Furthermore, default values like `{ count = 0 }` produce `scope['count = 0'] = itemVal['count = 0']`.
-
-#### Impact
-
-Using standard JavaScript destructuring aliases or default values in `@for` loops causes undefined variable references in templates.
-
-#### Remediation
-
-Properly extract both key and target variable names, supporting aliases (`{ prop: alias }`) and default values (`{ prop = default }`).
+  ```
+  Unlike `DriftClientVM` (which correctly creates prototype inheritance with `Object.assign(Object.create(parentOptionsScope), module.scope)`), the SSR VM writes directly into `options.scope`.
+- **Impact:** In multi-tenant Node.js SSR environments, if an application passes a shared request context or root state to multiple components, component-local state variables mutate the caller's shared scope object, causing cross-request data leaks and state pollution between concurrent renders.
+- **Remediation:**
+  Use prototypal scope isolation in SSR:
+  ```ts
+  const parentScope = options.scope || null;
+  this.scope = Object.assign(Object.create(parentScope), module.scope);
+  ```
 
 ---
 
-### BUG-05: Transpiler Unconditionally Rewrites `this` to `scope` in Classes and Methods
+### BUG-003: Missing `break;` in `SequenceExpression` AST Identifier Extraction
 
-- **Category:** Correctness
-- **Severity:** High
-- **Package:** `driftjs-compiler`
-- **File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L984-L986)
-
-#### Description & Root Cause
-
-In `DriftGenerator.astToJS()`, `ThisExpression` is unconditionally transpiled to `'scope'`:
-
-```ts
-case 'ThisExpression':
-  return 'scope';
-```
-
-When `<script>` blocks declare ES6 classes, constructor functions, or object literal methods (e.g. `class Store { constructor() { this.data = []; } }`), any reference to `this.data` is rewritten to `scope.data`. Consequently, creating class instances mutates component scope rather than the instance object.
-
-#### Impact
-
-Breaks all ES6 classes, constructor functions, and object methods declared in component `<script>` blocks.
-
-#### Remediation
-
-Scope the `this` rewrite to only apply when not inside a class declaration, method definition, or standard function expression context.
-
----
-
-### BUG-06: Multi-Root `@for` Items Fail Fast-Path Attribute Patching
-
-- **Category:** Correctness
-- **Severity:** High
-- **Package:** `driftjs-dom`
-- **File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L730-L736), [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L831-L930)
-
-#### Description & Root Cause
-
-In `DriftClientVM`'s `@for` reconciler, unchanged items execute `vm.patchItemAttributes(bodyMod, childScope, record.nodes[0])`.
-`patchItemAttributes` assumes `rootNode` is the single root of the item. In `mapChildren(rootReg, rootNode)`, it uses `rootNode.childNodes` to map register IDs to DOM elements.
-When a sub-module template has multiple root sibling nodes (e.g. `<dt>{item.term}</dt><dd :class="item.cls">{item.desc}</dd>`), `record.nodes` contains both `<dt>` and `<dd>`. `patchItemAttributes` treats `<dt>` as the root and searches for `<dd>` *inside* `<dt>`, failing to resolve `<dd>`'s register.
-
-#### Impact
-
-Dynamic attributes on non-first root elements in multi-root list items are never patched during fast-path reconciliation.
-
-#### Remediation
-
-Support multi-root element records in `patchItemAttributes` by passing the full `record.nodes` array and mapping top-level sub-module registers across `record.nodes`.
-
----
-
-### BUG-07: Child Component Prop Updates Fail to Unset Removed Props
-
-- **Category:** Correctness
+- **Criteria:** Correctness
 - **Severity:** Medium
-- **Package:** `driftjs-dom`
-- **File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L237-L259)
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L493-L502)
+- **Description:**
+  In [`DriftGenerator.extractIdentifiers()`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L441-L597), the `switch` statement handles `SequenceExpression` without a terminating `break;`:
+  ```ts
+  case 'SequenceExpression':
+    if (Array.isArray(node.expressions)) {
+      for (const expr of node.expressions) {
+        for (const id of this.extractIdentifiers(expr)) ids.add(id);
+      }
+    }
+  case 'ChainExpression':
+  case 'ParenthesizedExpression':
+    for (const id of this.extractIdentifiers(node.expression)) ids.add(id);
+    break;
+  ```
+- **Impact:** After iterating through sequence expressions, execution falls through into `ChainExpression` and invokes `this.extractIdentifiers(node.expression)` where `node.expression` is `undefined` on `SequenceExpression` AST nodes. While `extractIdentifiers(undefined)` returns an empty set, this accidental fallthrough violates switch semantics and creates brittle AST traversal.
+- **Remediation:**
+  Insert the missing `break;` statement at line 498.
 
-#### Description & Root Cause
+---
 
-In `DriftClientVM.updateChildComponentProps()`:
+### BUG-004: Nested Object/Array Pattern Destructuring Generates Invalid Scope Variables
 
-```ts
-for (const key of Object.keys(newPropsObj)) {
-  if (key === '__drift_props__') continue;
-  const newVal = newPropsObj[key];
-  const oldVal = oldProps[key];
-  if (newVal !== oldVal) {
-    setScopeValue(childScope, key, newVal);
-    dirtyPropVars.add(key);
+- **Criteria:** Correctness
+- **Severity:** High
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1216-L1244)
+- **Description:**
+  In [`astToJS()`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L726-L1453) under `case 'VariableDeclaration':`, when generating JavaScript code for destructuring declarations:
+  ```ts
+  for (const prop of (d.id.properties || [])) {
+    if (prop.type === 'Property') {
+      ...
+      let varName = prop.value?.name;
+      if (!varName) {
+        varName = astToJS(prop.value, locals);
+      }
+      if (varName) {
+        setCalls.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
+      }
+    }
   }
-}
-```
-
-The update routine only iterates over keys present in `newPropsObj`. If a prop existed in `oldProps` but is omitted in `newPropsObj` (e.g. conditional prop removal), the key is never unset on `childScope` and never marked dirty.
-
-#### Impact
-
-Child components retain stale prop values when parent components remove dynamic props.
-
-#### Remediation
-
-Iterate over keys in `oldProps` that are absent in `newPropsObj`, setting them to `undefined` on `childScope` and adding them to `dirtyPropVars`.
+  ```
+  If `prop.value` is a nested pattern (such as `let { user: { name } } = data;`), `prop.value.name` is `undefined`. `astToJS(prop.value, locals)` evaluates to the literal string `"{ name }"`. The emitted code then assigns `scope["{ name }"] = ...` instead of extracting the nested property `name`.
+- **Impact:** Component scripts using nested object or array destructuring fail to populate inner variables on the component scope, causing expressions in templates relying on nested destructured variables to evaluate to `undefined`.
+- **Remediation:**
+  Recursively unroll nested `ObjectPattern` and `ArrayPattern` nodes in `astToJS` variable declaration code generation.
 
 ---
 
-### BUG-08: Named Route Parameter Interpolation Stringifies `undefined` as `"/undefined"`
+### BUG-005: Function Parameter Defaults Use Outer Locals Breaking Inter-Parameter References
 
-- **Category:** Correctness
+- **Criteria:** Correctness
 - **Severity:** Medium
-- **Package:** `driftjs-router`
-- **File:** [`packages/router/src/matcher.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/matcher.ts#L105-L136)
-
-#### Description & Root Cause
-
-In `interpolatePathParams()`:
-
-```ts
-if (paramName in params) {
-  const val = params[paramName];
-  return Array.isArray(val) ? val.join('/') : String(val);
-}
-```
-
-When `params` is `{ id: undefined }`, `'id' in params` is `true`. `String(undefined)` evaluates to `"undefined"`, resolving a route like `/users/:id` to `/users/undefined`.
-
-#### Impact
-
-Passing undefined parameters produces invalid URLs containing literal `"undefined"` path segments.
-
-#### Remediation
-
-Verify `val !== undefined && val !== null` before stringifying.
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L939-L959), [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1303), [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1342), [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1408)
+- **Description:**
+  When generating code for `FunctionDeclaration`, `ArrowFunctionExpression`, `FunctionExpression`, and `MethodDefinition` in `astToJS`:
+  ```ts
+  const newLocals = new Set(locals);
+  if (node.params) {
+    for (const p of node.params) {
+      for (const pName of extractBindingNames(p)) {
+        newLocals.add(pName);
+      }
+      paramNames.push(paramToJS(p, locals)); // <-- passes outer 'locals' instead of 'newLocals'
+    }
+  }
+  ```
+  `paramToJS(p, locals)` is called with `locals` (outer scope) rather than `newLocals`.
+- **Impact:** If a parameter default value references an earlier parameter (e.g. `function format(text, prefix = text)`), `astToJS` checks `locals` which does not yet include `text`. `text` is incorrectly transpiled as a scope-lookup `_get(scope, "text")` instead of referencing the local parameter variable.
+- **Remediation:**
+  Pass `newLocals` to `paramToJS(p, newLocals)` across all function and method AST code generators.
 
 ---
 
-### BUG-09: `RouterLink` and `Link` Fail to React to Dynamic Prop Changes
+### BUG-006: `@switch` Transformation Pollutes Scope with Synthetic Discriminant Variables
 
-- **Category:** Correctness
+- **Criteria:** Efficiency & Correctness
 - **Severity:** Medium
-- **Package:** `driftjs-router`
-- **File:** [`packages/router/src/components/RouterLink.drift`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/components/RouterLink.drift#L15-L44), [`packages/router/src/components/Link.drift`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/components/Link.drift#L15-L44)
-
-#### Description & Root Cause
-
-In `RouterLink.drift` and `Link.drift`, `updateLink()` is invoked on initial setup and subscribed to `router.subscribe()`.
-When a parent component dynamically updates `:to="dynamicUrl"` or `:class="dynamicClass"`, `updateChildComponentProps` updates `to` on the component's scope and marks it dirty, but `updateLink()` is not executed because it only subscribes to router history events. As a result, the rendered `<a href={href}>` keeps the stale URL.
-
-#### Impact
-
-Dynamic `to` bindings on `<RouterLink>` components do not update rendered `href` and active classes until a navigation occurs.
-
-#### Remediation
-
-Include reactive bindings or getter functions for `href` and `activeClass` so DOM text and attribute bindings update reactively when `props.to` changes.
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/transformer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/transformer.ts#L147-L208)
+- **Description:**
+  In [`DriftTransformer.transformSwitchToIfChain()`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/transformer.ts#L141-L277), when a `@switch` discriminant is not a simple identifier (e.g. `@switch getStatus()`), the transformer creates a synthetic assignment expression:
+  ```ts
+  const discVarName = `__drift_sw_${this.switchCounter++}`;
+  ...
+  leftNode = {
+    type: 'AssignmentExpression',
+    operator: '=',
+    left: { type: 'Identifier', name: discVarName },
+    right: cloneAstNode(discAst),
+  };
+  ```
+  Because `discVarName` (`__drift_sw_0`) is not added to the module's `declaredVars`, `astToJS` transforms this into `setScopeValue(scope, '__drift_sw_0', getStatus())`.
+- **Impact:** Component runtime scope becomes polluted with temporary internal variable keys. On every evaluation of the switch statement, `setScopeValue` calls `__drift_mark_dirty__('__drift_sw_0')`, scheduling unnecessary microtask updates and wasting CPU cycles.
+- **Remediation:**
+  Either register `discVarName` as a local lexical binding in the enclosing sub-module or wrap the transformed conditional in an IIFE passing the evaluated discriminant.
 
 ---
 
-### BUG-10: Vite Plugin Serializes `NaN` and `Infinity` as `null`
+### BUG-007: Dynamic Event Handlers Updating to `null`/`undefined` Fail to Detach Listeners
 
-- **Category:** Correctness
+- **Criteria:** Correctness
+- **Severity:** High
+- **Component:** `driftjs-dom`
+- **Affected File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L455-L526)
+- **Description:**
+  In [`DriftClientVM`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L69-L1209) opcode handler for `SET_ATTR`:
+  ```ts
+  if (attrName.startsWith('on') && typeof val === 'function') {
+    const eventName = attrName.slice(2).toLowerCase();
+    ...
+  } else {
+    // Falls here when val is null or undefined for an 'on...' attribute
+    elem.setAttribute(attrName, String(val));
+  }
+  ```
+  If a dynamic event binding (e.g. `onclick={isEnabled ? handleClick : null}`) updates from a function to `null`, `typeof val === 'function'` is false. The VM falls into the `else` branch, setting `onclick="null"` attribute on the DOM element while leaving the old handler in `eventHandlersMap`.
+- **Impact:** User clicks on the disabled element continue to trigger the previous event handler function because the delegated listener still finds the entry in `DriftClientVM.eventHandlersMap`.
+- **Remediation:**
+  When `attrName.startsWith('on')` and `val == null`, delete the entry from `eventHandlersMap`:
+  ```ts
+  if (attrName.startsWith('on')) {
+    const eventName = attrName.slice(2).toLowerCase();
+    if (typeof val === 'function') {
+      ...
+    } else {
+      const handlers = DriftClientVM.eventHandlersMap.get(elem);
+      if (handlers) delete handlers[eventName];
+    }
+  }
+  ```
+
+---
+
+### BUG-008: `unmountSubtree` Fails to Unregister Active `ReactiveRegion`s
+
+- **Criteria:** Efficiency / Memory Leak
 - **Severity:** Medium
-- **Package:** `driftjs-vite-plugin`
-- **File:** [`packages/vite-plugin/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/vite-plugin/src/index.ts#L17-L34)
-
-#### Description & Root Cause
-
-In `driftjs-vite-plugin`, `serializeValueToJS()` uses `JSON.stringify(val)` for primitive values. In JavaScript, `JSON.stringify(NaN)`, `JSON.stringify(Infinity)`, and `JSON.stringify(-Infinity)` all return `"null"`.
-When a component constant pool contains `NaN` or `Infinity`, the emitted ESM module turns them into `null`.
-
-#### Impact
-
-Numeric constants evaluating to `NaN` or `Infinity` become `null` after Vite compilation.
-
-#### Remediation
-
-Handle non-finite numbers explicitly in `serializeValueToJS`:
-
-```ts
-if (typeof val === 'number') {
-  if (Number.isNaN(val)) return 'NaN';
-  if (val === Infinity) return 'Infinity';
-  if (val === -Infinity) return '-Infinity';
-  return String(val);
-}
-```
+- **Component:** `driftjs-dom`
+- **Affected File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L102-L122)
+- **Description:**
+  When DOM nodes are unmounted via [`DriftClientVM.unmountSubtree()`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L102-L122), the VM recurses over child nodes and unmounts child VMs in `mountedChildVMs`. However, any `ReactiveRegion` instances anchored to nodes within that subtree are never unlinked from `this.reactiveRegions` and `this.reactiveRegionsIndex`.
+- **Impact:** Orphaned reactive regions remain active in memory. When variables referenced in their `deps` mutate, the dormant regions attempt to re-render, executing DOM operations on detached parent nodes and causing memory leaks.
+- **Remediation:**
+  Track associated reactive regions on subtree nodes or item records and invoke `this.removeRegion(region)` during subtree unmounting.
 
 ---
 
-### BUG-11: `sanitizeDependencies` Fails on `workspace:^` Range Protocols
+### BUG-009: Out-of-Bounds Negative Index Access in LIS Reconciler `getSequence`
 
-- **Category:** Correctness
-- **Severity:** Medium
-- **Package:** `create-drift`
-- **File:** [`packages/cli/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/cli/src/index.ts#L73-L82)
-
-#### Description & Root Cause
-
-In `sanitizeDependencies()`:
-
-```ts
-if (typeof value === 'string' && value.startsWith('workspace:')) {
-  const cleanVersion = value.replace('workspace:', '').trim();
-  deps[key] = cleanVersion === '*' ? specifier : cleanVersion;
-}
-```
-
-If a dependency uses pnpm workspace range specifiers `workspace:^` or `workspace:~`, `cleanVersion` becomes `"^"` or `"~"`. Because `cleanVersion !== '*' `, `deps[key]` is set to `"^"` or `"~"`.
-
-#### Impact
-
-Generates malformed `package.json` files when scaffolding projects, causing `npm install` and `yarn install` to fail.
-
-#### Remediation
-
-Check for `cleanVersion === '*'` or `cleanVersion === '^'` or `cleanVersion === '~'`, resolving them to `specifier`.
-
----
-
-### BUG-12: Language Server Misses Multi-Variable and Destructuring Declarations
-
-- **Category:** Correctness
+- **Criteria:** Correctness
 - **Severity:** Low
-- **Package:** `drift-vscode`
-- **File:** [`packages/vscode-plugin/src/server.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/vscode-plugin/src/server.ts#L82-L84)
-
-#### Description & Root Cause
-
-In `server.ts`:
-
-```ts
-const declRegex = /(?:let|const|var)\s+([a-zA-Z0-9_$]+)|function\s+([a-zA-Z0-9_$]+)/g;
-```
-
-This regex only extracts the first variable name immediately following the `let`/`const`/`var` keyword. Declarations like `let a = 1, b = 2, c = 3;` or `const { x, y } = point;` ignore `b`, `c`, `x`, and `y`.
-
-#### Impact
-
-IDE autocompletion and hover documentation fail to suggest secondary variables in multi-variable declarations.
-
-#### Remediation
-
-Parse the `<script>` block with Acorn or enhance the tokenizer to extract all declarator identifiers.
+- **Component:** `driftjs-dom`
+- **Affected File:** [`packages/dom/src/reconciler.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/reconciler.ts#L11-L12)
+- **Description:**
+  In [`getSequence()`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/reconciler.ts#L3-L43):
+  ```ts
+  for (let i = 0; i < len; i++) {
+    const arrI = arr[i]!;
+    if (arrI !== -1) {
+      const lastIdx = result[result.length - 1]!;
+      if (result.length === 0 || arr[lastIdx]! < arrI) {
+  ```
+  On the very first iteration where `result.length === 0`, `result[result.length - 1]` accesses `result[-1]` which is `undefined`. While JavaScript returns `undefined` without throwing, reading negative indices before checking `result.length === 0` is technically incorrect.
+- **Impact:** Triggers de-optimizations in V8 JIT compiler due to negative property lookups on arrays.
+- **Remediation:**
+  Guard `lastIdx` lookup after verifying length:
+  ```ts
+  if (result.length === 0 || arr[result[result.length - 1]!]! < arrI) {
+  ```
 
 ---
 
-### BUG-13: Prototype Pollution and Key Collision in Route Query Parser
+### BUG-010: `HydrationCursor` Permanently Discards Intermediate Nodes on Type Mismatch
 
-- **Category:** Security
+- **Criteria:** Correctness
 - **Severity:** High
-- **Package:** `driftjs-router`
-- **File:** [`packages/router/src/matcher.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/matcher.ts#L25-L61)
-
-#### Description & Root Cause
-
-In `parseQuery()`:
-
-```ts
-const query: RouteQuery = {};
-...
-if (key in query) {
-  const existing = query[key];
-  if (Array.isArray(existing)) {
-    (existing as (string | null)[]).push(val);
-  } else if (existing !== undefined) {
-    query[key] = [existing as string | null, val];
+- **Component:** `driftjs-dom`
+- **Affected File:** [`packages/dom/src/hydration.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/hydration.ts#L19-L55)
+- **Description:**
+  In [`HydrationCursor`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/hydration.ts#L5-L56), methods advance the `TreeWalker` in loops:
+  ```ts
+  public claimElement(tag: string, doc: Document): Element {
+    while (this.current && this.current.nodeType !== 1) {
+      this.current = this.walker.nextNode();
+    }
+    if (this.current && this.current.nodeType === 1 && (this.current as Element).tagName.toLowerCase() === tag.toLowerCase()) {
+      const node = this.current as Element;
+      this.current = this.walker.nextNode();
+      return node;
+    }
+    return doc.createElement(tag);
   }
-} else {
-  query[key] = val;
-}
-```
-
-`query` is created as `{}` (inheriting `Object.prototype`). If a URL contains query parameters matching standard prototype methods (e.g. `?toString=1` or `?valueOf=2` or `?constructor=test`), `'toString' in query` evaluates to `true`.
-`existing` is `Object.prototype.toString` (a function). Because `existing !== undefined` is `true`, `query['toString']` is overwritten with `[Function: toString, '1']`.
-
-#### Impact
-
-Causes prototype key collisions, unexpected type errors when methods like `query.toString()` are called, and potential prototype pollution risks.
-
-#### Remediation
-
-Initialize `query` with `Object.create(null)` or use `Object.prototype.hasOwnProperty.call(query, key)` and reject dangerous keys (`__proto__`, `constructor`, `prototype`).
+  ```
+  If `this.current` points to a comment or text node, `claimElement` skips past it. Since `TreeWalker` only advances forward, those skipped nodes are lost forever and cannot be claimed by subsequent `claimComment` or `claimText` calls. Furthermore, on tag mismatch, `this.current` is not advanced, leaving the cursor stuck on the mismatched node.
+- **Impact:** SSR hydration fails to claim valid server-rendered comment delimiters (`<!--if-->`, `<!--for-->`) and text nodes whenever the AST structure differs slightly from DOM traversal order, causing duplicate DOM creation and broken event listeners.
+- **Remediation:**
+  Implement a backtracking-capable or lookahead cursor that preserves unmatched nodes in an uncollected pool rather than skipping forward irreversibly.
 
 ---
 
-### BUG-14: SSR Comment Sanitization Bypass via HTML5 Bang Delimiter (`--!>`)
+### BUG-011: Prototype Pollution Vulnerability in `evaluatePropsSpec`
 
-- **Category:** Security
+- **Criteria:** Security
 - **Severity:** High
-- **Package:** `driftjs-ssr`
-- **File:** [`packages/ssr/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L340-L342)
-
-#### Description & Root Cause
-
-In `serializeNode()`:
-
-```ts
-if (node.type === 'comment') {
-  const safeContent = String(node.content ?? '').replace(/-->/g, '-- >');
-  return `<!--${safeContent}-->`;
-}
-```
-
-According to the HTML5 specification (Section 13.1.2.4 "Comment end bang state"), the delimiter `--!>` terminates an HTML comment in all modern web browsers.
-The sanitization logic only replaces `-->`. If dynamic comment content contains `--!><script>alert(1)</script>`, the comment closes prematurely and the injected script tag executes in the browser.
-
-#### Impact
-
-Stored/Reflected Cross-Site Scripting (XSS) in server-side rendered pages containing dynamic comments.
-
-#### Remediation
-
-Sanitize both `-->` and `--!>`:
-
-```ts
-const safeContent = String(node.content ?? '')
-  .replace(/-->/g, '-- >')
-  .replace(/--!>/g, '--! >');
-```
+- **Component:** `driftjs-shared`
+- **Affected File:** [`packages/utils/src/evaluator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/evaluator.ts#L77-L90)
+- **Description:**
+  In [`evaluatePropsSpec()`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/evaluator.ts#L77-L90):
+  ```ts
+  export function evaluatePropsSpec(
+    propsSpec: Record<string, any> | null | undefined,
+    scope: Record<string, any>,
+    declaredVars?: Set<string>
+  ): Record<string, any> {
+    if (!propsSpec || typeof propsSpec !== 'object') return {};
+    const res: Record<string, any> = {};
+    for (const key of Object.keys(propsSpec)) {
+      if (key === '__drift_props__') continue;
+      const rawVal = propsSpec[key];
+      res[key] = evaluateExpression(rawVal, scope, declaredVars);
+    }
+    return res;
+  }
+  ```
+  The function iterates over `propsSpec` and sets `res[key]` directly without validating against dangerous property names (`__proto__`, `constructor`, `prototype`).
+- **Impact:** If untrusted input is passed through dynamic component props, prototype pollution can occur on `res` and `Object.prototype`, leading to potential remote code execution or application tampering.
+- **Remediation:**
+  Filter forbidden prototype keys:
+  ```ts
+  if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+  ```
 
 ---
 
-### BUG-15: Inconsistent ARIA and Data Boolean Attribute Stripping
+### BUG-012: `populateItemScope` Drops Default Values on Nullish Items & Splits Commas Naively
 
-- **Category:** Security / Accessibility
+- **Criteria:** Correctness
 - **Severity:** Medium
-- **Package:** `driftjs-ssr` / `driftjs-dom`
-- **File:** [`packages/ssr/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L358-L365), [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L498-L502)
-
-#### Description & Root Cause
-
-When evaluating boolean attribute expressions (e.g. `aria-hidden={false}` or `aria-expanded={false}` or `data-active={false}`), both SSR serializer and client VM treat boolean `false` as an instruction to remove the attribute entirely.
-In ARIA specifications, `aria-hidden="false"` is fundamentally different from omitting `aria-hidden` (which defaults to element visibility rules).
-
-#### Impact
-
-Breaks accessibility trees and security visibility states where explicit `"false"` string attributes are required.
-
-#### Remediation
-
-Only remove boolean attributes for standard HTML boolean attributes (`disabled`, `checked`, `selected`, `readonly`, etc.). For `aria-*` and `data-*` attributes, serialize boolean `false` as `attr="false"`.
+- **Component:** `driftjs-shared`
+- **Affected File:** [`packages/utils/src/scope.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L103-L159)
+- **Description:**
+  In [`populateItemScope()`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L103-L159):
+  1. If `itemVal` is `null` or `undefined`, the block `if (itemVal && typeof itemVal === 'object')` is skipped completely. As a result, variables with default values in destructuring patterns (e.g. `@for { id, active = true } in items`) are never populated on the scope.
+  2. `itemName.slice(1, -1).split(',')` naively splits on commas without tracking quotes or brackets. A default value such as `{ a = [1, 2], b = "x,y" }` is split into broken segments (`a = [1`, `2]`, `b = "x`, `y"`).
+- **Impact:** Loop iterations over nullish items fail to receive default values, and complex destructuring patterns with commas in defaults crash or corrupt scope bindings.
+- **Remediation:**
+  Parse destructuring patterns using a character-level scanner that respects quotes and brackets, and populate defaults even when `itemVal` is nullish.
 
 ---
 
-### BUG-16: Event Handler Scope Snapshotting Triggers Redundant Reactive Updates
+### BUG-013: Uncontrolled Recursive Redirects Cause Call Stack Overflow in Router
 
-- **Category:** Efficiency
+- **Criteria:** Correctness & Efficiency
+- **Severity:** Critical
+- **Component:** `driftjs-router`
+- **Affected File:** [`packages/router/src/router.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/router.ts#L220-L226)
+- **Description:**
+  In [`pushWithGuards()`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/router.ts#L210-L330):
+  ```ts
+  if (targetRoute.matched.length > 0) {
+    const leaf = targetRoute.matched[targetRoute.matched.length - 1]!;
+    if (leaf.redirect) {
+      const redirectTarget =
+        typeof leaf.redirect === 'function' ? leaf.redirect(targetRoute) : leaf.redirect;
+      return pushWithGuards(redirectTarget, true, isPop);
+    }
+  }
+  ```
+  If a circular redirect exists (e.g. `/login` -> `/dashboard` -> `/login`) or a navigation guard always redirects, `pushWithGuards` recursively calls itself with no redirect counter or hop limit.
+- **Impact:** Triggers uncaught `RangeError: Maximum call stack size exceeded`, crashing the client application completely.
+- **Remediation:**
+  Add a maximum redirect count limit (e.g. `MAX_REDIRECTS = 20`) and abort with a `NavigationFailure` when exceeded.
+
+---
+
+### BUG-014: Router Guard Pipeline Prematurely Resolves Async Callback Guards
+
+- **Criteria:** Correctness
 - **Severity:** High
-- **Package:** `driftjs-dom`
-- **File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L466-L478)
-
-#### Description & Root Cause
-
-In `DriftClientVM`'s delegated event handler wrapper:
-
-```ts
-const scopeSnapshot: Record<string, any> = { ...targetVM.scope };
-const result = currentFn.apply(this, args);
-const changedVars = new Set<string>();
-for (const key of targetVM.declaredVars) {
-  if (targetVM.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
-}
-```
-
-`targetVM.scope` is prototypically linked to parent scopes (`Object.create(parentScope)`).
-The shallow spread `{ ...targetVM.scope }` only copies *own* properties. For any variable inherited from a parent prototype, `scopeSnapshot[key]` is `undefined`.
-During the loop, `targetVM.scope[key] !== undefined` evaluates to `true` on **every single event execution**, even when the variable was never modified.
-
-#### Impact
-
-Every user interaction (click, input, keypress) triggers full re-renders of all reactive regions depending on inherited variables, causing severe UI jank and wasted microtask cycles.
-
-#### Remediation
-
-Snapshot all `declaredVars` via prototype-aware lookup:
-
-```ts
-const scopeSnapshot = new Map<string, any>();
-for (const key of targetVM.declaredVars) {
-  scopeSnapshot.set(key, targetVM.scope[key]);
-}
-// After handler execution:
-for (const key of targetVM.declaredVars) {
-  if (targetVM.scope[key] !== scopeSnapshot.get(key)) changedVars.add(key);
-}
-```
+- **Component:** `driftjs-router`
+- **Affected File:** [`packages/router/src/router.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/router.ts#L100-L135)
+- **Description:**
+  In [`runGuardQueue()`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/router.ts#L100-L135):
+  ```ts
+  const returned = guard(to, from, next);
+  if (returned instanceof Promise) {
+    guardRes = await returned;
+  } else {
+    guardRes = returned;
+  }
+  ```
+  If a guard uses the 3-argument callback signature `(to, from, next) => { asyncAuth((ok) => next(ok)); }` and does not return a Promise, `returned` is `undefined`. `runGuardQueue` immediately concludes the guard passed and advances to the next step before `next()` is called.
+- **Impact:** Protected routes are entered before asynchronous authentication or authorization checks complete.
+- **Remediation:**
+  Check `guard.length >= 3` and wrap callback-based guards in a `Promise` that resolves only when `next()` is invoked.
 
 ---
 
-### BUG-17: `mount()` Does Not Return Unmount Handle, Causing Event Listener Leaks
+### BUG-015: Arbitrary Directory Deletion Risk in CLI `emptyDirectory`
 
-- **Category:** Efficiency / Memory
+- **Criteria:** Security
+- **Severity:** Critical
+- **Component:** `create-drift`
+- **Affected File:** [`packages/cli/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/cli/src/index.ts#L20-L22), [`packages/cli/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/cli/src/index.ts#L123-L139)
+- **Description:**
+  In [`emptyDirectory()`](file:///home/hrutav-modha/Documents/driftjs/packages/cli/src/index.ts#L123-L139):
+  ```ts
+  export function emptyDirectory(dirPath: string): void {
+    if (!fs.existsSync(dirPath)) return;
+    for (const file of fs.readdirSync(dirPath)) {
+      if (file === '.git') continue;
+      const fullPath = path.join(dirPath, file);
+      ...
+      fs.rmSync(fullPath, { recursive: true, force: true });
+    }
+  }
+  ```
+  When `overwriteMode === 'empty'`, `scaffoldProject` invokes `emptyDirectory(targetDir)` without verifying that `targetDir` is not the filesystem root (`/`), user home directory, or a system directory.
+- **Impact:** A path traversal or misconfigured target path can recursively wipe critical system or project directories.
+- **Remediation:**
+  Enforce path boundary checks ensuring `targetDir` resolves within `process.cwd()` and is not root or home before deleting files.
+
+---
+
+### BUG-016: Catastrophic Backtracking (ReDoS) in Language Server `extractScriptVars`
+
+- **Criteria:** Security & Efficiency
 - **Severity:** Medium
-- **Package:** `driftjs-dom`
-- **File:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L1154-L1160)
+- **Component:** `drift-vscode`
+- **Affected File:** [`packages/vscode-plugin/src/server.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/vscode-plugin/src/server.ts#L131)
+- **Description:**
+  In `packages/vscode-plugin/src/server.ts`, [`extractScriptVars()`](file:///home/hrutav-modha/Documents/driftjs/packages/vscode-plugin/src/server.ts#L85-L154) uses a greedy regular expression to capture variable declarations:
+  ```ts
+  const declBlockRegex = /(?:let|const|var)\s+([^;]+)(?:;|$)/gm;
+  ```
+  On unclosed script statements or large files with complex multiline expressions, the `([^;]+)` quantifier causes catastrophic backtracking over newline boundaries.
+- **Impact:** High CPU usage and freezing of the language server worker during interactive typing in VS Code.
+- **Remediation:**
+  Use non-greedy matching or parse via the AST-based `compile()` parser directly.
 
-#### Description & Root Cause
+---
 
-`mount(component, container)` instantiates a `DriftClientVM`, increments `DriftClientVM.activeVMCount`, attaches delegated listeners to `document`, and returns `void`.
-Unlike `hydrate()` (which returns the `DriftClientVM` instance), `mount()` provides no handle to invoke `vm.unmount()`.
+### BUG-017: Hover Provider Calculates Wrong Range When Multiple Directives Occur on Same Line
 
-#### Impact
+- **Criteria:** Correctness
+- **Severity:** Low
+- **Component:** `drift-vscode`
+- **Affected File:** [`packages/vscode-plugin/src/server.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/vscode-plugin/src/server.ts#L436-L440)
+- **Description:**
+  In [`server.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/vscode-plugin/src/server.ts#L423-L470) onHover handler:
+  ```ts
+  const directiveMatch = lineText.match(/@(if|else\s+if|else|for|switch|case|default)\b/);
+  if (directiveMatch) {
+    const dirIdx = lineText.indexOf(directiveMatch[0]);
+    if (charInLine >= dirIdx && charInLine <= dirIdx + directiveMatch[0].length) {
+  ```
+  `lineText.indexOf(directiveMatch[0])` always returns the index of the first occurrence on that line.
+- **Impact:** If a line contains multiple directives (e.g. `@if (cond) { ... } @else { ... }`) or text before the directive, hovering over subsequent directives calculates the character offset based on the first occurrence, failing to show hover info for the second directive.
+- **Remediation:**
+  Iterate over all match occurrences using `matchAll` and test whether `charInLine` falls within the specific match offset.
 
-Single Page Applications mounting and destroying Drift components dynamically cannot unmount the client VM, leaving `activeVMCount` permanently incremented and preventing global document event listeners from ever being cleaned up.
-
-#### Remediation
-
-Update `mount()` signature to return `DriftClientVM` or `{ unmount: () => void }`.
+---

@@ -496,6 +496,7 @@ export class DriftGenerator {
             for (const id of this.extractIdentifiers(expr)) ids.add(id);
           }
         }
+        break;
       case 'ChainExpression':
       case 'ParenthesizedExpression':
         for (const id of this.extractIdentifiers(node.expression)) ids.add(id);
@@ -936,7 +937,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
               for (const pName of extractBindingNames(p)) {
                 newLocals.add(pName);
               }
-              paramNames.push(paramToJS(p, locals));
+              paramNames.push(paramToJS(p, newLocals));
             }
           }
           const bodyCode = fn.body?.type === 'BlockStatement'
@@ -954,7 +955,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
               for (const pName of extractBindingNames(p)) {
                 newLocals.add(pName);
               }
-              paramNames.push(paramToJS(p, locals));
+              paramNames.push(paramToJS(p, newLocals));
             }
           }
           const asyncPrefix = fn.async ? 'async ' : '';
@@ -1300,7 +1301,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
           for (const pName of extractBindingNames(p)) {
             newLocals.add(pName);
           }
-          paramNames.push(paramToJS(p, locals));
+          paramNames.push(paramToJS(p, newLocals));
         }
       }
       if (node.body?.type === 'BlockStatement' && Array.isArray(node.body.body)) {
@@ -1339,7 +1340,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
           for (const pName of extractBindingNames(p)) {
             newLocals.add(pName);
           }
-          paramNames.push(paramToJS(p, locals));
+          paramNames.push(paramToJS(p, newLocals));
         }
       }
       if (node.body?.type === 'BlockStatement' && Array.isArray(node.body.body)) {
@@ -1405,7 +1406,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
           for (const pName of extractBindingNames(p)) {
             newLocals.add(pName);
           }
-          paramNames.push(paramToJS(p, locals));
+          paramNames.push(paramToJS(p, newLocals));
         }
       }
       if (node.value?.body?.type === 'BlockStatement' && Array.isArray(node.value.body.body)) {

@@ -55,5 +55,20 @@ describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
     expect(scope.title).toBe('Item 1');
     expect(scope.role).toBe('guest');
   });
+
+  it('evaluatePropsSpec ignores dangerous prototype pollution keys (BUG-011)', async () => {
+    const { evaluatePropsSpec } = await import('../src/index.js');
+    const propsSpec = {
+      __proto__: { polluted: true },
+      constructor: { hacked: true },
+      prototype: { evil: true },
+      title: 'Valid Title',
+    };
+
+    const res = evaluatePropsSpec(propsSpec as any, {});
+    expect(res.title).toBe('Valid Title');
+    expect(res.polluted).toBeUndefined();
+    expect((Object.prototype as any).polluted).toBeUndefined();
+  });
 });
 

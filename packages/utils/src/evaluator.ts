@@ -82,7 +82,7 @@ export function evaluatePropsSpec(
   if (!propsSpec || typeof propsSpec !== 'object') return {};
   const res: Record<string, any> = {};
   for (const key of Object.keys(propsSpec)) {
-    if (key === '__drift_props__') continue;
+    if (key === '__drift_props__' || key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
     const rawVal = propsSpec[key];
     res[key] = evaluateExpression(rawVal, scope, declaredVars);
   }

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 import type { ScaffoldOptions } from '../types/index.js';
 
@@ -121,10 +122,16 @@ export function startDevServer(targetDir: string, pm: string): void {
 }
 
 export function emptyDirectory(dirPath: string): void {
-  if (!fs.existsSync(dirPath)) return;
-  for (const file of fs.readdirSync(dirPath)) {
+  const resolved = path.resolve(dirPath);
+  const root = path.parse(resolved).root;
+  const home = os.homedir();
+  if (resolved === root || (home && resolved === home)) {
+    throw new Error(`Cannot empty root or home directory: ${dirPath}`);
+  }
+  if (!fs.existsSync(resolved)) return;
+  for (const file of fs.readdirSync(resolved)) {
     if (file === '.git') continue;
-    const fullPath = path.join(dirPath, file);
+    const fullPath = path.join(resolved, file);
     try {
       const stat = fs.lstatSync(fullPath);
       if (stat.isSymbolicLink()) {
