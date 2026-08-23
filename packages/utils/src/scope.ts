@@ -98,7 +98,7 @@ if (typeof globalThis !== 'undefined' && !(globalThis as any)._get) {
 }
 
 /**
- * Populates scope for @for loop items, supporting object and array destructuring patterns.
+ * Populates scope for @for loop items, supporting object and array destructuring patterns with aliasing and defaults.
  */
 export function populateItemScope(
   scope: Record<string, any>,
@@ -109,22 +109,74 @@ export function populateItemScope(
 ): void {
   scope[itemName] = itemVal;
   if (indexName) scope[indexName] = indexVal;
+
   if (itemName.startsWith('{') && itemName.endsWith('}')) {
     if (itemVal && typeof itemVal === 'object') {
-      const keys = itemName.slice(1, -1).split(',').map((s) => s.trim().split(':')[0]?.trim() || '');
-      for (const k of keys) {
-        if (k) scope[k] = (itemVal as any)[k];
+      const entries = itemName.slice(1, -1).split(',').map((s) => s.trim()).filter(Boolean);
+      for (const entry of entries) {
+        if (entry.includes(':')) {
+          const colonIdx = entry.indexOf(':');
+          const propName = entry.slice(0, colonIdx).trim();
+          const target = entry.slice(colonIdx + 1).trim();
+          if (target.includes('=')) {
+            const eqIdx = target.indexOf('=');
+            const varName = target.slice(0, eqIdx).trim();
+            const defValStr = target.slice(eqIdx + 1).trim();
+            const val = (itemVal as any)[propName];
+            scope[varName] = val !== undefined ? val : parseDefaultValue(defValStr);
+          } else {
+            scope[target] = (itemVal as any)[propName];
+          }
+        } else if (entry.includes('=')) {
+          const eqIdx = entry.indexOf('=');
+          const propName = entry.slice(0, eqIdx).trim();
+          const defValStr = entry.slice(eqIdx + 1).trim();
+          const val = (itemVal as any)[propName];
+          scope[propName] = val !== undefined ? val : parseDefaultValue(defValStr);
+        } else {
+          scope[entry] = (itemVal as any)[entry];
+        }
       }
     }
   } else if (itemName.startsWith('[') && itemName.endsWith(']')) {
     if (Array.isArray(itemVal) || (itemVal && typeof itemVal[Symbol.iterator] === 'function')) {
       const arr = Array.isArray(itemVal) ? itemVal : Array.from(itemVal);
-      const keys = itemName.slice(1, -1).split(',').map((s) => s.trim());
-      for (let i = 0; i < keys.length; i++) {
-        const k = keys[i];
-        if (k) scope[k] = arr[i];
+      const entries = itemName.slice(1, -1).split(',').map((s) => s.trim()).filter(Boolean);
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i]!;
+        if (entry.includes('=')) {
+          const eqIdx = entry.indexOf('=');
+          const varName = entry.slice(0, eqIdx).trim();
+          const defValStr = entry.slice(eqIdx + 1).trim();
+          const val = arr[i];
+          scope[varName] = val !== undefined ? val : parseDefaultValue(defValStr);
+        } else {
+          scope[entry] = arr[i];
+        }
       }
     }
+  }
+}
+
+function parseDefaultValue(defStr: string): any {
+  const trimmed = defStr.trim();
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+  if (trimmed === 'null') return null;
+  if (trimmed === 'undefined') return undefined;
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  if (!Number.isNaN(Number(trimmed)) && trimmed !== '') {
+    return Number(trimmed);
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return trimmed;
   }
 }
 

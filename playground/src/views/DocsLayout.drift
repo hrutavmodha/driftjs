@@ -1,5 +1,5 @@
 <script>
-  import { RouterView, RouterLink } from 'driftjs-router';
+  import { RouterView, Link } from 'driftjs-router';
 </script>
 
 <div class="view-container">
@@ -14,19 +14,19 @@
       <nav class="docs-nav-menu">
         <div class="nav-group">
           <span class="nav-group-title">Getting Started</span>
-          <RouterLink to="/docs/intro" label="1. Introduction &amp; Syntax" class="docs-link" />
+          <Link to="/docs/intro" label="1. Introduction &amp; Syntax" class="docs-link" />
         </div>
 
         <div class="nav-group">
           <span class="nav-group-title">Core Engine</span>
-          <RouterLink to="/docs/vm" label="2. Register Virtual Machine" class="docs-link" />
-          <RouterLink to="/docs/reactivity" label="3. Fine-Grained Reactivity" class="docs-link" />
+          <Link to="/docs/vm" label="2. Register Virtual Machine" class="docs-link" />
+          <Link to="/docs/reactivity" label="3. Fine-Grained Reactivity" class="docs-link" />
         </div>
 
         <div class="nav-group">
           <span class="nav-group-title">Ecosystem &amp; Web</span>
-          <RouterLink to="/docs/router" label="4. Client-Side Router" class="docs-link" />
-          <RouterLink to="/docs/ssr" label="5. SSR &amp; Hydration" class="docs-link" />
+          <Link to="/docs/router" label="4. Client-Side Router" class="docs-link" />
+          <Link to="/docs/ssr" label="5. SSR &amp; Hydration" class="docs-link" />
         </div>
       </nav>
     </aside>

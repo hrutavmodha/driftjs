@@ -1,5 +1,5 @@
 <script>
-  import { RouterContext, RouterView, RouterLink } from 'driftjs-router';
+  import { RouterContext, RouterView, Link } from 'driftjs-router';
   import { CounterContext } from './context.js';
   import { router } from './routes';
 
@@ -75,11 +75,11 @@
   </header>
 
   <nav class="nav-bar">
-    <RouterLink to="/" label="🏠 Home" class="nav-link" />
-    <RouterLink to="/docs/intro" label="📚 Documentation" class="nav-link" />
-    <RouterLink to="/pioneers" label="👤 Pioneers Directory" class="nav-link" />
-    <RouterLink to="/benchmarks" label="⚡ Benchmarks" class="nav-link" />
-    <RouterLink to="/roadmap" label="🗺️ Roadmap" class="nav-link" />
+    <Link to="/" label="🏠 Home" class="nav-link" />
+    <Link to="/docs/intro" label="📚 Documentation" class="nav-link" />
+    <Link to="/pioneers" label="👤 Pioneers Directory" class="nav-link" />
+    <Link to="/benchmarks" label="⚡ Benchmarks" class="nav-link" />
+    <Link to="/roadmap" label="🗺️ Roadmap" class="nav-link" />
   </nav>
 
   <section class="router-inspector">

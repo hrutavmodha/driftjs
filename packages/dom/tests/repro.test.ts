@@ -411,5 +411,66 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
 
     expect(btn.getAttribute('class')).toBe('btn-danger');
   });
+
+  it('patchItemAttributes updates attributes across multi-root sibling elements', () => {
+    const doc = document;
+    const vm = new DriftClientVM();
+
+    const bodyMod: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_FRAGMENT, 0,
+        Opcode.CREATE_ELEMENT, 1, 0, // dt
+        Opcode.SET_ATTR, 1, 1, 2, 1, // class = eval(item.dtClass)
+        Opcode.APPEND_CHILD, 0, 1,
+        Opcode.CREATE_ELEMENT, 2, 3, // dd
+        Opcode.SET_ATTR, 2, 1, 4, 1, // class = eval(item.ddClass)
+        Opcode.APPEND_CHILD, 0, 2,
+        Opcode.RETURN, 0,
+      ],
+      constants: [
+        'dt',
+        'class',
+        { __drift_fn__: '(scope) => scope.item.dtClass' },
+        'dd',
+        { __drift_fn__: '(scope) => scope.item.ddClass' },
+      ],
+    };
+
+    const initialScope = { item: { dtClass: 'dt-1', ddClass: 'dd-1' } };
+    const frag = vm.execute(bodyMod, { document: doc, scope: initialScope }) as DocumentFragment;
+    const nodes = Array.from(frag.childNodes);
+
+    expect((nodes[0] as HTMLElement).className).toBe('dt-1');
+    expect((nodes[1] as HTMLElement).className).toBe('dd-1');
+
+    const updatedScope = { item: { dtClass: 'dt-updated', ddClass: 'dd-updated' } };
+    vm.patchItemAttributes(bodyMod, updatedScope, nodes);
+
+    expect((nodes[0] as HTMLElement).className).toBe('dt-updated');
+    expect((nodes[1] as HTMLElement).className).toBe('dd-updated');
+  });
+
+  it('updateChildComponentProps unsets removed parent props on child scope', () => {
+    const vm = new DriftClientVM();
+    const childVM = new DriftClientVM();
+    const triggerSpy = vi.spyOn(childVM, 'triggerUpdates');
+
+    const childScope: Record<string, any> = {
+      props: { title: 'Initial', disabled: true },
+      title: 'Initial',
+      disabled: true,
+    };
+
+    const newProps = { title: 'Updated' }; // disabled prop is omitted/removed
+    (vm as any).updateChildComponentProps(childScope, childVM, newProps);
+
+    expect(childScope.props.title).toBe('Updated');
+    expect(childScope.title).toBe('Updated');
+    expect(childScope.disabled).toBeUndefined();
+    expect(triggerSpy).toHaveBeenCalled();
+    const passedDirtyVars = triggerSpy.mock.calls[0]![0] as Set<string>;
+    expect(passedDirtyVars.has('disabled')).toBe(true);
+    expect(passedDirtyVars.has('title')).toBe(true);
+  });
 });
 

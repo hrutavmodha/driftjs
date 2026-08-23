@@ -3,7 +3,7 @@ import {
   createRouter,
   createMemoryHistory,
   RouterView,
-  RouterLink,
+  Link,
   RouterContext,
 } from '../src/index.js';
 import { compile } from 'driftjs-compiler';
@@ -28,7 +28,7 @@ describe('PioneerDetailView Integration', () => {
   it('renders pioneer detail page when navigating to /pioneers/ada', async () => {
     const pioneerDetailSrc = `
 <script>
-  import { RouterContext, RouterLink } from 'driftjs-router';
+  import { RouterContext, Link } from 'driftjs-router';
 
   const router = RouterContext.inject();
 
@@ -88,7 +88,7 @@ describe('PioneerDetailView Integration', () => {
 <div class="view-container">
   <div class="header-card">
     <div class="badge-row">
-      <RouterLink to="/pioneers" label="← Back to Directory" class="btn btn-outline btn-sm" />
+      <Link to="/pioneers" label="← Back to Directory" class="btn btn-outline btn-sm" />
       <span class="pill-badge pill-purple">Route: /pioneers/{pid}</span>
     </div>
     <h1 class="pioneer-heading">👤 {pioneer.name}</h1>
@@ -104,8 +104,8 @@ describe('PioneerDetailView Integration', () => {
       <blockquote class="pioneer-quote">{pioneer.quote}</blockquote>
 
       <div class="tab-bar">
-        <RouterLink to={'/pioneers/' + pid + '?tab=bio'} label="📖 Biography" class="tab-btn" />
-        <RouterLink to={'/pioneers/' + pid + '?tab=achievements'} label="🏆 Key Achievements" class="tab-btn" />
+        <Link to={'/pioneers/' + pid + '?tab=bio'} label="📖 Biography" class="tab-btn" />
+        <Link to={'/pioneers/' + pid + '?tab=achievements'} label="🏆 Key Achievements" class="tab-btn" />
       </div>
 
       <div class="tab-content">
@@ -149,16 +149,16 @@ describe('PioneerDetailView Integration', () => {
       </div>
     `;
     const App = compile(appSrc);
-    (App as any).scope = { RouterContext, RouterView, RouterLink, router };
+    (App as any).scope = { RouterContext, RouterView, Link, router };
     (PioneerDetailView as any).scope = {
       ...(PioneerDetailView as any).scope,
       RouterContext,
-      RouterLink,
+      Link,
       router,
     };
 
     const vm = new DriftClientVM();
-    const node = vm.execute(App, { scope: { router, RouterView, RouterLink, RouterContext }, document }) as HTMLElement;
+    const node = vm.execute(App, { scope: { router, RouterView, Link, RouterContext }, document }) as HTMLElement;
     container.appendChild(node);
 
     expect(container.textContent).toContain('Ada Lovelace');
@@ -168,7 +168,7 @@ describe('PioneerDetailView Integration', () => {
   it('navigates from PioneersListView to PioneerDetailView and switches tabs on click', async () => {
     const pioneerListSrc = `
 <script>
-  import { RouterLink } from 'driftjs-router';
+  import { Link } from 'driftjs-router';
 
   const pioneers = [
     { id: 'ada', name: 'Ada Lovelace', tag: 'Algorithms', icon: '👩‍💻', summary: 'Published the first machine algorithm.' },
@@ -182,7 +182,7 @@ describe('PioneerDetailView Integration', () => {
     @for p in pioneers {
       <div class="pioneer-card">
         <h3>{p.name}</h3>
-        <RouterLink to={'/pioneers/' + p.id} label={'View Profile →'} class={'btn-view-' + p.id} />
+        <Link to={'/pioneers/' + p.id} label={'View Profile →'} class={'btn-view-' + p.id} />
       </div>
     }
   </div>
@@ -191,7 +191,7 @@ describe('PioneerDetailView Integration', () => {
 
     const pioneerDetailSrc = `
 <script>
-  import { RouterContext, RouterLink } from 'driftjs-router';
+  import { RouterContext, Link } from 'driftjs-router';
 
   const router = RouterContext.inject();
 
@@ -234,13 +234,13 @@ describe('PioneerDetailView Integration', () => {
 </script>
 
 <div class="pioneer-detail">
-  <RouterLink to="/pioneers" label="← Back to Directory" class="btn-back" />
+  <Link to="/pioneers" label="← Back to Directory" class="btn-back" />
   <h1 class="pioneer-name">{pioneer.name}</h1>
   <p class="pioneer-title">{pioneer.title}</p>
 
   <div class="tab-bar">
-    <RouterLink to={'/pioneers/' + (router.currentRoute.params.id || 'ada') + '?tab=bio'} label="Bio Tab" class="tab-bio" />
-    <RouterLink to={'/pioneers/' + (router.currentRoute.params.id || 'ada') + '?tab=achievements'} label="Achievements Tab" class="tab-achievements" />
+    <Link to={'/pioneers/' + (router.currentRoute.params.id || 'ada') + '?tab=bio'} label="Bio Tab" class="tab-bio" />
+    <Link to={'/pioneers/' + (router.currentRoute.params.id || 'ada') + '?tab=achievements'} label="Achievements Tab" class="tab-achievements" />
   </div>
 
   <div class="tab-content">
@@ -280,12 +280,12 @@ describe('PioneerDetailView Integration', () => {
       </div>
     `;
     const App = compile(appSrc);
-    (App as any).scope = { RouterContext, RouterView, RouterLink, router };
-    (PioneersListView as any).scope = { RouterContext, RouterLink, router };
-    (PioneerDetailView as any).scope = { RouterContext, RouterLink, router };
+    (App as any).scope = { RouterContext, RouterView, Link, router };
+    (PioneersListView as any).scope = { RouterContext, Link, router };
+    (PioneerDetailView as any).scope = { RouterContext, Link, router };
 
     const vm = new DriftClientVM();
-    const node = vm.execute(App, { scope: { router, RouterView, RouterLink, RouterContext }, document }) as HTMLElement;
+    const node = vm.execute(App, { scope: { router, RouterView, Link, RouterContext }, document }) as HTMLElement;
     container.appendChild(node);
 
     // 1. Initial view: PioneersListView

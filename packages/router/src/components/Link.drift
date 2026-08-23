@@ -11,30 +11,56 @@
   let label = props.label || props.title || '';
   let activeClass = '';
   let href = '';
+  let currentPath = router && router.currentRoute ? router.currentRoute.path : '';
+
+  function getHref(targetTo, r) {
+    const val = targetTo || '/';
+    if (!r) {
+      return typeof val === 'string' ? val : (val && val.path ? val.path : '#');
+    }
+    return r.resolve(val).href;
+  }
+
+  function getActiveClass(targetTo, r, cClass, actClass, exactClass, _curr) {
+    const custom = cClass || '';
+    if (!r) return custom;
+    const val = targetTo || '/';
+    const resolved = r.resolve(val);
+    const targetPath = resolved.path;
+    const currPath = r.currentRoute.path;
+    const activeName = actClass || (r.options && r.options.linkActiveClass) || 'router-link-active';
+    const exactName = exactClass || (r.options && r.options.linkExactActiveClass) || 'router-link-exact-active';
+
+    if (currPath === targetPath) {
+      return (custom ? custom + ' ' : '') + activeName + ' ' + exactName;
+    } else if (targetPath !== '/' && (currPath.startsWith(targetPath.endsWith('/') ? targetPath : targetPath + '/'))) {
+      return (custom ? custom + ' ' : '') + activeName;
+    }
+    return custom;
+  }
 
   function updateLink() {
-    if (!router) {
-      href = typeof to === 'string' ? to : (to && to.path ? to.path : '#');
-      activeClass = customClass;
-      return;
-    }
-    href = router.resolve(to).href;
-    const targetPath = router.resolve(to).path;
-    const currentPath = router.currentRoute.path;
-    if (currentPath === targetPath) {
-      activeClass = (customClass ? customClass + ' ' : '') + ((props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active') + ' ' + (props.exactActiveClass || (router.options && router.options.linkExactActiveClass) || 'router-link-exact-active'));
-    } else if (targetPath !== '/' && (currentPath.startsWith(targetPath.endsWith('/') ? targetPath : targetPath + '/'))) {
-      activeClass = (customClass ? customClass + ' ' : '') + (props.activeClass || (router.options && router.options.linkActiveClass) || 'router-link-active');
-    } else {
-      activeClass = customClass;
-    }
+    to = props.to || to || '/';
+    replace = props.replace !== undefined ? props.replace : replace;
+    target = props.target || target || '_self';
+    rel = props.rel || rel || '';
+    customClass = props.class || customClass || '';
+    label = props.label || props.title || label || '';
+    href = getHref(to, router);
+    activeClass = getActiveClass(to, router, customClass, props.activeClass, props.exactActiveClass, currentPath);
   }
 
   updateLink();
 
   if (router && typeof router.subscribe === 'function') {
     const unsubscribe = router.subscribe(() => {
+      currentPath = router.currentRoute.path;
       updateLink();
+      if (typeof __drift_mark_dirty__ === 'function') {
+        __drift_mark_dirty__('href');
+        __drift_mark_dirty__('activeClass');
+        __drift_mark_dirty__('currentPath');
+      }
     });
     if (typeof onUnmount === 'function') {
       onUnmount(() => {
@@ -46,19 +72,27 @@
   function handleClick(e) {
     if (e.defaultPrevented) return;
     if (e.button !== 0) return;
-    if (target && target !== '_self') return;
+    const tgt = props.target || target;
+    if (tgt && tgt !== '_self') return;
     if (e.metaKey || e.altKey || e.ctrlKey || e.shiftKey) return;
 
     e.preventDefault();
     if (!router) return;
-    if (replace) {
-      router.replace(to);
+    const dest = props.to || to || '/';
+    if (props.replace || replace) {
+      router.replace(dest);
     } else {
-      router.push(to);
+      router.push(dest);
     }
   }
 </script>
 
-<a href={href} class={activeClass} target={target} rel={rel} onclick={handleClick}>
-  {label}
+<a
+  href={getHref(props.to || to, router)}
+  class={getActiveClass(props.to || to, router, props.class || customClass, props.activeClass, props.exactActiveClass, currentPath)}
+  target={props.target || target}
+  rel={props.rel || rel}
+  onclick={handleClick}
+>
+  {props.label || props.title || label}
 </a>

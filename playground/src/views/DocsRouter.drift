@@ -25,15 +25,15 @@ export const router = createRouter(&#123;
   <p>Provide the router instance using DriftJS native Context API:</p>
   <div class="code-block">
     <pre><code>&lt;script&gt;
-  import &#123; RouterContext, RouterView, RouterLink &#125; from 'driftjs-router';
+  import &#123; RouterContext, RouterView, Link &#125; from 'driftjs-router';
   import &#123; router &#125; from './routes';
 
   RouterContext.provide(router);
 &lt;/script&gt;
 
 &lt;nav&gt;
-  &lt;RouterLink to="/" label="Home" /&gt;
-  &lt;RouterLink to="/users/ada" label="Ada's Profile" /&gt;
+  &lt;Link to="/" label="Home" /&gt;
+  &lt;Link to="/users/ada" label="Ada's Profile" /&gt;
 &lt;/nav&gt;
 
 &lt;main&gt;

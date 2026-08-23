@@ -351,6 +351,78 @@ describe('DriftJS Compiler - Reproduction Test Cases', () => {
     expect(token.type).toBe('DirectiveIf');
     expect(token.value).toBe('(msg === `val: ${format({ active: true })}`)');
   });
+
+  it('preserves HTML entity strings inside script tags without decoding them', () => {
+    const template = `
+      <script>
+        const text = "Tom &amp; Jerry";
+        const json = "&quot;quoted&quot;";
+      </script>
+      <div>{text}</div>
+    `;
+    const lexer = new DriftLexer(template);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const scriptNode = ast.body.find((n: any) => n.type === ASTNodeType.Element && n.tagName === 'script') as any;
+    expect(scriptNode).toBeDefined();
+    const scriptText = scriptNode.children[0].content;
+    expect(scriptText).toContain('"Tom &amp; Jerry"');
+    expect(scriptText).toContain('"&quot;quoted&quot;"');
+  });
+
+  it('extractIdentifiers captures variables in optional chaining expressions', () => {
+    const template = `
+      <script>
+        let user = { profile: { name: 'Alice' } };
+      </script>
+      <div>{user?.profile?.name}</div>
+    `;
+    const compiled = compile(template);
+    const userBinding = compiled.reactiveBindings?.find((b) => b.variable === 'user');
+    expect(userBinding).toBeDefined();
+    expect(userBinding?.positions.length).toBeGreaterThan(0);
+  });
+
+  it('lexes attribute string literals containing escaped quotes correctly', () => {
+    const template = `<input placeholder="He said \\"hello\\"" />`;
+    const lexer = new DriftLexer(template);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+    const inputNode = ast.body.find((n: any) => n.type === ASTNodeType.Element && n.tagName === 'input') as any;
+    expect(inputNode).toBeDefined();
+    const placeholderAttr = inputNode.attributes.find((a: any) => a.name === 'placeholder');
+    expect(placeholderAttr).toBeDefined();
+    expect(placeholderAttr.value).toBe('He said "hello"');
+  });
+
+  it('preserves "this" context inside class methods and constructors', () => {
+    const template = `
+      <script>
+        class Counter {
+          constructor(initial = 0) {
+            this.val = initial;
+          }
+          increment() {
+            this.val++;
+            return this.val;
+          }
+        }
+      </script>
+      <div>Counter</div>
+    `;
+    const compiled = compile(template);
+    const scope: Record<string, any> = {};
+    const scriptAst = compiled.constants[0];
+    if (typeof scriptAst === 'object' && scriptAst.__drift_fn__) {
+      const fn = new Function('return (' + scriptAst.__drift_fn__ + ')')();
+      fn(scope);
+    }
+    expect(scope.Counter).toBeDefined();
+    const counter = new scope.Counter(5);
+    expect(counter.val).toBe(5);
+    expect(counter.increment()).toBe(6);
+    expect(counter.val).toBe(6);
+  });
 });
 
 

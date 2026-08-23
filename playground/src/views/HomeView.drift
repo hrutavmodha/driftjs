@@ -1,5 +1,5 @@
 <script>
-  import { RouterLink } from 'driftjs-router';
+  import { Link } from 'driftjs-router';
   import { CounterContext } from '../context.js';
 
   const counterStore = CounterContext.inject();
@@ -54,9 +54,9 @@
       DriftJS replaces traditional virtual DOM diffing and proxy graphs with a lightweight 256-register Virtual Machine executing build-time compiled bytecode directly in the browser and on the server.
     </p>
     <div class="hero-cta-row">
-      <RouterLink to="/docs/intro" label="📖 Read Documentation" class="btn btn-hero-primary" />
-      <RouterLink to="/benchmarks" label="⚡ Run Live Benchmarks" class="btn btn-hero-secondary" />
-      <RouterLink to="/pioneers" label="👤 View Pioneers Directory" class="btn btn-hero-outline" />
+      <Link to="/docs/intro" label="📖 Read Documentation" class="btn btn-hero-primary" />
+      <Link to="/benchmarks" label="⚡ Run Live Benchmarks" class="btn btn-hero-secondary" />
+      <Link to="/pioneers" label="👤 View Pioneers Directory" class="btn btn-hero-outline" />
     </div>
   </section>
 

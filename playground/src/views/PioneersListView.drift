@@ -1,5 +1,5 @@
 <script>
-  import { RouterLink } from 'driftjs-router';
+  import { Link } from 'driftjs-router';
 
   const pioneers = [
     { id: 'ada', name: 'Ada Lovelace', tag: 'Algorithms', icon: '👩‍💻', summary: 'Published the first machine algorithm in 1843 for Babbage\'s Analytical Engine.' },
@@ -30,7 +30,7 @@
         </div>
         <h3>{p.name}</h3>
         <p>{p.summary}</p>
-        <RouterLink to={'/pioneers/' + p.id} label={'View Profile →'} class="btn btn-outline btn-full" />
+        <Link to={'/pioneers/' + p.id} label={'View Profile →'} class="btn btn-outline btn-full" />
       </div>
     }
   </div>

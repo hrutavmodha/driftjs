@@ -3,7 +3,6 @@ import {
   createRouter,
   createMemoryHistory,
   RouterView,
-  RouterLink,
   Link,
   RouterContext,
 } from '../src/index.js';
@@ -136,7 +135,7 @@ describe('Router Components (.drift SFC & VM Integration)', () => {
     expect(container.querySelector('p')?.textContent).toBe('User Profile Content');
   });
 
-  it('renders RouterLink and Link with dynamic active class and handles clicks', async () => {
+  it('renders Link with dynamic active class and handles clicks', async () => {
     const history = createMemoryHistory('/');
     const router = createRouter({
       history,
@@ -153,15 +152,15 @@ describe('Router Components (.drift SFC & VM Integration)', () => {
         RouterContext.provide(router);
       </script>
       <nav>
-        <RouterLink to="/" label="Home" class="nav-item" />
-        <RouterLink to="/about" label="About" class="nav-item" />
+        <Link to="/" label="Home" class="nav-item" />
+        <Link to="/about" label="About" class="nav-item" />
       </nav>
     `;
     const Nav = compile(navSrc);
-    (Nav as any).scope = { RouterContext, RouterLink };
+    (Nav as any).scope = { RouterContext, Link };
 
     const vm = new DriftClientVM();
-    const node = vm.execute(Nav, { scope: { router, RouterLink, RouterContext }, document }) as HTMLElement;
+    const node = vm.execute(Nav, { scope: { router, Link, RouterContext }, document }) as HTMLElement;
     if (node) container.appendChild(node);
 
     const links = container.querySelectorAll('a');
@@ -206,14 +205,14 @@ describe('Router Components (.drift SFC & VM Integration)', () => {
 
     const appSrc = `
       <script>
-        import { RouterContext, RouterView, RouterLink } from '../src/index.js';
+        import { RouterContext, RouterView, Link } from '../src/index.js';
         RouterContext.provide(router);
       </script>
       <div>
         <nav>
-          <RouterLink to="/a" label="Go A" class="btn-a" />
-          <RouterLink to="/b" label="Go B" class="btn-b" />
-          <RouterLink to="/c" label="Go C" class="btn-c" />
+          <Link to="/a" label="Go A" class="btn-a" />
+          <Link to="/b" label="Go B" class="btn-b" />
+          <Link to="/c" label="Go C" class="btn-c" />
         </nav>
         <main>
           <RouterView />
@@ -221,10 +220,10 @@ describe('Router Components (.drift SFC & VM Integration)', () => {
       </div>
     `;
     const AppComp = compile(appSrc);
-    (AppComp as any).scope = { RouterContext, RouterView, RouterLink, router };
+    (AppComp as any).scope = { RouterContext, RouterView, Link, router };
 
     const vm = new DriftClientVM();
-    const node = vm.execute(AppComp, { scope: { router, RouterView, RouterLink, RouterContext }, document }) as HTMLElement;
+    const node = vm.execute(AppComp, { scope: { router, RouterView, Link, RouterContext }, document }) as HTMLElement;
     if (node) container.appendChild(node);
 
     expect(container.querySelector('.page-name')?.textContent).toBe('Page A');
@@ -260,19 +259,19 @@ describe('Router Components (.drift SFC & VM Integration)', () => {
     const DocsVM = compile('<div class="docs-vm">VM Page</div>');
     const DocsLayout = compile(`
       <script>
-        import { RouterView, RouterLink } from '../src/index.js';
+        import { RouterView, Link } from '../src/index.js';
       </script>
       <div class="docs-layout">
         <nav class="docs-nav">
-          <RouterLink to="/docs/intro" label="Intro Link" class="link-docs-intro" />
-          <RouterLink to="/docs/vm" label="VM Link" class="link-docs-vm" />
+          <Link to="/docs/intro" label="Intro Link" class="link-docs-intro" />
+          <Link to="/docs/vm" label="VM Link" class="link-docs-vm" />
         </nav>
         <div class="docs-body">
           <RouterView />
         </div>
       </div>
     `);
-    (DocsLayout as any).scope = { RouterView, RouterLink };
+    (DocsLayout as any).scope = { RouterView, Link };
 
     const PioneersList = compile('<div class="pioneers-list">Pioneers Directory</div>');
 
@@ -296,14 +295,14 @@ describe('Router Components (.drift SFC & VM Integration)', () => {
 
     const appSrc = `
       <script>
-        import { RouterContext, RouterView, RouterLink } from '../src/index.js';
+        import { RouterContext, RouterView, Link } from '../src/index.js';
         RouterContext.provide(router);
       </script>
       <div>
         <nav class="main-nav">
-          <RouterLink to="/" label="Home" class="main-link-home" />
-          <RouterLink to="/docs/intro" label="Docs" class="main-link-docs" />
-          <RouterLink to="/pioneers" label="Pioneers" class="main-link-pioneers" />
+          <Link to="/" label="Home" class="main-link-home" />
+          <Link to="/docs/intro" label="Docs" class="main-link-docs" />
+          <Link to="/pioneers" label="Pioneers" class="main-link-pioneers" />
         </nav>
         <main>
           <RouterView />
@@ -311,10 +310,10 @@ describe('Router Components (.drift SFC & VM Integration)', () => {
       </div>
     `;
     const App = compile(appSrc);
-    (App as any).scope = { RouterContext, RouterView, RouterLink, router };
+    (App as any).scope = { RouterContext, RouterView, Link, router };
 
     const vm = new DriftClientVM();
-    const node = vm.execute(App, { scope: { router, RouterView, RouterLink, RouterContext }, document }) as HTMLElement;
+    const node = vm.execute(App, { scope: { router, RouterView, Link, RouterContext }, document }) as HTMLElement;
     container.appendChild(node);
 
     expect(container.querySelector('.home')).not.toBeNull();

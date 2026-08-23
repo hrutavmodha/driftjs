@@ -879,9 +879,23 @@ export class DriftLexer {
     tagName: string
   ): Token {
     let value = '';
+    let isEscaped = false;
 
     while (!this.isAtEnd()) {
       const ch = this.peek();
+
+      if (isEscaped) {
+        isEscaped = false;
+        value += this.advance();
+        continue;
+      }
+
+      if (ch === '\\') {
+        isEscaped = true;
+        this.advance();
+        continue;
+      }
+
       if (ch === quote) {
         this.advance();
         this.transitionTo({

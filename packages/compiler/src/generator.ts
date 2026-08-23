@@ -496,6 +496,9 @@ export class DriftGenerator {
             for (const id of this.extractIdentifiers(expr)) ids.add(id);
           }
         }
+      case 'ChainExpression':
+      case 'ParenthesizedExpression':
+        for (const id of this.extractIdentifiers(node.expression)) ids.add(id);
         break;
       case 'MemberExpression':
         for (const id of this.extractIdentifiers(node.object)) ids.add(id);
@@ -982,7 +985,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
     }
 
     case 'ThisExpression':
-      return 'scope';
+      return 'this';
 
     case 'Super':
       return 'super';

@@ -248,9 +248,19 @@ export class DriftParser {
       };
     }
 
+    const isRaw = tagName.toLowerCase() === 'script' || tagName.toLowerCase() === 'style';
     const children: TemplateChildNode[] = [];
     while (!this.check(TokenType.TagOpenSlash) && !this.isAtEnd()) {
-      children.push(this.parseChild());
+      if (isRaw && this.check(TokenType.Text)) {
+        const textToken = this.advance();
+        children.push({
+          type: ASTNodeType.Text,
+          content: textToken.value,
+          loc: textToken.loc,
+        });
+      } else {
+        children.push(this.parseChild());
+      }
     }
 
     if (this.isAtEnd()) {

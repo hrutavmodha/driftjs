@@ -108,7 +108,9 @@ function interpolatePathParams(path: string, params: Record<string, any>): strin
     if (segment === '*' || segment === '/*') {
       if ('pathMatch' in params) {
         const val = params['pathMatch'];
-        return Array.isArray(val) ? val.join('/') : String(val);
+        if (val !== undefined && val !== null) {
+          return Array.isArray(val) ? val.join('/') : String(val);
+        }
       }
       return '';
     }
@@ -128,7 +130,10 @@ function interpolatePathParams(path: string, params: Record<string, any>): strin
     }
     if (paramName in params) {
       const val = params[paramName];
-      return Array.isArray(val) ? val.join('/') : String(val);
+      if (val !== undefined && val !== null) {
+        return Array.isArray(val) ? val.join('/') : String(val);
+      }
+      return '';
     }
     return '';
   });

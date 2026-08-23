@@ -1,5 +1,5 @@
 <script>
-  import { RouterContext, RouterLink } from 'driftjs-router';
+  import { RouterContext, Link } from 'driftjs-router';
 
   const router = RouterContext.inject();
 
@@ -120,7 +120,7 @@
 <div class="view-container">
   <div class="header-card">
     <div class="badge-row">
-      <RouterLink to="/pioneers" label="← Back to Directory" class="btn btn-outline btn-sm" />
+      <Link to="/pioneers" label="← Back to Directory" class="btn btn-outline btn-sm" />
       <span class="pill-badge pill-purple">Route: /pioneers/{pid}</span>
     </div>
     <h1>👤 {pioneer.name}</h1>
@@ -136,8 +136,8 @@
       <blockquote class="pioneer-quote">{pioneer.quote}</blockquote>
 
       <div class="tab-bar">
-        <RouterLink to={'/pioneers/' + pid + '?tab=bio'} label="📖 Biography" class="tab-btn" />
-        <RouterLink to={'/pioneers/' + pid + '?tab=achievements'} label="🏆 Key Achievements" class="tab-btn" />
+        <Link to={'/pioneers/' + pid + '?tab=bio'} label="📖 Biography" class="tab-btn" />
+        <Link to={'/pioneers/' + pid + '?tab=achievements'} label="🏆 Key Achievements" class="tab-btn" />
       </div>
 
       <div class="tab-content">

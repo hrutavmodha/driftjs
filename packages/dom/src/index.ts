@@ -250,6 +250,14 @@ export class DriftClientVM {
       }
     }
 
+    for (const key of Object.keys(oldProps)) {
+      if (key === '__drift_props__') continue;
+      if (!Object.prototype.hasOwnProperty.call(newPropsObj, key)) {
+        setScopeValue(childScope, key, undefined);
+        dirtyPropVars.add(key);
+      }
+    }
+
     if (dirtyPropVars.size > 0) {
       dirtyPropVars.add('props');
       if (childVM) {
@@ -730,7 +738,7 @@ export class DriftClientVM {
                 if (itemsEqual(record.itemVal, itemVal) && (!indexName || record.indexVal === indexVal)) {
                   record.indexVal = indexVal;
                   if (record.nodes.length > 0) {
-                    vm.patchItemAttributes(bodyMod, childScope, record.nodes[0]);
+                    vm.patchItemAttributes(bodyMod, childScope, record.nodes);
                   }
                   return;
                 }
@@ -828,8 +836,17 @@ export class DriftClientVM {
    * Evaluates dynamic SET_ATTR opcodes in bodyMod against childScope and updates the root DOM element
    * only if an attribute value actually changed.
    */
-  public patchItemAttributes(bodyMod: CompiledModule, childScope: Record<string, any>, rootNode: Node): void {
-    if (!rootNode || (rootNode.nodeType !== 1 && rootNode.nodeType !== 11)) return;
+  public patchItemAttributes(
+    bodyMod: CompiledModule,
+    childScope: Record<string, any>,
+    rootNodeOrNodes: Node | Node[] | readonly Node[]
+  ): void {
+    const nodes: Node[] = Array.isArray(rootNodeOrNodes)
+      ? Array.from(rootNodeOrNodes)
+      : [rootNodeOrNodes as Node];
+    if (nodes.length === 0) return;
+    const firstNode = nodes[0]!;
+    if (firstNode.nodeType !== 1 && firstNode.nodeType !== 11 && firstNode.nodeType !== 3) return;
     const bytecode = bodyMod.bytecode;
     const constants = bodyMod.constants;
 
@@ -884,7 +901,6 @@ export class DriftClientVM {
 
     // Step 2: Map each register to its corresponding DOM node in the subtree
     const regs = new Map<number, Node>();
-    regs.set(rootReg, rootNode);
 
     const getDirectChildNodes = (parentNode: Node): Node[] => {
       const result: Node[] = [];
@@ -927,7 +943,20 @@ export class DriftClientVM {
         mapChildren(cReg, cNode);
       }
     };
-    mapChildren(rootReg, rootNode);
+
+    if (nodes.length > 1) {
+      const topChildRegs = childrenOf.get(rootReg) || [];
+      for (let i = 0; i < topChildRegs.length && i < nodes.length; i++) {
+        const cReg = topChildRegs[i]!;
+        const cNode = nodes[i]!;
+        regs.set(cReg, cNode);
+        mapChildren(cReg, cNode);
+      }
+    } else {
+      const rootNode = nodes[0]!;
+      regs.set(rootReg, rootNode);
+      mapChildren(rootReg, rootNode);
+    }
 
 
     // Step 3: Iterate over SET_ATTR opcodes and patch attributes on the targeted DOM element
@@ -954,7 +983,7 @@ export class DriftClientVM {
           const rawVal = constants[bytecode[pc + 3]!];
           const isDynamic = bytecode[pc + 4]!;
 
-          const targetNode = regs.get(targetReg) ?? (targetReg === rootReg ? rootNode : null);
+          const targetNode = regs.get(targetReg) ?? (targetReg === rootReg && nodes.length === 1 ? nodes[0] : null);
           if (targetNode && targetNode.nodeType === 1 && isDynamic === 1) {
             const elem = targetNode as Element;
             let val = evaluateExpression(rawVal, childScope, this.declaredVars);

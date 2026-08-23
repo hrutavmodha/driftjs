@@ -173,7 +173,7 @@ export interface RouterViewProps {
   route?: RouteLocationNormalized | undefined;
 }
 
-export interface RouterLinkProps {
+export interface LinkProps {
   to: RouteLocationRaw;
   replace?: boolean | undefined;
   activeClass?: string | undefined;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { setScopeValue, getScopeValue } from '../src/index.js';
+import { setScopeValue, getScopeValue, populateItemScope } from '../src/index.js';
 
 describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
   it('setScopeValue returns the assigned value for expression assignment evaluation', () => {
@@ -44,6 +44,16 @@ describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
     } finally {
       Object.setPrototypeOf(globalThis, currentGlobalProto);
     }
+  });
+
+  it('populateItemScope extracts destructuring aliases and defaults correctly', () => {
+    const scope: Record<string, any> = {};
+    const item = { id: 101, title: 'Item 1' };
+    populateItemScope(scope, '{ id: userId, title, role = "guest" }', item, null, 0);
+
+    expect(scope.userId).toBe(101);
+    expect(scope.title).toBe('Item 1');
+    expect(scope.role).toBe('guest');
   });
 });
 
