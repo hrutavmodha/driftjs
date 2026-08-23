@@ -47,13 +47,14 @@ export function parseQuery(search: string): RouteQuery {
     if (key in query) {
       const existing = query[key];
       if (Array.isArray(existing)) {
-        existing.push(val ?? '');
+        (existing as (string | null)[]).push(val);
       } else if (existing !== undefined) {
-        query[key] = [existing as string, val ?? ''];
+        query[key] = [existing as string | null, val];
       }
     } else {
       query[key] = val;
     }
+
   }
 
   return query;

@@ -86,6 +86,9 @@ export class DriftClientVM {
   private pendingDirtyVars = new Set<string>();
   private isUpdateScheduled = false;
   private isUnmounted = false;
+  private static readonly MAX_FLUSH_ITERATIONS = 100;
+  private flushRecursionCount = 0;
+
 
 
   public parentVM: DriftClientVM | null = null;
@@ -209,11 +212,27 @@ export class DriftClientVM {
 
   private flushUpdates(): void {
     this.isUpdateScheduled = false;
-    if (!this.module || this.pendingDirtyVars.size === 0) return;
+    if (!this.module || this.pendingDirtyVars.size === 0) {
+      this.flushRecursionCount = 0;
+      return;
+    }
+    if (this.flushRecursionCount >= DriftClientVM.MAX_FLUSH_ITERATIONS) {
+      this.pendingDirtyVars.clear();
+      this.flushRecursionCount = 0;
+      console.error(
+        `DriftClientVM: Maximum recursive update limit (${DriftClientVM.MAX_FLUSH_ITERATIONS}) exceeded. Possible infinite reactivity loop detected.`
+      );
+      return;
+    }
+    this.flushRecursionCount++;
     const dirty = new Set(this.pendingDirtyVars);
     this.pendingDirtyVars.clear();
     this.triggerUpdates(dirty);
+    if (this.pendingDirtyVars.size === 0) {
+      this.flushRecursionCount = 0;
+    }
   }
+
 
   private updateChildComponentProps(childScope: Record<string, any>, childVM: DriftClientVM, newPropsObj: Record<string, any>): void {
     const oldProps = childScope.props || {};

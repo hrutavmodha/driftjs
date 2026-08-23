@@ -344,13 +344,24 @@ export function createRouter(options: RouterOptions): Router {
   // Initial navigation
   const initialLoc = history.location || '/';
   pushWithGuards(initialLoc, true, true)
-    .then(() => {
-      if (readyResolve) readyResolve();
+    .then((failure) => {
+      if (failure) {
+        if (failure.type === NavigationFailureType.aborted) {
+          if (readyReject) readyReject(failure);
+          triggerError(failure);
+        } else if (readyResolve) {
+          readyResolve();
+        }
+      } else if (readyResolve) {
+        readyResolve();
+      }
     })
     .catch((err) => {
       if (readyReject) readyReject(err);
       triggerError(err);
     });
+
+
 
   const router: Router = {
     get currentRoute(): RouteLocationNormalized {

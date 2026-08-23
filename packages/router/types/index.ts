@@ -3,7 +3,8 @@
  */
 
 export type RouteParams = Record<string, string | string[]>;
-export type RouteQuery = Record<string, string | string[] | null | undefined>;
+export type RouteQuery = Record<string, string | null | (string | null)[] | undefined>;
+
 
 export interface ScrollPositionCoordinates {
   left?: number | undefined;
