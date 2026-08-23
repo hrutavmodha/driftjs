@@ -117,9 +117,20 @@ export function emptyDirectory(dirPath: string): void {
   if (!fs.existsSync(dirPath)) return;
   for (const file of fs.readdirSync(dirPath)) {
     if (file === '.git') continue;
-    fs.rmSync(path.join(dirPath, file), { recursive: true, force: true });
+    const fullPath = path.join(dirPath, file);
+    try {
+      const stat = fs.lstatSync(fullPath);
+      if (stat.isSymbolicLink()) {
+        fs.unlinkSync(fullPath);
+      } else {
+        fs.rmSync(fullPath, { recursive: true, force: true });
+      }
+    } catch {
+      fs.rmSync(fullPath, { recursive: true, force: true });
+    }
   }
 }
+
 
 export function isDirectoryNotEmpty(dirPath: string): boolean {
   if (!fs.existsSync(dirPath)) return false;

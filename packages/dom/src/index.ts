@@ -97,8 +97,9 @@ export class DriftClientVM {
   }
 
   public unmountSubtree(node: Node | null): void {
-    if (!node) return;
+    if (!node || this.mountedChildVMs.size === 0) return;
     const entry = this.childVMs.get(node);
+
     if (entry) {
       if (this.mountedChildVMs.has(entry.vm)) {
         this.mountedChildVMs.delete(entry.vm);
@@ -449,9 +450,16 @@ export class DriftClientVM {
                   for (const key of targetVM.declaredVars) {
                     if (targetVM.scope[key] !== scopeSnapshot[key]) changedVars.add(key);
                   }
-                  if (changedVars.size > 0) targetVM.triggerUpdates(changedVars);
+                  for (const dirtyVar of targetVM.pendingDirtyVars) {
+                    changedVars.add(dirtyVar);
+                  }
+                  if (changedVars.size > 0) {
+                    targetVM.pendingDirtyVars.clear();
+                    targetVM.triggerUpdates(changedVars);
+                  }
                   if (targetVM.pendingDirtyVars.size > 0) targetVM.flushUpdates();
                   return result;
+
                 };
                 (wrappedHandler as any)._fn = val;
                 (wrappedHandler as any)._vm = this;
