@@ -358,11 +358,12 @@ export function serializeNode(node: ServerNode | string, isRawText = false, rawT
         if (k === 'style' && (v === '' || v == null || v === false)) {
           continue;
         }
-        if (v === '' || v === true) {
+        if (v === true) {
           attrsStr += ` ${k}`;
         } else if (v !== null && v !== undefined && v !== false) {
           attrsStr += ` ${k}="${escapeHtml(String(v))}"`;
         }
+
       }
     }
     const selfClosing = VOID_ELEMENTS.has(tag.toLowerCase());

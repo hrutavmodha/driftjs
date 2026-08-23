@@ -85,6 +85,8 @@ export class DriftClientVM {
   private mountedChildVMs = new Set<DriftClientVM>();
   private pendingDirtyVars = new Set<string>();
   private isUpdateScheduled = false;
+  private isUnmounted = false;
+
 
   public parentVM: DriftClientVM | null = null;
   public contextMap = new Map<symbol | string, any>();
@@ -147,9 +149,13 @@ export class DriftClientVM {
   }
 
   public unmount(): void {
+    if (this.isUnmounted) return;
+    this.isUnmounted = true;
+
     if (DriftClientVM.activeVMCount > 0) {
       DriftClientVM.activeVMCount--;
     }
+
 
     for (const childVM of Array.from(this.mountedChildVMs)) {
       childVM.unmount();

@@ -140,10 +140,60 @@ interface PathTokens {
   score: number;
 }
 
+function toNonCapturing(pattern: string): string {
+  let result = '';
+  let inCharClass = false;
+  let isEscaped = false;
+
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i]!;
+
+    if (isEscaped) {
+      result += ch;
+      isEscaped = false;
+      continue;
+    }
+
+    if (ch === '\\') {
+      result += ch;
+      isEscaped = true;
+      continue;
+    }
+
+    if (inCharClass) {
+      result += ch;
+      if (ch === ']') {
+        inCharClass = false;
+      }
+      continue;
+    }
+
+    if (ch === '[') {
+      inCharClass = true;
+      result += ch;
+      continue;
+    }
+
+    if (ch === '(') {
+      if (pattern[i + 1] === '?') {
+        result += ch;
+      } else {
+        result += '(?:';
+      }
+      continue;
+    }
+
+    result += ch;
+  }
+
+  return result;
+}
+
 /**
  * Compiles a path pattern string into a RegExp and parameter list.
  */
 export function compilePathToRegex(path: string): PathTokens {
+
   const paramNames: string[] = [];
   let score = 0;
 
@@ -173,14 +223,16 @@ export function compilePathToRegex(path: string): PathTokens {
       if (regexMatch && regexMatch[1] && regexMatch[2]) {
         paramName = regexMatch[1];
         paramNames.push(paramName);
+        const nonCapturingCustomRegex = toNonCapturing(regexMatch[2]);
         if (isOptional) {
-          regexParts.push(`(?:/(${regexMatch[2]}))?`);
+          regexParts.push(`(?:/(${nonCapturingCustomRegex}))?`);
           score += 25;
         } else {
-          regexParts.push(`/(${regexMatch[2]})`);
+          regexParts.push(`/(${nonCapturingCustomRegex})`);
           score += 30;
         }
       } else {
+
         if (isOptional || isRepeatable) {
           paramName = paramName.replace(/[?*+]$/, '');
         }
