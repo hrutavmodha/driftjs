@@ -301,4 +301,56 @@ describe('DriftJS Compiler - Reproduction Test Cases', () => {
     expect(scope.a).toBe('first');
     expect(scope.b).toBe('second');
   });
+
+  it('parses @for directive with destructuring pattern and index parameter', () => {
+    const template = `
+      <div>
+        @for (({ id, name }, idx) in users) {
+          <span>{name} ({idx})</span>
+        }
+      </div>
+    `;
+    const lexer = new DriftLexer(template);
+    const parser = new DriftParser(lexer);
+    const ast = parser.parse();
+
+    const divNode = ast.body.find((n: any) => n.type === ASTNodeType.Element) as any;
+    const forNode = divNode.children.find((n: any) => n.type === ASTNodeType.For);
+
+    expect(forNode).toBeDefined();
+    expect(forNode.item).toBe('{ id, name }');
+    expect(forNode.index).toBe('idx');
+  });
+
+  it('astToJS generates assignment code for destructuring assignments to local variables', () => {
+    const template = `
+      <script>
+        function run() {
+          let x = 0, y = 0;
+          [x, y] = [100, 200];
+          return x + y;
+        }
+      </script>
+      <div>{run()}</div>
+    `;
+    const compiled = compile(template);
+    const scope: Record<string, any> = {};
+    const scriptAst = compiled.constants[0];
+    if (typeof scriptAst === 'object' && scriptAst.__drift_fn__) {
+      const fn = new Function('return (' + scriptAst.__drift_fn__ + ')')();
+      fn(scope, null, (s: any, k: string, v: any) => { s[k] = v; return v; });
+    }
+    expect(scope.run).toBeDefined();
+    expect(scope.run()).toBe(300);
+  });
+
+  it('readDirectiveHeader parses directive header with template literal containing nested braces', () => {
+    const template = '@if (msg === `val: ${format({ active: true })}`) { <span>Active</span> }';
+    const lexer = new DriftLexer(template);
+    const token = lexer.nextToken();
+    expect(token.type).toBe('DirectiveIf');
+    expect(token.value).toBe('(msg === `val: ${format({ active: true })}`)');
+  });
 });
+
+

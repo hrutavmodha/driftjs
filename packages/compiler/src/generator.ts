@@ -806,7 +806,9 @@ export function astToJS(node: any, locals?: Set<string>): string {
           const el = elems[i];
           if (el?.type === 'Identifier') {
             const varName = el.name;
-            if (!locals || !locals.has(varName)) {
+            if (locals && locals.has(varName)) {
+              setCalls.push(`${varName} = _val[${i}];`);
+            } else {
               setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, _val[${i}]); else (scope || {})[${JSON.stringify(varName)}] = _val[${i}];`);
             }
           } else if (el?.type === 'AssignmentPattern') {
@@ -814,7 +816,9 @@ export function astToJS(node: any, locals?: Set<string>): string {
             const defaultValJS = astToJS(el.right, locals);
             if (varName) {
               const expr = `(_val[${i}] !== undefined ? _val[${i}] : ${defaultValJS})`;
-              if (!locals || !locals.has(varName)) {
+              if (locals && locals.has(varName)) {
+                setCalls.push(`${varName} = ${expr};`);
+              } else {
                 setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
               }
             }
@@ -822,7 +826,9 @@ export function astToJS(node: any, locals?: Set<string>): string {
             const varName = el.argument?.name || astToJS(el.argument, locals);
             if (varName) {
               const expr = `((_val && typeof _val.slice === 'function') ? _val.slice(${i}) : [])`;
-              if (!locals || !locals.has(varName)) {
+              if (locals && locals.has(varName)) {
+                setCalls.push(`${varName} = ${expr};`);
+              } else {
                 setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
               }
             }
@@ -837,8 +843,36 @@ export function astToJS(node: any, locals?: Set<string>): string {
           if (p.type === 'Property' && p.value?.type === 'Identifier') {
             const propKey = p.key?.name || (typeof p.key?.value === 'string' ? p.key.value : String(p.key?.value));
             const varName = p.value.name;
-            if (!locals || !locals.has(varName)) {
-              setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, _val[${JSON.stringify(propKey)}]);`);
+            if (locals && locals.has(varName)) {
+              setCalls.push(`${varName} = _val[${JSON.stringify(propKey)}];`);
+            } else {
+              setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, _val[${JSON.stringify(propKey)}]); else (scope || {})[${JSON.stringify(varName)}] = _val[${JSON.stringify(propKey)}];`);
+            }
+          } else if (p.type === 'Property' && p.value?.type === 'AssignmentPattern') {
+            const propKey = p.key?.name || (typeof p.key?.value === 'string' ? p.key.value : String(p.key?.value));
+            const varName = p.value.left?.name || astToJS(p.value.left, locals);
+            const defaultValJS = astToJS(p.value.right, locals);
+            if (varName) {
+              const expr = `(_val[${JSON.stringify(propKey)}] !== undefined ? _val[${JSON.stringify(propKey)}] : ${defaultValJS})`;
+              if (locals && locals.has(varName)) {
+                setCalls.push(`${varName} = ${expr};`);
+              } else {
+                setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
+              }
+            }
+          } else if (p.type === 'RestElement') {
+            const varName = p.argument?.name || astToJS(p.argument, locals);
+            if (varName) {
+              const knownKeys = (node.left.properties || [])
+                .filter((prop: any) => prop.type === 'Property')
+                .map((prop: any) => prop.key?.name || (typeof prop.key?.value === 'string' ? prop.key.value : ''))
+                .filter(Boolean);
+              const expr = `(() => { const _r = Object.assign({}, _val); ${JSON.stringify(knownKeys)}.forEach(k => delete _r[k]); return _r; })()`;
+              if (locals && locals.has(varName)) {
+                setCalls.push(`${varName} = ${expr};`);
+              } else {
+                setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
+              }
             }
           }
         }
@@ -846,6 +880,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
       }
       return `(${astToJS(node.left, locals)} ${node.operator} ${valJS})`;
     }
+
 
     case 'UpdateExpression': {
       if (node.argument?.type === 'Identifier') {

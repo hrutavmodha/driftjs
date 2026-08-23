@@ -15,4 +15,5 @@ my-app/
 packages/cli/template/
 *.tgz
 *.env
+prompts/
 __screenshots__/

@@ -160,4 +160,19 @@ describe('DriftJS Router - Reproduction Test Cases', () => {
 
     expect(resolved.path).toBe('/order/aba');
   });
+
+  it('createMatcher extracts parameters accurately for route regex with inner capturing groups', () => {
+    const matcher = createMatcher([
+      {
+        path: '/posts/:date(\\d{4}-(\\d{2})-(\\d{2}))/:slug',
+        name: 'post-detail',
+        component: { bytecode: [], constants: [] },
+      },
+    ]);
+
+    const resolved = matcher.resolve('/posts/2026-08-23/driftjs-launch');
+    expect(resolved.params.date).toBe('2026-08-23');
+    expect(resolved.params.slug).toBe('driftjs-launch');
+  });
 });
+

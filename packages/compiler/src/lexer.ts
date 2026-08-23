@@ -267,6 +267,9 @@ export class DriftLexer {
     this.skipWhitespace();
     let headerContent = '';
     let parenDepth = 0;
+    let bracketDepth = 0;
+    let braceDepth = 0;
+    const templateStack: number[] = [];
     let inQuote: string | null = null;
     let isEscaped = false;
     let inLineComment = false;
@@ -313,6 +316,16 @@ export class DriftLexer {
           isEscaped = true;
         } else if (ch === inQuote) {
           inQuote = null;
+        } else if (inQuote === '`' && ch === '{' && headerContent.endsWith('${')) {
+          let backslashCount = 0;
+          for (let i = headerContent.length - 3; i >= 0 && headerContent[i] === '\\'; i--) {
+            backslashCount++;
+          }
+          if (backslashCount % 2 === 0) {
+            templateStack.push(braceDepth);
+            inQuote = null;
+            braceDepth++;
+          }
         }
         continue;
       }
@@ -353,10 +366,37 @@ export class DriftLexer {
         continue;
       }
 
-      if (ch === '{' && parenDepth === 0) {
-        this.blockDepth++;
-        this.blockElementDepthStack.push(this.elementDepth);
-        return this.createToken(type, headerContent.trim(), startLoc);
+      if (ch === '[') {
+        bracketDepth++;
+        headerContent += ch;
+        continue;
+      }
+
+      if (ch === ']') {
+        if (bracketDepth > 0) bracketDepth--;
+        headerContent += ch;
+        continue;
+      }
+
+      if (ch === '{') {
+        if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0 && templateStack.length === 0) {
+          this.blockDepth++;
+          this.blockElementDepthStack.push(this.elementDepth);
+          return this.createToken(type, headerContent.trim(), startLoc);
+        }
+        braceDepth++;
+        headerContent += ch;
+        continue;
+      }
+
+      if (ch === '}') {
+        braceDepth--;
+        if (templateStack.length > 0 && braceDepth === templateStack[templateStack.length - 1]) {
+          templateStack.pop();
+          inQuote = '`';
+        }
+        headerContent += ch;
+        continue;
       }
 
       headerContent += ch;
@@ -369,6 +409,7 @@ export class DriftLexer {
       startLoc.offset
     );
   }
+
 
   private readTagNameToken(isClosingTag: boolean): Token {
     if (this.isAtEnd()) {

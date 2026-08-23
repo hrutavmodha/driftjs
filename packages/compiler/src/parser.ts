@@ -422,17 +422,38 @@ export class DriftParser {
   private parseForDirective(): ForNode {
     const forToken = this.consume(TokenType.DirectiveFor, 'Expected @for directive');
     const startLoc = forToken.loc.start;
-    const header = forToken.value; // e.g. "item in items" or "(item, index) in items"
+    let header = forToken.value.trim(); // e.g. "item in items" or "(item, index) in items"
 
-    const inIndex = (() => {
+    function hasMatchingOuterParens(str: string): boolean {
+      if (!str.startsWith('(') || !str.endsWith(')')) return false;
+      let depth = 0;
+      let inQuote: string | null = null;
+      let isEscaped = false;
+      for (let i = 0; i < str.length - 1; i++) {
+        const ch = str[i]!;
+        if (inQuote !== null) {
+          if (isEscaped) isEscaped = false;
+          else if (ch === '\\') isEscaped = true;
+          else if (ch === inQuote) inQuote = null;
+          continue;
+        }
+        if (ch === '"' || ch === "'" || ch === '`') inQuote = ch;
+        else if (ch === '(') depth++;
+        else if (ch === ')') depth--;
+        if (depth === 0) return false;
+      }
+      return depth === 1;
+    }
+
+    function findInIndex(str: string): number {
       let parenDepth = 0;
       let bracketDepth = 0;
       let braceDepth = 0;
       let inQuote: string | null = null;
       let isEscaped = false;
 
-      for (let i = 0; i <= header.length - 4; i++) {
-        const ch = header[i]!;
+      for (let i = 0; i <= str.length - 4; i++) {
+        const ch = str[i]!;
         if (inQuote !== null) {
           if (isEscaped) {
             isEscaped = false;
@@ -453,12 +474,23 @@ export class DriftParser {
         else if (ch === ']') bracketDepth--;
         else if (ch === '{') braceDepth++;
         else if (ch === '}') braceDepth--;
-        else if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0 && header.slice(i, i + 4) === ' in ') {
+        else if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0 && str.slice(i, i + 4) === ' in ') {
           return i;
         }
       }
       return -1;
-    })();
+    }
+
+    let inIndex = findInIndex(header);
+    if (inIndex === -1 && hasMatchingOuterParens(header)) {
+      const stripped = header.slice(1, -1).trim();
+      const strippedIn = findInIndex(stripped);
+      if (strippedIn !== -1) {
+        header = stripped;
+        inIndex = strippedIn;
+      }
+    }
+
     if (inIndex === -1) {
       throw new DriftParserError(
         `Invalid @for header syntax '${header}'. Expected format: 'item in list' or '(item, index) in list'`,
@@ -467,6 +499,7 @@ export class DriftParser {
         forToken.loc.start.offset
       );
     }
+
 
     const lhs = header.slice(0, inIndex).trim();
     let rawIterable = header.slice(inIndex + 4).trim();
@@ -524,10 +557,47 @@ export class DriftParser {
     let item = lhs;
     let index: string | null = null;
 
-    if (lhs.startsWith('(') && lhs.endsWith(')')) {
-      const parts = lhs.slice(1, -1).split(',').map(s => s.trim());
-      item = parts[0] || '';
-      index = parts[1] || null;
+    while (hasMatchingOuterParens(item)) {
+      item = item.slice(1, -1).trim();
+    }
+
+
+    const commaIdx = (() => {
+      let parenDepth = 0;
+      let bracketDepth = 0;
+      let braceDepth = 0;
+      let inQuote: string | null = null;
+      let isEscaped = false;
+
+      for (let i = 0; i < item.length; i++) {
+        const ch = item[i]!;
+        if (inQuote !== null) {
+          if (isEscaped) isEscaped = false;
+          else if (ch === '\\') isEscaped = true;
+          else if (ch === inQuote) inQuote = null;
+          continue;
+        }
+        if (ch === '"' || ch === "'" || ch === '`') inQuote = ch;
+        else if (ch === '(') parenDepth++;
+        else if (ch === ')') parenDepth--;
+        else if (ch === '[') bracketDepth++;
+        else if (ch === ']') bracketDepth--;
+        else if (ch === '{') braceDepth++;
+        else if (ch === '}') braceDepth--;
+        else if (ch === ',' && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
+          return i;
+        }
+      }
+      return -1;
+    })();
+
+    if (commaIdx !== -1) {
+      const firstPart = item.slice(0, commaIdx).trim();
+      index = item.slice(commaIdx + 1).trim() || null;
+      item = firstPart;
+      while (hasMatchingOuterParens(item)) {
+        item = item.slice(1, -1).trim();
+      }
     }
 
     const body: TemplateChildNode[] = [];

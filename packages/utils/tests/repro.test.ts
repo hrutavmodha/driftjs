@@ -31,4 +31,19 @@ describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
     expect(toStringVal).toBeUndefined();
     expect(valueOfVal).toBeUndefined();
   });
+
+  it('getScopeValue resolves prototype-inherited browser globals on globalThis', () => {
+    const scope = {};
+    const mockProto = { customBrowserGlobal: () => 'from-window-prototype' };
+    const currentGlobalProto = Object.getPrototypeOf(globalThis);
+    try {
+      Object.setPrototypeOf(globalThis, mockProto);
+      const val = getScopeValue(scope, 'customBrowserGlobal');
+      expect(typeof val).toBe('function');
+      expect(val()).toBe('from-window-prototype');
+    } finally {
+      Object.setPrototypeOf(globalThis, currentGlobalProto);
+    }
+  });
 });
+

@@ -18,6 +18,7 @@ import {
   normalizeStyle,
   pushActiveVM,
   popActiveVM,
+  populateItemScope,
   createContext,
   provide,
   inject,
@@ -25,6 +26,7 @@ import {
   injectContext,
   type Context,
 } from "driftjs-shared";
+
 
 
 const NON_BUBBLING_EVENTS = new Set([
@@ -60,6 +62,7 @@ function clearBetweenAnchors(startAnchor: Node, endAnchor: Node, vm?: DriftClien
 }
 
 /**
+
  * Register-based Virtual Machine for executing compiled DriftJS templates.
  * Clean, lightweight, and 100% CSP compliant.
  */
@@ -636,16 +639,14 @@ export class DriftClientVM {
               (itemVal, indexVal) => {
                 if (keyExpr) {
                   const itemScope = Object.create(scope);
-                  itemScope[itemName] = itemVal;
-                  if (indexName) itemScope[indexName] = indexVal;
+                  populateItemScope(itemScope, itemName, itemVal, indexName, indexVal);
                   return evaluateExpression(keyExpr, itemScope, vm.declaredVars);
                 }
                 return indexVal;
               },
               (itemVal, indexVal, refNode) => {
                 const childScope = Object.create(scope);
-                childScope[itemName] = itemVal;
-                if (indexName) childScope[indexName] = indexVal;
+                populateItemScope(childScope, itemName, itemVal, indexName, indexVal);
 
                 const before = vm.reactiveRegions.size;
                 const frag = vm.runSubModule(bodyMod, childScope);
@@ -691,8 +692,7 @@ export class DriftClientVM {
                 };
 
                 const childScope = Object.create(scope);
-                childScope[itemName] = itemVal;
-                if (indexName) childScope[indexName] = indexVal;
+                populateItemScope(childScope, itemName, itemVal, indexName, indexVal);
 
                 if (itemsEqual(record.itemVal, itemVal) && (!indexName || record.indexVal === indexVal)) {
                   record.indexVal = indexVal;
@@ -853,10 +853,40 @@ export class DriftClientVM {
     const regs = new Map<number, Node>();
     regs.set(rootReg, rootNode);
 
+    const getDirectChildNodes = (parentNode: Node): Node[] => {
+      const result: Node[] = [];
+      const children = parentNode.childNodes;
+      let ifDepth = 0;
+      let forDepth = 0;
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i]!;
+        if (child.nodeType === 8) {
+          const text = (child as Comment).data.trim();
+          if (text === 'if') {
+            ifDepth++;
+            continue;
+          } else if (text === '/if') {
+            if (ifDepth > 0) ifDepth--;
+            continue;
+          } else if (text === 'for') {
+            forDepth++;
+            continue;
+          } else if (text === '/for') {
+            if (forDepth > 0) forDepth--;
+            continue;
+          }
+        }
+        if (ifDepth === 0 && forDepth === 0) {
+          result.push(child);
+        }
+      }
+      return result;
+    };
+
     const mapChildren = (parentReg: number, parentNode: Node) => {
       const childRegs = childrenOf.get(parentReg);
       if (!childRegs) return;
-      const childNodes = parentNode.childNodes;
+      const childNodes = getDirectChildNodes(parentNode);
       for (let i = 0; i < childRegs.length && i < childNodes.length; i++) {
         const cReg = childRegs[i]!;
         const cNode = childNodes[i]!;
@@ -865,6 +895,7 @@ export class DriftClientVM {
       }
     };
     mapChildren(rootReg, rootNode);
+
 
     // Step 3: Iterate over SET_ATTR opcodes and patch attributes on the targeted DOM element
     for (let pc = 0; pc < bytecode.length; ) {

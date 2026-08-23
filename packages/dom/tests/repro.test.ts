@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DriftClientVM, mount } from '../src/index.js';
+import { HydrationCursor } from '../src/hydration.js';
 import { Opcode, type CompiledModule } from '../types/index.js';
 import { compile } from '../../compiler/src/index.js';
 
@@ -355,4 +356,60 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
 
     expect(flushSpy).not.toHaveBeenCalled();
   });
+
+  it('HydrationCursor matches comment content before claiming comment anchor', () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    const devComment = doc.createComment(' Section Description ');
+    const ifStart = doc.createComment('if');
+    const span = doc.createElement('span');
+    span.textContent = 'Hello';
+    const ifEnd = doc.createComment('/if');
+
+    container.appendChild(devComment);
+    container.appendChild(ifStart);
+    container.appendChild(span);
+    container.appendChild(ifEnd);
+
+    const cursor = new HydrationCursor(container, doc);
+
+    const claimedIf = cursor.claimComment('if', doc);
+    expect(claimedIf.data.trim()).toBe('if');
+  });
+
+  it('patchItemAttributes targets correct DOM element when sibling elements are preceded by comment boundaries', () => {
+    const doc = document;
+    const vm = new DriftClientVM();
+
+    const bodyMod: CompiledModule = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0, // div
+        Opcode.CREATE_COMMENT, 1, 1, // comment
+        Opcode.APPEND_CHILD, 0, 1,
+        Opcode.CREATE_ELEMENT, 2, 2, // button
+        Opcode.SET_ATTR, 2, 3, 4, 1, // class = eval(item.btnClass)
+        Opcode.APPEND_CHILD, 0, 2,
+        Opcode.RETURN, 0,
+      ],
+      constants: [
+        'div',
+        'section-divider',
+        'button',
+        'class',
+        { __drift_fn__: '(scope) => scope.item.btnClass' },
+      ],
+    };
+
+    const initialScope = { item: { btnClass: 'btn-primary' } };
+    const rootElem = vm.execute(bodyMod, { document: doc, scope: initialScope }) as HTMLElement;
+
+    const btn = rootElem.querySelector('button')!;
+    expect(btn.getAttribute('class')).toBe('btn-primary');
+
+    const updatedScope = { item: { btnClass: 'btn-danger' } };
+    vm.patchItemAttributes(bodyMod, updatedScope, rootElem);
+
+    expect(btn.getAttribute('class')).toBe('btn-danger');
+  });
 });
+

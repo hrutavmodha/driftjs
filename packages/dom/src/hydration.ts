@@ -41,14 +41,17 @@ export class HydrationCursor {
   }
 
   public claimComment(expectedContent: string, doc: Document): Comment {
-    while (this.current && this.current.nodeType !== 8) {
+    while (this.current) {
+      if (this.current.nodeType === 8) {
+        const comment = this.current as Comment;
+        if (comment.data.trim() === expectedContent.trim()) {
+          this.current = this.walker.nextNode();
+          return comment;
+        }
+      }
       this.current = this.walker.nextNode();
-    }
-    if (this.current && this.current.nodeType === 8) {
-      const node = this.current as Comment;
-      this.current = this.walker.nextNode();
-      return node;
     }
     return doc.createComment(expectedContent);
   }
 }
+

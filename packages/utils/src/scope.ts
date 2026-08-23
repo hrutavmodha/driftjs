@@ -76,8 +76,17 @@ export function getScopeValue(scope: any, name: string): any {
   if (scope && inScopeChain(scope, name)) {
     return scope[name];
   }
-  if (typeof globalThis !== 'undefined' && globalThis && Object.prototype.hasOwnProperty.call(globalThis, name)) {
-    return (globalThis as any)[name];
+  if (typeof globalThis !== 'undefined' && globalThis) {
+    if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+      return undefined;
+    }
+    let curr: any = globalThis;
+    while (curr && curr !== Object.prototype) {
+      if (Object.prototype.hasOwnProperty.call(curr, name)) {
+        return (globalThis as any)[name];
+      }
+      curr = Object.getPrototypeOf(curr);
+    }
   }
   return undefined;
 }
@@ -87,3 +96,35 @@ export const _get = getScopeValue;
 if (typeof globalThis !== 'undefined' && !(globalThis as any)._get) {
   (globalThis as any)._get = getScopeValue;
 }
+
+/**
+ * Populates scope for @for loop items, supporting object and array destructuring patterns.
+ */
+export function populateItemScope(
+  scope: Record<string, any>,
+  itemName: string,
+  itemVal: any,
+  indexName: string | null,
+  indexVal: number
+): void {
+  scope[itemName] = itemVal;
+  if (indexName) scope[indexName] = indexVal;
+  if (itemName.startsWith('{') && itemName.endsWith('}')) {
+    if (itemVal && typeof itemVal === 'object') {
+      const keys = itemName.slice(1, -1).split(',').map((s) => s.trim().split(':')[0]?.trim() || '');
+      for (const k of keys) {
+        if (k) scope[k] = (itemVal as any)[k];
+      }
+    }
+  } else if (itemName.startsWith('[') && itemName.endsWith(']')) {
+    if (Array.isArray(itemVal) || (itemVal && typeof itemVal[Symbol.iterator] === 'function')) {
+      const arr = Array.isArray(itemVal) ? itemVal : Array.from(itemVal);
+      const keys = itemName.slice(1, -1).split(',').map((s) => s.trim());
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        if (k) scope[k] = arr[i];
+      }
+    }
+  }
+}
+

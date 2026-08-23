@@ -6,6 +6,7 @@ import {
   normalizeStyle,
   pushActiveVM,
   popActiveVM,
+  populateItemScope,
   createContext,
   provide,
   inject,
@@ -47,6 +48,7 @@ const VALID_TAG_NAME_REGEX = /^[a-zA-Z_:][a-zA-Z0-9_.:-]*$/;
 
 /**
  * Register-based Virtual Machine for Server-Side Rendering (SSR) in DriftJS.
+
  * Executes bytecode without DOM dependencies and serializes directly to HTML string.
  */
 export class DriftServerVM {
@@ -291,8 +293,7 @@ export class DriftServerVM {
           parentNode.children.push({ type: 'comment', content: 'for', children: [] });
           for (let i = 0; i < items.length; i++) {
             const childScope = Object.create(this.scope);
-            childScope[itemName] = items[i];
-            if (indexName) childScope[indexName] = i;
+            populateItemScope(childScope, itemName, items[i], indexName, i);
 
             const subVm = new DriftServerVM();
             subVm.parentVM = this;

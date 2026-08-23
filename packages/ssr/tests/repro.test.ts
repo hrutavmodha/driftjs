@@ -143,4 +143,20 @@ describe('DriftServerVM (SSR Engine) - Reproduction Test Cases', () => {
 
     expect((vm as any).scope.subVar).toBeUndefined();
   });
+
+  it('serializeNode formats empty string attributes with explicit empty string assignment', () => {
+    const node: any = {
+      type: 'element',
+      tag: 'img',
+      attrs: new Map([
+        ['src', '/logo.png'],
+        ['alt', ''],
+      ]),
+      children: [],
+    };
+
+    const html = serializeNode(node);
+    expect(html).toBe('<img src="/logo.png" alt="" />');
+  });
 });
+
