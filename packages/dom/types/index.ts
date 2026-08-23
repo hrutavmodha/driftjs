@@ -14,5 +14,8 @@ export interface ReactiveRegion {
   readonly deps: ReadonlySet<string>;
   readonly reRender: () => void;
   childRegions?: ReactiveRegion[];
+  parentNode?: Node;
+  startAnchor?: Node;
+  endAnchor?: Node;
 }
 

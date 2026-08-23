@@ -607,5 +607,37 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     vm.unmount();
     doc.body.removeChild(container);
   });
+
+  it('unmountSubtree unregisters reactive regions anchored inside the unmounted element (BUG-008)', () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    doc.body.appendChild(container);
+
+    const template = `
+      <script>
+        let show = true;
+      </script>
+      <div id="sub-wrapper">
+        @if (show) {
+          <span>Visible</span>
+        }
+      </div>
+    `;
+
+    const compiled = compile(template);
+    const vm = new DriftClientVM();
+    const node = vm.execute(compiled, { document: doc }) as HTMLElement;
+    container.appendChild(node);
+
+    expect((vm as any).reactiveRegions.size).toBeGreaterThan(0);
+
+    const wrapper = container.querySelector('#sub-wrapper')!;
+    vm.unmountSubtree(wrapper);
+
+    expect((vm as any).reactiveRegions.size).toBe(0);
+
+    vm.unmount();
+    doc.body.removeChild(container);
+  });
 });
 

@@ -100,7 +100,7 @@ export class DriftClientVM {
   }
 
   public unmountSubtree(node: Node | null): void {
-    if (!node || this.mountedChildVMs.size === 0) return;
+    if (!node) return;
     const entry = this.childVMs.get(node);
 
     if (entry) {
@@ -110,6 +110,17 @@ export class DriftClientVM {
       }
       this.childVMs.delete(node);
     }
+
+    for (const region of Array.from(this.reactiveRegions)) {
+      if (
+        (region.startAnchor && (region.startAnchor === node || (node.contains && node.contains(region.startAnchor)))) ||
+        (region.endAnchor && (region.endAnchor === node || (node.contains && node.contains(region.endAnchor)))) ||
+        (region.parentNode && (region.parentNode === node || (node.contains && node.contains(region.parentNode))))
+      ) {
+        this.removeRegion(region);
+      }
+    }
+
     const children = (node as any).childNodes;
     if (children) {
       for (let i = 0; i < children.length; i++) {
@@ -635,6 +646,9 @@ export class DriftClientVM {
               renderIf();
             },
             childRegions,
+            parentNode: parentElem,
+            startAnchor,
+            endAnchor: actualEndAnchor,
           };
           this.registerRegion(ifRegion);
 
@@ -838,6 +852,9 @@ export class DriftClientVM {
             reRender: () => {
               renderFor();
             },
+            parentNode: parentElem,
+            startAnchor,
+            endAnchor: actualEndAnchor,
           };
           this.registerRegion(forRegion);
 

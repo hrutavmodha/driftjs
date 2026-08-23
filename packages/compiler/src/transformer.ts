@@ -143,7 +143,7 @@ export class DriftTransformer {
       ? acorn.parseExpressionAt(node.discriminant, 0, { ecmaVersion: 'latest' })
       : node.discriminant;
 
-    const isSimple = (discAst as any).type === 'Identifier' || (discAst as any).type === 'Literal';
+    const isSimple = (discAst as any).type === 'Identifier' || (discAst as any).type === 'Literal' || (discAst as any).type === 'MemberExpression';
     const discVarName = `__drift_sw_${this.switchCounter++}`;
     let isFirstCase = true;
 
@@ -237,7 +237,7 @@ export class DriftTransformer {
         test: parsedTest,
         consequent,
         alternate,
-        extraDeps: !isSimple ? cloneAstNode(discAst) : undefined,
+        extraDeps: cloneAstNode(discAst),
         loc: c.loc,
       };
     };

@@ -39,12 +39,14 @@ export function setScopeValue<T = any>(targetScope: Record<string, any>, name: s
     scan = Object.getPrototypeOf(scan);
   }
 
-  // 4. Trigger dirty marking on all affected scope VMs
-  for (const fn of dirtyFns) {
-    try {
-      fn(name);
-    } catch {
-      // ignore errors
+  // 4. Trigger dirty marking on all affected scope VMs (skip internal __drift_ variables)
+  if (!name.startsWith('__drift_')) {
+    for (const fn of dirtyFns) {
+      try {
+        fn(name);
+      } catch {
+        // ignore errors
+      }
     }
   }
 

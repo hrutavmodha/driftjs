@@ -456,6 +456,48 @@ describe('DriftJS Compiler - Reproduction Test Cases', () => {
     expect(scope.greet('World')).toBe('Hello, World');
     expect(scope.greet('Drift', 'Welcome to Drift')).toBe('Welcome to Drift');
   });
+
+  it('nested object and array destructuring correctly assigns leaf variables to scope (BUG-004)', () => {
+    const template = `
+      <script>
+        const data = { user: { name: 'Alice', scores: [95, 100] } };
+        const { user: { name, scores: [firstScore, secondScore] } } = data;
+      </script>
+      <div>{name}</div>
+    `;
+    const compiled = compile(template);
+    const scope: Record<string, any> = {};
+    const scriptAst = compiled.constants[0];
+    if (typeof scriptAst === 'object' && scriptAst.__drift_fn__) {
+      const fn = new Function('return (' + scriptAst.__drift_fn__ + ')')();
+      fn(scope);
+    }
+    expect(scope.name).toBe('Alice');
+    expect(scope.firstScore).toBe(95);
+    expect(scope.secondScore).toBe(100);
+  });
+
+  it('switch on member expression does not emit unnecessary synthetic temporary variable (BUG-006)', () => {
+    const template = `
+      <script>
+        let user = { role: 'admin' };
+      </script>
+      @switch user.role {
+        @case 'admin' {
+          <span>Admin</span>
+        }
+        @default {
+          <span>Guest</span>
+        }
+      }
+    `;
+    const ast = new DriftParser(new DriftLexer(template)).parse();
+    const transformed = new DriftTransformer(ast).transform();
+    const ifNode = transformed.body.find((n: any) => n.type === ASTNodeType.If) as any;
+    expect(ifNode).toBeDefined();
+    // Test that the binary expression directly tests user.role
+    expect(ifNode.test.left.type).toBe('MemberExpression');
+  });
 });
 
 

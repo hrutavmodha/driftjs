@@ -3,11 +3,12 @@
 This document records the comprehensive defect audit of the **DriftJS** codebase across all monorepo packages (`driftjs-compiler`, `driftjs-dom`, `driftjs-ssr`, `driftjs-shared`, `driftjs-router`, `driftjs-vite-plugin`, `create-drift`, and `drift-vscode`).
 
 Every bug is evaluated and categorized under three primary criteria:
+
 1. **Correctness** (runtime logic errors, edge cases, state synchronization, specification non-conformance)
 2. **Security** (XSS, prototype pollution, state contamination, path traversal, ReDoS)
 3. **Efficiency** (redundant microtask dispatching, memory leaks, uncollected regions, unneeded DOM thrashing)
 
-All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
+All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-023`).
 
 ---
 
@@ -18,11 +19,11 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
 | [`BUG-001`](#bug-001-typeerror-crash-in-serializenode-on-null--undefined-children) | `TypeError` Crash in `serializeNode` on Null / Undefined Children | Correctness | **High** | `driftjs-ssr` | **Resolved** |
 | [`BUG-002`](#bug-002-cross-request-state-contamination-via-optionsscope-mutation) | Cross-Request State Contamination via `options.scope` Mutation | Security / Correctness | **High** | `driftjs-ssr` | **Resolved** |
 | [`BUG-003`](#bug-003-missing-break-in-sequenceexpression-ast-identifier-extraction) | Missing `break;` in `SequenceExpression` AST Identifier Extraction | Correctness | **Medium** | `driftjs-compiler` | **Resolved** |
-| [`BUG-004`](#bug-004-nested-objectarray-pattern-destructuring-generates-invalid-scope-variables) | Nested Object/Array Pattern Destructuring Generates Invalid Scope Variables | Correctness | **High** | `driftjs-compiler` | Open |
+| [`BUG-004`](#bug-004-nested-objectarray-pattern-destructuring-generates-invalid-scope-variables) | Nested Object/Array Pattern Destructuring Generates Invalid Scope Variables | Correctness | **High** | `driftjs-compiler` | **Resolved** |
 | [`BUG-005`](#bug-005-function-parameter-defaults-use-outer-locals-breaking-inter-parameter-references) | Function Parameter Defaults Use Outer Locals Breaking Inter-Parameter References | Correctness | **Medium** | `driftjs-compiler` | **Resolved** |
-| [`BUG-006`](#bug-006-switch-transformation-pollutes-scope-with-synthetic-discriminant-variables) | `@switch` Transformation Pollutes Scope with Synthetic Discriminant Variables | Efficiency / Correctness | **Medium** | `driftjs-compiler` | Open |
+| [`BUG-006`](#bug-006-switch-transformation-pollutes-scope-with-synthetic-discriminant-variables) | `@switch` Transformation Pollutes Scope with Synthetic Discriminant Variables | Efficiency / Correctness | **Medium** | `driftjs-compiler` | **Resolved** |
 | [`BUG-007`](#bug-007-dynamic-event-handlers-updating-to-nullundefined-fail-to-detach-listeners) | Dynamic Event Handlers Updating to `null`/`undefined` Fail to Detach Listeners | Correctness | **High** | `driftjs-dom` | **Resolved** |
-| [`BUG-008`](#bug-008-unmountsubtree-fails-to-unregister-active-reactiveregions) | `unmountSubtree` Fails to Unregister Active `ReactiveRegion`s | Efficiency / Memory Leak | **Medium** | `driftjs-dom` | Open |
+| [`BUG-008`](#bug-008-unmountsubtree-fails-to-unregister-active-reactiveregions) | `unmountSubtree` Fails to Unregister Active `ReactiveRegion`s | Efficiency / Memory Leak | **Medium** | `driftjs-dom` | **Resolved** |
 | [`BUG-009`](#bug-009-out-of-bounds-negative-index-access-in-lis-reconciler-getsequence) | Out-of-Bounds Negative Index Access in LIS Reconciler `getSequence` | Correctness | **Low** | `driftjs-dom` | **Resolved** |
 | [`BUG-010`](#bug-010-hydrationcursor-permanently-discards-intermediate-nodes-on-type-mismatch) | `HydrationCursor` Permanently Discards Intermediate Nodes on Type Mismatch | Correctness | **High** | `driftjs-dom` | Open |
 | [`BUG-011`](#bug-011-prototype-pollution-vulnerability-in-evaluatepropsspec) | Prototype Pollution Vulnerability in `evaluatePropsSpec` | Security | **High** | `driftjs-shared` | **Resolved** |
@@ -32,6 +33,12 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
 | [`BUG-015`](#bug-015-arbitrary-directory-deletion-risk-in-cli-emptydirectory) | Arbitrary Directory Deletion Risk in CLI `emptyDirectory` | Security | **Critical** | `create-drift` | **Resolved** |
 | [`BUG-016`](#bug-016-catastrophic-backtracking-redos-in-language-server-extractscriptvars) | Catastrophic Backtracking (ReDoS) in Language Server `extractScriptVars` | Security / Efficiency | **Medium** | `drift-vscode` | **Resolved** |
 | [`BUG-017`](#bug-017-hover-provider-calculates-wrong-range-when-multiple-directives-occur-on-same-line) | Hover Provider Calculates Wrong Range When Multiple Directives Occur on Same Line | Correctness | **Low** | `drift-vscode` | **Resolved** |
+| [`BUG-018`](#bug-018-naive-regex-in-language-server-extractscriptvars-treats-rhs-expressions-as-local-variables) | Naive Regex in Language Server `extractScriptVars` Treats RHS Expressions as Local Variables | Correctness | **Medium** | `drift-vscode` | Open |
+| [`BUG-019`](#bug-019-string-slicing-and-heuristic-scanners-in-for-header-parser-instead-of-recursive-descent) | String Slicing and Heuristic Scanners in `@for` Header Parser Instead of Recursive Descent | Correctness | **Medium** | `driftjs-compiler` | Open |
+| [`BUG-020`](#bug-020-path-splitting-on-slash-in-compilepathtoregex-precludes-multi-parameter-and-composite-segments) | Path Splitting on `/` in `compilePathToRegex` Precludes Multi-Parameter and Composite Segments | Correctness | **Medium** | `driftjs-router` | Open |
+| [`BUG-021`](#bug-021-monolithic-switch-ast-traversal-in-extractidentifiers-lacks-estree-visitor-pattern) | Monolithic `switch (node.type)` AST Traversal in `extractIdentifiers` Lacks ESTree Visitor Pattern | Correctness / Efficiency | **High** | `driftjs-compiler` | Open |
+| [`BUG-022`](#bug-022-heuristic-buffer-splitting-in-isregexstart-for-lexer-slash-disambiguation) | Heuristic Buffer Splitting in `isRegexStart` for Lexer Slash Disambiguation | Correctness | **Low** | `driftjs-compiler` | Open |
+| [`BUG-023`](#bug-023-ad-hoc-ast-transformation-in-drifttransformer-lacks-formal-visitor-pattern) | Ad-Hoc AST Transformation in `DriftTransformer` Lacks Formal Visitor Pattern | Efficiency / Architecture | **Medium** | `driftjs-compiler` | Open |
 
 ---
 
@@ -51,6 +58,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     if (node.type === 'text') return isRawText ? sanitizeRawContent(node.content ?? '', rawTag) : escapeHtml(node.content ?? '');
     ...
   ```
+
   If a child component is missing from scope, fails compilation, or an unassigned register is appended via `APPEND_CHILD`, `parentNode.children` contains `null` or `undefined`. Calling `serializeNode(null)` immediately crashes with:
   `TypeError: Cannot read properties of null (reading 'type')`.
 - **Impact:** Entire server render fails unexpectedly with an unhandled exception instead of gracefully emitting an empty string or partial DOM tree.
@@ -80,6 +88,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     }
   }
   ```
+
   Unlike `DriftClientVM` (which correctly creates prototype inheritance with `Object.assign(Object.create(parentOptionsScope), module.scope)`), the SSR VM writes directly into `options.scope`.
 - **Impact:** In multi-tenant Node.js SSR environments, if an application passes a shared request context or root state to multiple components, component-local state variables mutate the caller's shared scope object, causing cross-request data leaks and state pollution between concurrent renders.
 - **Remediation:**
@@ -139,6 +148,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     }
   }
   ```
+
   If `prop.value` is a nested pattern (such as `let { user: { name } } = data;`), `prop.value.name` is `undefined`. `astToJS(prop.value, locals)` evaluates to the literal string `"{ name }"`. The emitted code then assigns `scope["{ name }"] = ...` instead of extracting the nested property `name`.
 - **Impact:** Component scripts using nested object or array destructuring fail to populate inner variables on the component scope, causing expressions in templates relying on nested destructured variables to evaluate to `undefined`.
 - **Remediation:**
@@ -165,6 +175,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     }
   }
   ```
+
   `paramToJS(p, locals)` is called with `locals` (outer scope) rather than `newLocals`.
 - **Impact:** If a parameter default value references an earlier parameter (e.g. `function format(text, prefix = text)`), `astToJS` checks `locals` which does not yet include `text`. `text` is incorrectly transpiled as a scope-lookup `_get(scope, "text")` instead of referencing the local parameter variable.
 - **Remediation:**
@@ -190,6 +201,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     right: cloneAstNode(discAst),
   };
   ```
+
   Because `discVarName` (`__drift_sw_0`) is not added to the module's `declaredVars`, `astToJS` transforms this into `setScopeValue(scope, '__drift_sw_0', getStatus())`.
 - **Impact:** Component runtime scope becomes polluted with temporary internal variable keys. On every evaluation of the switch statement, `setScopeValue` calls `__drift_mark_dirty__('__drift_sw_0')`, scheduling unnecessary microtask updates and wasting CPU cycles.
 - **Remediation:**
@@ -214,6 +226,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     elem.setAttribute(attrName, String(val));
   }
   ```
+
   If a dynamic event binding (e.g. `onclick={isEnabled ? handleClick : null}`) updates from a function to `null`, `typeof val === 'function'` is false. The VM falls into the `else` branch, setting `onclick="null"` attribute on the DOM element while leaving the old handler in `eventHandlersMap`.
 - **Impact:** User clicks on the disabled element continue to trigger the previous event handler function because the delegated listener still finds the entry in `DriftClientVM.eventHandlersMap`.
 - **Remediation:**
@@ -261,6 +274,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
       const lastIdx = result[result.length - 1]!;
       if (result.length === 0 || arr[lastIdx]! < arrI) {
   ```
+
   On the very first iteration where `result.length === 0`, `result[result.length - 1]` accesses `result[-1]` which is `undefined`. While JavaScript returns `undefined` without throwing, reading negative indices before checking `result.length === 0` is technically incorrect.
 - **Impact:** Triggers de-optimizations in V8 JIT compiler due to negative property lookups on arrays.
 - **Remediation:**
@@ -292,6 +306,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     return doc.createElement(tag);
   }
   ```
+
   If `this.current` points to a comment or text node, `claimElement` skips past it. Since `TreeWalker` only advances forward, those skipped nodes are lost forever and cannot be claimed by subsequent `claimComment` or `claimText` calls. Furthermore, on tag mismatch, `this.current` is not advanced, leaving the cursor stuck on the mismatched node.
 - **Impact:** SSR hydration fails to claim valid server-rendered comment delimiters (`<!--if-->`, `<!--for-->`) and text nodes whenever the AST structure differs slightly from DOM traversal order, causing duplicate DOM creation and broken event listeners.
 - **Remediation:**
@@ -323,6 +338,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     return res;
   }
   ```
+
   The function iterates over `propsSpec` and sets `res[key]` directly without validating against dangerous property names (`__proto__`, `constructor`, `prototype`).
 - **Impact:** If untrusted input is passed through dynamic component props, prototype pollution can occur on `res` and `Object.prototype`, leading to potential remote code execution or application tampering.
 - **Remediation:**
@@ -367,6 +383,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     }
   }
   ```
+
   If a circular redirect exists (e.g. `/login` -> `/dashboard` -> `/login`) or a navigation guard always redirects, `pushWithGuards` recursively calls itself with no redirect counter or hop limit.
 - **Impact:** Triggers uncaught `RangeError: Maximum call stack size exceeded`, crashing the client application completely.
 - **Remediation:**
@@ -390,6 +407,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     guardRes = returned;
   }
   ```
+
   If a guard uses the 3-argument callback signature `(to, from, next) => { asyncAuth((ok) => next(ok)); }` and does not return a Promise, `returned` is `undefined`. `runGuardQueue` immediately concludes the guard passed and advances to the next step before `next()` is called.
 - **Impact:** Protected routes are entered before asynchronous authentication or authorization checks complete.
 - **Remediation:**
@@ -416,6 +434,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     }
   }
   ```
+
   When `overwriteMode === 'empty'`, `scaffoldProject` invokes `emptyDirectory(targetDir)` without verifying that `targetDir` is not the filesystem root (`/`), user home directory, or a system directory.
 - **Impact:** A path traversal or misconfigured target path can recursively wipe critical system or project directories.
 - **Remediation:**
@@ -434,6 +453,7 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
   ```ts
   const declBlockRegex = /(?:let|const|var)\s+([^;]+)(?:;|$)/gm;
   ```
+
   On unclosed script statements or large files with complex multiline expressions, the `([^;]+)` quantifier causes catastrophic backtracking over newline boundaries.
 - **Impact:** High CPU usage and freezing of the language server worker during interactive typing in VS Code.
 - **Remediation:**
@@ -455,9 +475,105 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-017`).
     const dirIdx = lineText.indexOf(directiveMatch[0]);
     if (charInLine >= dirIdx && charInLine <= dirIdx + directiveMatch[0].length) {
   ```
+
   `lineText.indexOf(directiveMatch[0])` always returns the index of the first occurrence on that line.
 - **Impact:** If a line contains multiple directives (e.g. `@if (cond) { ... } @else { ... }`) or text before the directive, hovering over subsequent directives calculates the character offset based on the first occurrence, failing to show hover info for the second directive.
 - **Remediation:**
   Iterate over all match occurrences using `matchAll` and test whether `charInLine` falls within the specific match offset.
 
 ---
+
+### BUG-018: Naive Regex in Language Server `extractScriptVars` Treats RHS Expressions as Local Variables
+
+- **Criteria:** Correctness
+- **Severity:** Medium
+- **Component:** `drift-vscode`
+- **Affected File:** [`packages/vscode-plugin/src/server.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/vscode-plugin/src/server.ts#L131-L151)
+- **Description:**
+  In `packages/vscode-plugin/src/server.ts`, `extractScriptVars()` uses naive regular expressions to capture declared variables from `<script>` blocks:
+  ```ts
+  const declBlockRegex = /(?:let|const|var)\s+([^;\r\n]+)(?:;|$)/g;
+  const idRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
+  while ((idMatch = idRegex.exec(declContent)) !== null) {
+    seen.add(name);
+    items.push({ label: name, kind: CompletionItemKind.Variable, ... });
+  }
+  ```
+- **Impact:** In expressions like `let a = computeTotal(discount, tax);`, the identifiers `computeTotal`, `discount`, and `tax` are captured and falsely presented as declared reactive variables in autocomplete menus.
+- **Remediation:** Parse the `<script>` contents with an Acorn ESTree parser and extract binding identifiers strictly from `VariableDeclaration.declarations[].id` patterns.
+
+---
+
+### BUG-019: String Slicing and Heuristic Scanners in `@for` Header Parser Instead of Recursive Descent
+
+- **Criteria:** Correctness
+- **Severity:** Medium
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/parser.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/parser.ts#L435-L600)
+- **Description:**
+  In `packages/compiler/src/parser.ts`, `parseForDirective()` parses `@for` directive headers using ad-hoc string slicing and custom paren-balancing character loops (`findInIndex`, `keyMatchInfo` with regex `^(\s+key\s+)(.+)$`, and `commaIdx` loop):
+  ```ts
+  let inIndex = findInIndex(header);
+  const lhs = header.slice(0, inIndex).trim();
+  let rawIterable = header.slice(inIndex + 4).trim();
+  ```
+- **Impact:** Complex iterable expressions containing `in` operators (e.g. `(item in list.filter(x => 'key' in x))`) or ternary operators with `key` identifiers can be incorrectly sliced, breaking compilation.
+- **Remediation:** Lex directive headers into structured tokens and parse the `@for` grammar via standard recursive descent.
+
+---
+
+### BUG-020: Path Splitting on `/` in `compilePathToRegex` Precludes Multi-Parameter and Composite Segments
+
+- **Criteria:** Correctness
+- **Severity:** Medium
+- **Component:** `driftjs-router`
+- **Affected File:** [`packages/router/src/matcher.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/matcher.ts#L216-L250)
+- **Description:**
+  In `packages/router/src/matcher.ts`, `compilePathToRegex()` segments route patterns by splitting naively on `/`:
+  ```ts
+  const segments = path.split('/').filter(Boolean);
+  ```
+- **Impact:** Composite path segments containing multiple inline parameters (e.g. `/files/:name.:ext`, `/users-:userId/posts-:postId`, or prefix matches `/api/v:version(\\d+)/`) cannot be matched because the entire segment is assumed to be a single parameter.
+- **Remediation:** Tokenize route path strings character-by-character into token streams (`Literal`, `Param`, `Delimiter`) and compile route regexes without segment-level array splitting.
+
+---
+
+### BUG-021: Monolithic `switch (node.type)` AST Traversal in `extractIdentifiers` Lacks ESTree Visitor Pattern
+
+- **Criteria:** Correctness & Efficiency
+- **Severity:** High
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L441-L525)
+- **Description:**
+  In `packages/compiler/src/generator.ts`, `extractIdentifiers()` uses a monolithic 100+ line `switch(node.type)` statement that manually checks a hardcoded subset of ESTree node types.
+- **Impact:** Any modern or unhandled ESTree node type (e.g. `MetaProperty`, `ImportExpression`, `ClassExpression`, `YieldExpression`, `PrivateIdentifier`, `TaggedTemplateExpression` edge cases) fails to traverse its child identifiers, resulting in missing reactive dependencies and stale UI renders.
+- **Remediation:** Implement a standardized ESTree AST Visitor pattern (`walk(node, visitor)`) to guarantee exhaustive traversal across all node specifications.
+
+---
+
+### BUG-022: Heuristic Buffer Splitting in `isRegexStart` for Lexer Slash Disambiguation
+
+- **Criteria:** Correctness
+- **Severity:** Low
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/lexer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/lexer.ts#L668-L678)
+- **Description:**
+  In `packages/compiler/src/lexer.ts`, `isRegexStart()` attempts to disambiguate division (`/`) from RegExp literals (`/.../`) by splitting the accumulated string buffer with regex:
+  ```ts
+  const lastWord = trimmed.split(/\s+/).pop();
+  ```
+- **Impact:** On complex expressions with trailing multiline comments or non-standard token sequences, the buffer inspection heuristic can misidentify division operators as regexes.
+- **Remediation:** Track preceding token types in the lexer state machine rather than performing retroactive string splitting on the raw character buffer.
+
+---
+
+### BUG-023: Ad-Hoc AST Transformation in `DriftTransformer` Lacks Formal Visitor Pattern
+
+- **Criteria:** Efficiency & Architecture
+- **Severity:** Medium
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/transformer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/transformer.ts#L53-L120)
+- **Description:**
+  In `packages/compiler/src/transformer.ts`, `DriftTransformer` manually branches and clones nodes through ad-hoc recursion (`transformNode`, `transformChildren`, `cloneAstNode`).
+- **Impact:** Coupling AST traversal with whitespace stripping, script transformation, and directive rewriting prevents modular AST passes and increases the risk of missed subtree mutations.
+- **Remediation:** Provide an explicit Template AST Visitor (`traverse(ast, visitors)`) allowing isolated, composable compiler transformation passes.
