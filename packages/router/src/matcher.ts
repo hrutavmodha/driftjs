@@ -98,20 +98,78 @@ export function stringifyQuery(query: RouteQuery): string {
 
 import { pathToRegexp, compile as compilePath, type Key } from 'path-to-regexp';
 
+function sanitizeForPathToRegexp(path: string): string {
+  const res = path.replace(/\/\*$/, '/(.*)');
+  let i = 0;
+  let out = '';
+  while (i < res.length) {
+    if (res[i] === ':' && /[a-zA-Z0-9_$]/.test(res[i + 1] || '')) {
+      let pName = '';
+      i++;
+      while (i < res.length && /[a-zA-Z0-9_$]/.test(res[i]!)) {
+        pName += res[i]!;
+        i++;
+      }
+      if (res[i] === '(') {
+        let depth = 1;
+        let cReg = '';
+        i++;
+        while (i < res.length && depth > 0) {
+          if (res[i] === '\\') {
+            cReg += res[i]! + (res[i + 1] || '');
+            i += 2;
+            continue;
+          }
+          if (res[i] === '(') {
+            depth++;
+            cReg += '(?:';
+            i++;
+            continue;
+          }
+          if (res[i] === ')') {
+            depth--;
+            if (depth === 0) {
+              i++;
+              break;
+            }
+          }
+          cReg += res[i]!;
+          i++;
+        }
+        out += `:${pName}(${cReg})`;
+      } else {
+        out += `:${pName}`;
+      }
+    } else {
+      out += res[i]!;
+      i++;
+    }
+  }
+  return out;
+}
+
 function interpolatePathParams(path: string, params: Record<string, any>): string {
+  const cleanParams: Record<string, any> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null) {
+      cleanParams[k] = v;
+    }
+  }
+
   try {
-    const normalized = path.replace(/\/\*$/, '/:pathMatch(.*)');
+    const normalized = sanitizeForPathToRegexp(path.replace(/\/\*$/, '/:pathMatch(.*)'));
     const toPath = compilePath(normalized, { validate: false, encode: (v) => v });
-    return toPath(params);
+    return toPath(cleanParams);
   } catch {
     let result = path;
-    for (const [k, v] of Object.entries(params)) {
+    for (const [k, v] of Object.entries(cleanParams)) {
       if (k === 'pathMatch') {
         result = result.replace(/\/\*$/, '/' + (Array.isArray(v) ? v.join('/') : String(v)));
       } else {
         result = result.replace(new RegExp(`:${k}\\b(?:\\([^)]+\\))?[?*+]?`, 'g'), Array.isArray(v) ? v.join('/') : String(v));
       }
     }
+    result = result.replace(/\/:[a-zA-Z0-9_$]+\?/g, '').replace(/:[a-zA-Z0-9_$]+\?/g, '');
     return result;
   }
 }
@@ -134,7 +192,7 @@ export function compilePathToRegex(path: string): PathTokens {
     };
   }
 
-  const normalized = path.replace(/\/\*$/, '/(.*)');
+  const normalized = sanitizeForPathToRegexp(path);
   const keys: Key[] = [];
   const regex = pathToRegexp(normalized, keys, {
     sensitive: false,
@@ -146,7 +204,7 @@ export function compilePathToRegex(path: string): PathTokens {
 
   let score = 0;
   for (const segment of path.split('/').filter(Boolean)) {
-    if (segment === '*') {
+    if (segment === '*' || segment.includes('(.*)')) {
       score += 1;
     } else if (segment.includes(':')) {
       if (segment.includes('(')) {
@@ -157,7 +215,7 @@ export function compilePathToRegex(path: string): PathTokens {
         score += 20;
       }
     } else {
-      score += 10;
+      score += 100;
     }
   }
 
