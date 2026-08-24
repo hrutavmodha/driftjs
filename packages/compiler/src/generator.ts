@@ -17,6 +17,7 @@ import {
   ASTNodeType,
   Opcode,
 } from '../types/index.js';
+import * as walk from 'acorn-walk';
 
 /**
  * Generator for Drift template compiler.
@@ -440,160 +441,33 @@ export class DriftGenerator {
 
   private extractIdentifiers(node: any): Set<string> {
     const ids = new Set<string>();
-    if (!node || typeof node !== 'object' || !node.type) return ids;
+    if (!node || typeof node !== 'object') return ids;
 
-    switch (node.type) {
-      case 'Identifier':
-        ids.add(node.name);
-        break;
-      case 'BinaryExpression':
-      case 'LogicalExpression':
-        for (const id of this.extractIdentifiers(node.left)) ids.add(id);
-        for (const id of this.extractIdentifiers(node.right)) ids.add(id);
-        break;
-      case 'UnaryExpression':
-      case 'UpdateExpression':
-        for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
-        break;
-      case 'ObjectExpression':
-        if (Array.isArray(node.properties)) {
-          for (const prop of node.properties) {
-            if (prop.type === 'Property') {
-              if (prop.computed) {
-                for (const id of this.extractIdentifiers(prop.key)) ids.add(id);
-              }
-              for (const id of this.extractIdentifiers(prop.value)) ids.add(id);
-            } else if (prop.type === 'SpreadElement') {
-              for (const id of this.extractIdentifiers(prop.argument)) ids.add(id);
+    try {
+      walk.ancestor(node, {
+        Identifier(idNode: any, ancestors: any[]) {
+          const parent = ancestors[ancestors.length - 2];
+          if (parent) {
+            if (parent.type === 'MemberExpression' && parent.property === idNode && !parent.computed) {
+              return;
+            }
+            if (
+              (parent.type === 'Property' ||
+                parent.type === 'MethodDefinition' ||
+                parent.type === 'PropertyDefinition') &&
+              parent.key === idNode &&
+              !parent.computed
+            ) {
+              return;
             }
           }
-        }
-        break;
-      case 'ArrayExpression':
-        if (Array.isArray(node.elements)) {
-          for (const el of node.elements) {
-            if (el) for (const id of this.extractIdentifiers(el)) ids.add(id);
-          }
-        }
-        break;
-      case 'TemplateLiteral':
-        if (Array.isArray(node.expressions)) {
-          for (const expr of node.expressions) {
-            for (const id of this.extractIdentifiers(expr)) ids.add(id);
-          }
-        }
-        break;
-      case 'TaggedTemplateExpression':
-        for (const id of this.extractIdentifiers(node.tag)) ids.add(id);
-        for (const id of this.extractIdentifiers(node.quasi)) ids.add(id);
-        break;
-      case 'SpreadElement':
-        for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
-        break;
-      case 'SequenceExpression':
-        if (Array.isArray(node.expressions)) {
-          for (const expr of node.expressions) {
-            for (const id of this.extractIdentifiers(expr)) ids.add(id);
-          }
-        }
-        break;
-      case 'ChainExpression':
-      case 'ParenthesizedExpression':
-        for (const id of this.extractIdentifiers(node.expression)) ids.add(id);
-        break;
-      case 'MemberExpression':
-        for (const id of this.extractIdentifiers(node.object)) ids.add(id);
-        if (node.computed && node.property) {
-          for (const id of this.extractIdentifiers(node.property)) ids.add(id);
-        }
-        break;
-      case 'CallExpression':
-        for (const id of this.extractIdentifiers(node.callee)) ids.add(id);
-        for (const arg of node.arguments) {
-          for (const id of this.extractIdentifiers(arg)) ids.add(id);
-        }
-        break;
-      case 'ConditionalExpression':
-        for (const id of this.extractIdentifiers(node.test)) ids.add(id);
-        for (const id of this.extractIdentifiers(node.consequent)) ids.add(id);
-        for (const id of this.extractIdentifiers(node.alternate)) ids.add(id);
-        break;
-      case 'AssignmentExpression':
-        for (const id of this.extractIdentifiers(node.left)) ids.add(id);
-        for (const id of this.extractIdentifiers(node.right)) ids.add(id);
-        break;
-      case 'ArrowFunctionExpression':
-      case 'FunctionExpression':
-        for (const id of this.extractIdentifiers(node.body)) ids.add(id);
-        break;
-      case 'BlockStatement':
-        for (const stmt of node.body) {
-          for (const id of this.extractIdentifiers(stmt)) ids.add(id);
-        }
-        break;
-      case 'ExpressionStatement':
-        for (const id of this.extractIdentifiers(node.expression)) ids.add(id);
-        break;
-      case 'ReturnStatement':
-        if (node.argument) {
-          for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
-        }
-        break;
-      case 'NewExpression':
-        for (const id of this.extractIdentifiers(node.callee)) ids.add(id);
-        if (node.arguments) {
-          for (const arg of node.arguments) {
-            for (const id of this.extractIdentifiers(arg)) ids.add(id);
-          }
-        }
-        break;
-      case 'ForStatement':
-        if (node.init) for (const id of this.extractIdentifiers(node.init)) ids.add(id);
-        if (node.test) for (const id of this.extractIdentifiers(node.test)) ids.add(id);
-        if (node.update) for (const id of this.extractIdentifiers(node.update)) ids.add(id);
-        if (node.body) for (const id of this.extractIdentifiers(node.body)) ids.add(id);
-        break;
-      case 'ForOfStatement':
-      case 'ForInStatement':
-        if (node.left) for (const id of this.extractIdentifiers(node.left)) ids.add(id);
-        if (node.right) for (const id of this.extractIdentifiers(node.right)) ids.add(id);
-        if (node.body) for (const id of this.extractIdentifiers(node.body)) ids.add(id);
-        break;
-      case 'WhileStatement':
-      case 'DoWhileStatement':
-        if (node.test) for (const id of this.extractIdentifiers(node.test)) ids.add(id);
-        if (node.body) for (const id of this.extractIdentifiers(node.body)) ids.add(id);
-        break;
-      case 'AwaitExpression':
-      case 'YieldExpression':
-      case 'ThrowStatement':
-        if (node.argument) for (const id of this.extractIdentifiers(node.argument)) ids.add(id);
-        break;
-      case 'TryStatement':
-        if (node.block) for (const id of this.extractIdentifiers(node.block)) ids.add(id);
-        if (node.handler) for (const id of this.extractIdentifiers(node.handler)) ids.add(id);
-        if (node.finalizer) for (const id of this.extractIdentifiers(node.finalizer)) ids.add(id);
-        break;
-      case 'CatchClause':
-        if (node.body) for (const id of this.extractIdentifiers(node.body)) ids.add(id);
-        break;
-      case 'SwitchStatement':
-        if (node.discriminant) for (const id of this.extractIdentifiers(node.discriminant)) ids.add(id);
-        if (node.cases) {
-          for (const c of node.cases) {
-            for (const id of this.extractIdentifiers(c)) ids.add(id);
-          }
-        }
-        break;
-      case 'SwitchCase':
-        if (node.test) for (const id of this.extractIdentifiers(node.test)) ids.add(id);
-        if (node.consequent) {
-          for (const s of node.consequent) {
-            for (const id of this.extractIdentifiers(s)) ids.add(id);
-          }
-        }
-        break;
+          ids.add(idNode.name);
+        },
+      });
+    } catch {
+      // Ignored for partial/incomplete AST nodes
     }
+
     return ids;
   }
 

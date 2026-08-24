@@ -324,5 +324,32 @@ describe('DriftGenerator', () => {
     expect(fnStr).toContain('constructor(');
     expect(fnStr).toContain('inc()');
   });
+
+  it('BUG-021: exhaustively extracts reactive dependencies from complex and modern ESTree expressions', () => {
+    const src = `
+      <script>
+        let a = 1;
+        let b = 2;
+        let c = 3;
+        let d = 4;
+        let user = { profile: { name: 'Alice' } };
+        let customTag = (s) => s;
+      </script>
+      <div>
+        { customTag\`prefix \${a} middle \${b} suffix\` }
+        { c ?? (d ? user?.profile?.name : 'fallback') }
+      </div>
+    `;
+    const module = compile(src);
+
+    expect(module.reactiveBindings).toBeDefined();
+    const boundVars = module.reactiveBindings!.map((b) => b.variable);
+    expect(boundVars).toContain('customTag');
+    expect(boundVars).toContain('a');
+    expect(boundVars).toContain('b');
+    expect(boundVars).toContain('c');
+    expect(boundVars).toContain('d');
+    expect(boundVars).toContain('user');
+  });
 });
 

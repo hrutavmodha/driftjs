@@ -2,7 +2,8 @@ export * from '../types/index.js';
 export { Opcode } from '../types/opcodes.js';
 export { DriftLexer } from './lexer.js';
 export { DriftParser } from './parser.js';
-export { DriftTransformer } from './transformer.js';
+export { DriftTransformer, traverseTemplateAST } from './transformer.js';
+export type { TemplateASTVisitor } from './transformer.js';
 export { DriftGenerator, astToJS } from './generator.js';
 
 import { DriftLexer } from './lexer.js';

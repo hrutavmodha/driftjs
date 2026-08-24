@@ -54,10 +54,16 @@ importers:
       acorn:
         specifier: ^8.17.0
         version: 8.17.0
+      acorn-walk:
+        specifier: ^8.3.4
+        version: 8.3.5
     devDependencies:
       '@types/acorn':
         specifier: ^6.0.4
         version: 6.0.4
+      '@types/estree':
+        specifier: ^1.0.6
+        version: 1.0.9
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -767,6 +773,10 @@ packages:
     resolution: {integrity: sha512-XSxMosEEDO6vLxELAHVkwmhC0qe0ijZni2jB9Rcs8kQsW4lhTDQ/wMzmwFs/buotAWSnpmUp/dRWD2ufG3UYKA==}
     engines: {node: '>= 20'}
     hasBin: true
+
+  acorn-walk@8.3.5:
+    resolution: {integrity: sha512-HEHNfbars9v4pgpW6SO1KSPkfoS0xVOM/9UzkJltjlsHZmJasxg8aXkuZa7SMf8vKGIBhpUsPluQSqhJFCqebw==}
+    engines: {node: '>=0.4.0'}
 
   acorn@8.17.0:
     resolution: {integrity: sha512-xRQbDb9BnwDafYNn6Vwl839DYVjqXYb1XVGtWAZ1kcDc6iwAL4hg3B1dZlRiuENFeO2H53gFG3in621AdERVAg==}
@@ -2599,6 +2609,10 @@ snapshots:
       keytar: 7.9.0
     transitivePeerDependencies:
       - supports-color
+
+  acorn-walk@8.3.5:
+    dependencies:
+      acorn: 8.17.0
 
   acorn@8.17.0: {}
 

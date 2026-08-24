@@ -271,5 +271,28 @@ describe('DriftLexer', () => {
 
     expect(idents).toEqual(['_MyComponent', '_custom', '$ref', '$count']);
   });
+
+  describe('BUG-022: regex start and division slash disambiguation', () => {
+    it('correctly identifies division operator after comments', () => {
+      const lexer = new DriftLexer('<div>{ total /* multiline comment */ / divisor }</div>');
+      const tokens = collectTokens(lexer);
+      const interp = tokens.find((t) => t.type === TokenType.Interpolation);
+      expect(interp?.value).toBe(' total /* multiline comment */ / divisor ');
+    });
+
+    it('correctly identifies division after postfix operator ++ with trailing comment', () => {
+      const lexer = new DriftLexer('<div>{ count++ /* comment */ / 2 }</div>');
+      const tokens = collectTokens(lexer);
+      const interp = tokens.find((t) => t.type === TokenType.Interpolation);
+      expect(interp?.value).toBe(' count++ /* comment */ / 2 ');
+    });
+
+    it('correctly identifies regex literal after keyword return and comment', () => {
+      const lexer = new DriftLexer('<div>{ (() => { return /* comment */ /test[0-9]+/i; })() }</div>');
+      const tokens = collectTokens(lexer);
+      const interp = tokens.find((t) => t.type === TokenType.Interpolation);
+      expect(interp?.value).toBe(' (() => { return /* comment */ /test[0-9]+/i; })() ');
+    });
+  });
 });
 

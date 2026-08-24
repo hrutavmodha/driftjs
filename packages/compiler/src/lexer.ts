@@ -86,6 +86,29 @@ const VOID_ELEMENTS = new Set([
   'link', 'meta', 'param', 'source', 'track', 'wbr'
 ]);
 
+const enum ExprTokenKind {
+  Start,
+  Punctuator,
+  Keyword,
+  IdentifierOrLiteral,
+  PostfixOp,
+}
+
+const REGEX_PRECEDING_KEYWORDS = new Set([
+  'return',
+  'yield',
+  'await',
+  'case',
+  'typeof',
+  'void',
+  'delete',
+  'instanceof',
+  'in',
+  'do',
+  'throw',
+  'new',
+]);
+
 
 /**
  * Stateful on-demand lexer for Drift templates.
@@ -276,6 +299,7 @@ export class DriftLexer {
     let inBlockComment = false;
     let inRegex = false;
     let inRegexCharClass = false;
+    let prevTokenKind = ExprTokenKind.Start;
 
     while (!this.isAtEnd()) {
       const ch = this.advance();
@@ -304,6 +328,7 @@ export class DriftLexer {
           inRegexCharClass = false;
         } else if (ch === '/' && !inRegexCharClass) {
           inRegex = false;
+          prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
         }
         continue;
       }
@@ -316,6 +341,7 @@ export class DriftLexer {
           isEscaped = true;
         } else if (ch === inQuote) {
           inQuote = null;
+          prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
         } else if (inQuote === '`' && ch === '{' && headerContent.endsWith('${')) {
           let backslashCount = 0;
           for (let i = headerContent.length - 3; i >= 0 && headerContent[i] === '\\'; i--) {
@@ -325,6 +351,7 @@ export class DriftLexer {
             templateStack.push(braceDepth);
             inQuote = null;
             braceDepth++;
+            prevTokenKind = ExprTokenKind.Start;
           }
         }
         continue;
@@ -340,11 +367,13 @@ export class DriftLexer {
           inBlockComment = true;
           headerContent += ch;
           continue;
-        } else if (this.isRegexStart(headerContent)) {
+        } else if (this.isRegexStart(prevTokenKind)) {
           inRegex = true;
           inRegexCharClass = false;
           headerContent += ch;
           continue;
+        } else {
+          prevTokenKind = ExprTokenKind.Punctuator;
         }
       }
 
@@ -356,24 +385,28 @@ export class DriftLexer {
 
       if (ch === '(') {
         parenDepth++;
+        prevTokenKind = ExprTokenKind.Start;
         headerContent += ch;
         continue;
       }
 
       if (ch === ')') {
         if (parenDepth > 0) parenDepth--;
+        prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
         headerContent += ch;
         continue;
       }
 
       if (ch === '[') {
         bracketDepth++;
+        prevTokenKind = ExprTokenKind.Start;
         headerContent += ch;
         continue;
       }
 
       if (ch === ']') {
         if (bracketDepth > 0) bracketDepth--;
+        prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
         headerContent += ch;
         continue;
       }
@@ -385,6 +418,7 @@ export class DriftLexer {
           return this.createToken(type, headerContent.trim(), startLoc);
         }
         braceDepth++;
+        prevTokenKind = ExprTokenKind.Start;
         headerContent += ch;
         continue;
       }
@@ -395,7 +429,44 @@ export class DriftLexer {
           templateStack.pop();
           inQuote = '`';
         }
+        prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
         headerContent += ch;
+        continue;
+      }
+
+      if (ch === '+' || ch === '-') {
+        if (this.peek() === ch) {
+          const nextCh = this.advance();
+          headerContent += ch + nextCh;
+          if (prevTokenKind === ExprTokenKind.IdentifierOrLiteral) {
+            prevTokenKind = ExprTokenKind.PostfixOp;
+          } else {
+            prevTokenKind = ExprTokenKind.Start;
+          }
+          continue;
+        }
+        prevTokenKind = ExprTokenKind.Punctuator;
+        headerContent += ch;
+        continue;
+      }
+
+      if ('=(,:;!&|?*%<>~^'.includes(ch)) {
+        prevTokenKind = ExprTokenKind.Punctuator;
+        headerContent += ch;
+        continue;
+      }
+
+      if (/[a-zA-Z0-9_$]/.test(ch)) {
+        let word = ch;
+        while (!this.isAtEnd() && /[a-zA-Z0-9_$]/.test(this.peek())) {
+          word += this.advance();
+        }
+        if (REGEX_PRECEDING_KEYWORDS.has(word)) {
+          prevTokenKind = ExprTokenKind.Keyword;
+        } else {
+          prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
+        }
+        headerContent += word;
         continue;
       }
 
@@ -665,15 +736,12 @@ export class DriftLexer {
     );
   }
 
-  private isRegexStart(expr: string): boolean {
-    const trimmed = expr.trimEnd();
-    if (trimmed.length === 0) return true;
-    if (trimmed.endsWith('++') || trimmed.endsWith('--')) return false;
-    const lastChar = trimmed[trimmed.length - 1];
-    if ('=(,:;!&|?[{}+-*%<>~^'.includes(lastChar!)) return true;
-    const lastWord = trimmed.split(/\s+/).pop();
-    if (lastWord && ['return', 'yield', 'await', 'case', 'typeof', 'void', 'delete', 'instanceof', 'in', 'do'].includes(lastWord)) return true;
-    return false;
+  private isRegexStart(prevTokenKind: ExprTokenKind): boolean {
+    return (
+      prevTokenKind === ExprTokenKind.Start ||
+      prevTokenKind === ExprTokenKind.Punctuator ||
+      prevTokenKind === ExprTokenKind.Keyword
+    );
   }
 
   private readInterpolationToken(
@@ -688,6 +756,7 @@ export class DriftLexer {
     let inBlockComment = false;
     let inRegex = false;
     let inRegexCharClass = false;
+    let prevTokenKind = ExprTokenKind.Start;
     let templateStack: number[] = [];
     let expression = '';
 
@@ -722,6 +791,7 @@ export class DriftLexer {
           inRegexCharClass = false;
         } else if (ch === '/' && !inRegexCharClass) {
           inRegex = false;
+          prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
         }
         continue;
       }
@@ -734,6 +804,7 @@ export class DriftLexer {
           isEscaped = true;
         } else if (ch === inStringQuote) {
           inStringQuote = null;
+          prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
         } else if (inStringQuote === '`' && ch === '{' && expression.endsWith('${')) {
           let backslashCount = 0;
           for (let i = expression.length - 3; i >= 0 && expression[i] === '\\'; i--) {
@@ -743,6 +814,7 @@ export class DriftLexer {
             templateStack.push(braceDepth);
             inStringQuote = null;
             braceDepth++;
+            prevTokenKind = ExprTokenKind.Start;
           }
         }
         continue;
@@ -758,22 +830,49 @@ export class DriftLexer {
           inBlockComment = true;
           expression += ch;
           continue;
-        } else if (this.isRegexStart(expression)) {
+        } else if (this.isRegexStart(prevTokenKind)) {
           inRegex = true;
           inRegexCharClass = false;
           expression += ch;
           continue;
+        } else {
+          prevTokenKind = ExprTokenKind.Punctuator;
         }
       }
 
       if (ch === '"' || ch === "'" || ch === '`') {
-        inStringQuote = ch;
+        inQuote: inStringQuote = ch;
+        expression += ch;
+        continue;
+      }
+
+      if (ch === '(') {
+        prevTokenKind = ExprTokenKind.Start;
+        expression += ch;
+        continue;
+      }
+
+      if (ch === ')') {
+        prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
+        expression += ch;
+        continue;
+      }
+
+      if (ch === '[') {
+        prevTokenKind = ExprTokenKind.Start;
+        expression += ch;
+        continue;
+      }
+
+      if (ch === ']') {
+        prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
         expression += ch;
         continue;
       }
 
       if (ch === '{') {
         braceDepth++;
+        prevTokenKind = ExprTokenKind.Start;
         expression += ch;
         continue;
       }
@@ -784,6 +883,7 @@ export class DriftLexer {
           templateStack.pop();
           inStringQuote = '`';
         }
+        prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
 
         if (braceDepth === 0) {
           if (context === 'attribute' && tagName !== null) {
@@ -801,6 +901,42 @@ export class DriftLexer {
         }
 
         expression += ch;
+        continue;
+      }
+
+      if (ch === '+' || ch === '-') {
+        if (this.peek() === ch) {
+          const nextCh = this.advance();
+          expression += ch + nextCh;
+          if (prevTokenKind === ExprTokenKind.IdentifierOrLiteral) {
+            prevTokenKind = ExprTokenKind.PostfixOp;
+          } else {
+            prevTokenKind = ExprTokenKind.Start;
+          }
+          continue;
+        }
+        prevTokenKind = ExprTokenKind.Punctuator;
+        expression += ch;
+        continue;
+      }
+
+      if ('=(,:;!&|?*%<>~^'.includes(ch)) {
+        prevTokenKind = ExprTokenKind.Punctuator;
+        expression += ch;
+        continue;
+      }
+
+      if (/[a-zA-Z0-9_$]/.test(ch)) {
+        let word = ch;
+        while (!this.isAtEnd() && /[a-zA-Z0-9_$]/.test(this.peek())) {
+          word += this.advance();
+        }
+        if (REGEX_PRECEDING_KEYWORDS.has(word)) {
+          prevTokenKind = ExprTokenKind.Keyword;
+        } else {
+          prevTokenKind = ExprTokenKind.IdentifierOrLiteral;
+        }
+        expression += word;
         continue;
       }
 

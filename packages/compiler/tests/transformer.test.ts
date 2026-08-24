@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { DriftLexer } from '../src/lexer.js';
 import { DriftParser } from '../src/parser.js';
-import { DriftTransformer } from '../src/transformer.js';
+import { DriftTransformer, traverseTemplateAST } from '../src/transformer.js';
 import { ASTNodeType, type ElementNode, type TextNode, type InterpolationNode } from '../types/index.js';
 
 describe('DriftTransformer', () => {
@@ -131,5 +131,37 @@ describe('DriftTransformer', () => {
     expect(ifNode.consequent[0].tagName).toBe('p');
     expect(ifNode.consequent[1].tagName).toBe('p');
     expect(ifNode.consequent[2].tagName).toBe('p');
+  });
+
+  describe('BUG-023: traverseTemplateAST visitor pattern', () => {
+    it('traverses and mutates Template AST nodes using custom visitor hooks', () => {
+      const input = '<div><p>Paragraph 1</p><p>Paragraph 2</p></div>';
+      const lexer = new DriftLexer(input);
+      const parser = new DriftParser(lexer);
+      const rawAst = parser.parse();
+
+      const visitedTags: string[] = [];
+      const transformed = traverseTemplateAST(rawAst, {
+        Element: (node) => {
+          visitedTags.push(node.tagName);
+          if (node.tagName === 'p') {
+            return {
+              ...node,
+              tagName: 'span',
+            };
+          }
+        },
+      });
+
+      expect(visitedTags).toContain('div');
+      expect(visitedTags).toContain('p');
+
+      const div = transformed.body[0] as ElementNode;
+      expect(div.tagName).toBe('div');
+      const children = div.children.filter((c) => c.type === ASTNodeType.Element) as ElementNode[];
+      expect(children).toHaveLength(2);
+      expect(children[0]?.tagName).toBe('span');
+      expect(children[1]?.tagName).toBe('span');
+    });
   });
 });
