@@ -42,4 +42,31 @@ describe("VSCode Language Server - extractScriptVars", () => {
     expect(duration).toBeLessThan(1000);
     expect(items.some((i) => i.label === "another")).toBe(true);
   });
+
+  it("does not treat RHS expressions, function arguments, or calls as local variables (BUG-018)", () => {
+    const sfc = `
+      <script>
+        let a = computeTotal(discount, tax);
+        const { result = fallbackCalc(rate) } = calculate(base);
+        import { helper } from './utils';
+      </script>
+      <div>{a}</div>
+    `;
+
+    const items = extractScriptVars(sfc);
+    const labels = items.map((i) => i.label);
+
+    expect(labels).toContain("a");
+    expect(labels).toContain("result");
+    expect(labels).toContain("helper");
+
+    // RHS expressions must NOT be captured as local variables
+    expect(labels).not.toContain("computeTotal");
+    expect(labels).not.toContain("discount");
+    expect(labels).not.toContain("tax");
+    expect(labels).not.toContain("fallbackCalc");
+    expect(labels).not.toContain("rate");
+    expect(labels).not.toContain("calculate");
+    expect(labels).not.toContain("base");
+  });
 });

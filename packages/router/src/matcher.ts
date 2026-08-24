@@ -105,41 +105,130 @@ export function normalizePath(path: string): string {
 }
 
 function interpolatePathParams(path: string, params: Record<string, any>): string {
-  const segments = path.split('/');
-  const interpolatedSegments = segments.map((segment) => {
-    if (segment === '*' || segment === '/*') {
+  let result = '';
+  let i = 0;
+  const len = path.length;
+
+  while (i < len) {
+    const ch = path[i]!;
+
+    if (ch === '/') {
+      // Check for wildcard /*
+      if (path[i + 1] === '*') {
+        if ('pathMatch' in params) {
+          const val = params['pathMatch'];
+          if (val !== undefined && val !== null) {
+            result += '/' + (Array.isArray(val) ? val.join('/') : String(val));
+          }
+        }
+        i += 2;
+        continue;
+      }
+      // Check for optional param following /: e.g. /:id? or /:id(\d+)?
+      if (path[i + 1] === ':') {
+        let peek = i + 2;
+        let pName = '';
+        while (peek < len && /[a-zA-Z0-9_$]/.test(path[peek]!)) {
+          pName += path[peek]!;
+          peek++;
+        }
+        if (peek < len && path[peek] === '(') {
+          peek++;
+          let depth = 1;
+          while (peek < len && depth > 0) {
+            if (path[peek] === '\\') {
+              peek += 2;
+              continue;
+            }
+            if (path[peek] === '(') depth++;
+            if (path[peek] === ')') {
+              depth--;
+              if (depth === 0) {
+                peek++;
+                break;
+              }
+            }
+            peek++;
+          }
+        }
+        let modifier = '';
+        if (peek < len && (path[peek] === '?' || path[peek] === '*' || path[peek] === '+')) {
+          modifier = path[peek]!;
+          peek++;
+        }
+
+        if (modifier === '?' && (peek === len || path[peek] === '/')) {
+          const val = params[pName];
+          if (val !== undefined && val !== null) {
+            result += '/' + (Array.isArray(val) ? val.join('/') : String(val));
+          }
+          i = peek;
+          continue;
+        }
+      }
+
+      result += '/';
+      i++;
+      continue;
+    }
+
+    if (ch === '*') {
       if ('pathMatch' in params) {
         const val = params['pathMatch'];
         if (val !== undefined && val !== null) {
-          return Array.isArray(val) ? val.join('/') : String(val);
+          result += Array.isArray(val) ? val.join('/') : String(val);
         }
       }
-      return '';
+      i++;
+      continue;
     }
-    if (!segment.startsWith(':')) {
-      return segment;
-    }
-    let rest = segment.slice(1);
-    const isOptional = rest.endsWith('?');
-    const isRepeatable = rest.endsWith('*') || rest.endsWith('+');
-    if (isOptional || isRepeatable) {
-      rest = rest.slice(0, -1);
-    }
-    let paramName = rest;
-    const parenIdx = rest.indexOf('(');
-    if (parenIdx !== -1 && rest.endsWith(')')) {
-      paramName = rest.slice(0, parenIdx);
-    }
-    if (paramName in params) {
-      const val = params[paramName];
-      if (val !== undefined && val !== null) {
-        return Array.isArray(val) ? val.join('/') : String(val);
+
+    if (ch === ':') {
+      i++;
+      let paramName = '';
+      while (i < len && /[a-zA-Z0-9_$]/.test(path[i]!)) {
+        paramName += path[i]!;
+        i++;
       }
-      return '';
+
+      if (i < len && path[i] === '(') {
+        i++;
+        let depth = 1;
+        while (i < len && depth > 0) {
+          if (path[i] === '\\') {
+            i += 2;
+            continue;
+          }
+          if (path[i] === '(') depth++;
+          if (path[i] === ')') {
+            depth--;
+            if (depth === 0) {
+              i++;
+              break;
+            }
+          }
+          i++;
+        }
+      }
+
+      if (i < len && (path[i] === '?' || path[i] === '*' || path[i] === '+')) {
+        i++;
+      }
+
+      if (paramName in params) {
+        const val = params[paramName];
+        if (val !== undefined && val !== null) {
+          result += Array.isArray(val) ? val.join('/') : String(val);
+        }
+      }
+      continue;
     }
-    return '';
-  });
-  return interpolatedSegments.join('/');
+
+    result += ch;
+    i++;
+  }
+
+  return result;
 }
 
 interface PathTokens {
@@ -201,7 +290,6 @@ function toNonCapturing(pattern: string): string {
  * Compiles a path pattern string into a RegExp and parameter list.
  */
 export function compilePathToRegex(path: string): PathTokens {
-
   const paramNames: string[] = [];
   let score = 0;
 
@@ -213,58 +301,239 @@ export function compilePathToRegex(path: string): PathTokens {
     };
   }
 
-  const segments = path.split('/').filter(Boolean);
-  const regexParts: string[] = [];
+  let regexStr = '^';
+  let i = 0;
+  const len = path.length;
 
-  for (const segment of segments) {
-    if (segment === '*' || segment === '/*') {
+  while (i < len) {
+    const ch = path[i]!;
+
+    if (ch === '/') {
+      // Wildcard /*
+      if (path[i + 1] === '*') {
+        paramNames.push('pathMatch');
+        regexStr += '(?:/(.*))?';
+        score += 1;
+        i += 2;
+        continue;
+      }
+
+      // Check if following parameter is an optional segment (e.g. /:id? or /:id(\d+)?)
+      if (path[i + 1] === ':') {
+        let peek = i + 2;
+        let pName = '';
+        while (peek < len && /[a-zA-Z0-9_$]/.test(path[peek]!)) {
+          pName += path[peek]!;
+          peek++;
+        }
+
+        let customRegex: string | null = null;
+        if (peek < len && path[peek] === '(') {
+          peek++;
+          let depth = 1;
+          let inCharClass = false;
+          let isEscaped = false;
+          let cReg = '';
+          while (peek < len && depth > 0) {
+            const c = path[peek]!;
+            if (isEscaped) {
+              cReg += c;
+              isEscaped = false;
+              peek++;
+              continue;
+            }
+            if (c === '\\') {
+              cReg += c;
+              isEscaped = true;
+              peek++;
+              continue;
+            }
+            if (inCharClass) {
+              cReg += c;
+              if (c === ']') inCharClass = false;
+              peek++;
+              continue;
+            }
+            if (c === '[') {
+              inCharClass = true;
+              cReg += c;
+              peek++;
+              continue;
+            }
+            if (c === '(') {
+              depth++;
+              cReg += c;
+              peek++;
+              continue;
+            }
+            if (c === ')') {
+              depth--;
+              if (depth === 0) {
+                peek++;
+                break;
+              } else {
+                cReg += c;
+                peek++;
+                continue;
+              }
+            }
+            cReg += c;
+            peek++;
+          }
+          customRegex = cReg;
+        }
+
+        let modifier = '';
+        if (peek < len && (path[peek] === '?' || path[peek] === '*' || path[peek] === '+')) {
+          modifier = path[peek]!;
+          peek++;
+        }
+
+        if (modifier === '?' && (peek === len || path[peek] === '/')) {
+          paramNames.push(pName);
+          if (customRegex !== null) {
+            const nonCap = toNonCapturing(customRegex);
+            regexStr += `(?:/(${nonCap}))?`;
+            score += 25;
+          } else {
+            regexStr += '(?:/([^/]+))?';
+            score += 15;
+          }
+          i = peek;
+          continue;
+        }
+      }
+
+      regexStr += '/';
+      score += 10;
+      i++;
+      continue;
+    }
+
+    if (ch === '*') {
       paramNames.push('pathMatch');
-      regexParts.push('(?:/(.*))?');
+      regexStr += '(?:/(.*))?';
       score += 1;
-    } else if (segment.startsWith(':')) {
-      const isOptional = segment.endsWith('?');
-      const isRepeatable = segment.endsWith('*') || segment.endsWith('+');
-      let paramName = segment.slice(1);
+      i++;
+      continue;
+    }
 
-      // Check for custom regex constraint like :id(\\d+)
-      const regexMatch = paramName.match(/^([a-zA-Z0-9_]+)\((.*)\)[?*+]?$/);
-      if (regexMatch && regexMatch[1] && regexMatch[2]) {
-        paramName = regexMatch[1];
-        paramNames.push(paramName);
-        const nonCapturingCustomRegex = toNonCapturing(regexMatch[2]);
-        if (isOptional) {
-          regexParts.push(`(?:/(${nonCapturingCustomRegex}))?`);
+    if (ch === ':') {
+      i++;
+      let paramName = '';
+      while (i < len && /[a-zA-Z0-9_$]/.test(path[i]!)) {
+        paramName += path[i]!;
+        i++;
+      }
+
+      let customRegex: string | null = null;
+      if (i < len && path[i] === '(') {
+        i++;
+        let depth = 1;
+        let inCharClass = false;
+        let isEscaped = false;
+        let cReg = '';
+        while (i < len && depth > 0) {
+          const c = path[i]!;
+          if (isEscaped) {
+            cReg += c;
+            isEscaped = false;
+            i++;
+            continue;
+          }
+          if (c === '\\') {
+            cReg += c;
+            isEscaped = true;
+            i++;
+            continue;
+          }
+          if (inCharClass) {
+            cReg += c;
+            if (c === ']') inCharClass = false;
+            i++;
+            continue;
+          }
+          if (c === '[') {
+            inCharClass = true;
+            cReg += c;
+            i++;
+            continue;
+          }
+          if (c === '(') {
+            depth++;
+            cReg += c;
+            i++;
+            continue;
+          }
+          if (c === ')') {
+            depth--;
+            if (depth === 0) {
+              i++;
+              break;
+            } else {
+              cReg += c;
+              i++;
+              continue;
+            }
+          }
+          cReg += c;
+          i++;
+        }
+        customRegex = cReg;
+      }
+
+      let modifier = '';
+      if (i < len && (path[i] === '?' || path[i] === '*' || path[i] === '+')) {
+        modifier = path[i]!;
+        i++;
+      }
+
+      paramNames.push(paramName);
+
+      if (customRegex !== null) {
+        const nonCap = toNonCapturing(customRegex);
+        if (modifier === '?') {
+          regexStr += `(${nonCap})?`;
           score += 25;
+        } else if (modifier === '*') {
+          regexStr += `(${nonCap})*`;
+          score += 5;
+        } else if (modifier === '+') {
+          regexStr += `(${nonCap})+`;
+          score += 30;
         } else {
-          regexParts.push(`/(${nonCapturingCustomRegex})`);
+          regexStr += `(${nonCap})`;
           score += 30;
         }
       } else {
-
-        if (isOptional || isRepeatable) {
-          paramName = paramName.replace(/[?*+]$/, '');
-        }
-        paramNames.push(paramName);
-
-        if (isRepeatable) {
-          regexParts.push('(?:/(.*))?');
-          score += 5;
-        } else if (isOptional) {
-          regexParts.push('(?:/([^/]+))?');
+        if (modifier === '?') {
+          regexStr += '([^/]+)?';
           score += 15;
+        } else if (modifier === '*') {
+          regexStr += '(.*)';
+          score += 5;
+        } else if (modifier === '+') {
+          regexStr += '([^/]+)';
+          score += 20;
         } else {
-          regexParts.push('/([^/]+)');
+          regexStr += '([^/]+)';
           score += 20;
         }
       }
-    } else {
-      // Static segment
-      regexParts.push('/' + segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-      score += 100;
+      continue;
     }
+
+    if (/[.*+?^${}()|[\]\\]/.test(ch)) {
+      regexStr += '\\' + ch;
+    } else {
+      regexStr += ch;
+    }
+    score += 10;
+    i++;
   }
 
-  const regexStr = '^' + regexParts.join('') + '/?$';
+  regexStr += '/?$';
+
   return {
     regex: new RegExp(regexStr),
     paramNames,

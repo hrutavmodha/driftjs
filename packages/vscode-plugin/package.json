@@ -68,6 +68,7 @@
     "prepublishOnly": "pnpm build && pnpm test"
   },
   "dependencies": {
+    "acorn": "^8.17.0",
     "driftjs-compiler": "workspace:*",
     "vscode-languageclient": "^8.1.0",
     "vscode-languageserver": "^8.1.0",

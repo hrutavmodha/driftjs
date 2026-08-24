@@ -221,6 +221,47 @@ describe('DriftParser', () => {
     expect(forNode.key).toBe('item.id');
   });
 
+  it('parses complex @for headers with in operators and key tokens inside expressions (BUG-019)', () => {
+    const parser1 = new DriftParser(
+      new DriftLexer("@for (item in list.filter(x => 'key' in x)) { <div>{item}</div> }")
+    );
+    const ast1 = parser1.parse();
+    const node1 = ast1.body[0] as any;
+    expect(node1.item).toBe('item');
+    expect(node1.index).toBeNull();
+    expect(node1.iterable).toBe("list.filter(x => 'key' in x)");
+    expect(node1.key).toBeNull();
+
+    const parser2 = new DriftParser(
+      new DriftLexer("@for item in list.filter(x => 'in' in x) key item.id { <div>{item}</div> }")
+    );
+    const ast2 = parser2.parse();
+    const node2 = ast2.body[0] as any;
+    expect(node2.item).toBe('item');
+    expect(node2.index).toBeNull();
+    expect(node2.iterable).toBe("list.filter(x => 'in' in x)");
+    expect(node2.key).toBe('item.id');
+
+    const parser3 = new DriftParser(
+      new DriftLexer("@for ({ id, name = 'in' }, idx) in users key id { <div>{name}</div> }")
+    );
+    const ast3 = parser3.parse();
+    const node3 = ast3.body[0] as any;
+    expect(node3.item).toBe("{ id, name = 'in' }");
+    expect(node3.index).toBe('idx');
+    expect(node3.iterable).toBe('users');
+    expect(node3.key).toBe('id');
+
+    const parser4 = new DriftParser(
+      new DriftLexer("@for item in hasKey ? itemsWithKey : otherItems key item.id { <div>{item}</div> }")
+    );
+    const ast4 = parser4.parse();
+    const node4 = ast4.body[0] as any;
+    expect(node4.item).toBe('item');
+    expect(node4.iterable).toBe('hasKey ? itemsWithKey : otherItems');
+    expect(node4.key).toBe('item.id');
+  });
+
   it('parses @switch, @case, and @default directives cleanly', () => {
     const parser = new DriftParser(
       new DriftLexer('@switch userRole { @case "admin" { <p>Admin</p> } @case "user" { <p>User</p> } @default { <p>Unknown</p> } }')

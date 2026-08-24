@@ -75,6 +75,25 @@ describe('Route Matcher & Query Parser (driftjs-router)', () => {
       expect(regexTokens.regex.test('/items/12345')).toBe(true);
       expect(regexTokens.regex.test('/items/abc')).toBe(false);
     });
+
+    it('supports multi-parameter and composite segments without slash splitting (BUG-020)', () => {
+      const extTokens = compilePathToRegex('/files/:name.:ext');
+      expect(extTokens.paramNames).toEqual(['name', 'ext']);
+      expect(extTokens.regex.test('/files/document.pdf')).toBe(true);
+      expect(extTokens.regex.test('/files/archive.tar.gz')).toBe(true);
+      expect(extTokens.regex.test('/files/document')).toBe(false);
+
+      const compositeTokens = compilePathToRegex('/users-:userId/posts-:postId');
+      expect(compositeTokens.paramNames).toEqual(['userId', 'postId']);
+      expect(compositeTokens.regex.test('/users-42/posts-100')).toBe(true);
+      expect(compositeTokens.regex.test('/users-42/posts-')).toBe(false);
+
+      const prefixTokens = compilePathToRegex('/api/v:version(\\d+)');
+      expect(prefixTokens.paramNames).toEqual(['version']);
+      expect(prefixTokens.regex.test('/api/v1')).toBe(true);
+      expect(prefixTokens.regex.test('/api/v20')).toBe(true);
+      expect(prefixTokens.regex.test('/api/vabc')).toBe(false);
+    });
   });
 
   describe('Matcher Resolution & Hierarchy', () => {
@@ -100,6 +119,8 @@ describe('Route Matcher & Query Parser (driftjs-router)', () => {
         ],
       },
       { path: '/orders/:orderId(\\d+)', name: 'order-detail', component: dummyComp },
+      { path: '/files/:name.:ext', name: 'file-detail', component: dummyComp },
+      { path: '/users-:userId/posts-:postId', name: 'user-post', component: dummyComp },
       { path: '/:pathMatch(.*)*', name: 'not-found', component: dummyComp },
     ];
 
@@ -123,6 +144,22 @@ describe('Route Matcher & Query Parser (driftjs-router)', () => {
       expect(user.matched.length).toBe(2);
       expect(user.matched[0]?.name).toBe('users');
       expect(user.matched[1]?.name).toBe('user-detail');
+    });
+
+    it('extracts parameters accurately for composite and multi-parameter segments (BUG-020)', () => {
+      const file = matcher.resolve('/files/report.pdf');
+      expect(file.name).toBe('file-detail');
+      expect(file.params).toEqual({ name: 'report', ext: 'pdf' });
+
+      const userPost = matcher.resolve('/users-42/posts-100');
+      expect(userPost.name).toBe('user-post');
+      expect(userPost.params).toEqual({ userId: '42', postId: '100' });
+
+      const interpolated = matcher.resolve({
+        name: 'file-detail',
+        params: { name: 'annual-report', ext: 'docx' },
+      });
+      expect(interpolated.path).toBe('/files/annual-report.docx');
     });
 
     it('handles nested multi-segment dynamic routes', () => {

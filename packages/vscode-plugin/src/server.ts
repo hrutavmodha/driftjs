@@ -15,6 +15,7 @@ import {
 } from 'vscode-languageserver/node.js';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { compile } from 'driftjs-compiler';
+import * as acorn from 'acorn';
 
 let connection: ReturnType<typeof createConnection> | null = null;
 try {
@@ -90,62 +91,117 @@ export function extractScriptVars(docText: string): CompletionItem[] {
   const items: CompletionItem[] = [];
   const seen = new Set<string>();
 
-  // 1. First extract using compiler declaredVars if available
-  try {
-    const compiled = compile(docText);
-    if (compiled.declaredVars && Array.isArray(compiled.declaredVars)) {
-      for (const v of compiled.declaredVars) {
-        if (!seen.has(v)) {
-          seen.add(v);
-          items.push({
-            label: v,
-            kind: CompletionItemKind.Variable,
-            detail: 'Reactive Component State Variable',
-            documentation: `Declared state variable '${v}' in <script> block.`,
-          });
+  const addVar = (
+    name: string,
+    kind: CompletionItemKind = CompletionItemKind.Variable,
+    detail?: string,
+    doc?: string,
+    insertText?: string
+  ) => {
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    items.push({
+      label: name,
+      kind,
+      detail: detail ?? 'Reactive Component State Variable',
+      documentation: doc ?? `Declared state variable '${name}' in <script> block.`,
+      ...(insertText ? { insertText } : {}),
+    });
+  };
+
+  const extractPatternBindings = (patternNode: any) => {
+    if (!patternNode || typeof patternNode !== 'object') return;
+    if (patternNode.type === 'Identifier') {
+      addVar(patternNode.name);
+    } else if (patternNode.type === 'ObjectPattern' && Array.isArray(patternNode.properties)) {
+      for (const prop of patternNode.properties) {
+        if (prop.type === 'Property') {
+          extractPatternBindings(prop.value);
+        } else if (prop.type === 'RestElement') {
+          extractPatternBindings(prop.argument);
         }
+      }
+    } else if (patternNode.type === 'ArrayPattern' && Array.isArray(patternNode.elements)) {
+      for (const elem of patternNode.elements) {
+        if (elem) extractPatternBindings(elem);
+      }
+    } else if (patternNode.type === 'AssignmentPattern') {
+      extractPatternBindings(patternNode.left);
+    } else if (patternNode.type === 'RestElement') {
+      extractPatternBindings(patternNode.argument);
+    }
+  };
+
+  const processAstNode = (node: any) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'VariableDeclaration' && Array.isArray(node.declarations)) {
+      for (const decl of node.declarations) {
+        extractPatternBindings(decl.id);
+      }
+    } else if (node.type === 'FunctionDeclaration' && node.id?.name) {
+      addVar(
+        node.id.name,
+        CompletionItemKind.Function,
+        'Component Handler Function',
+        `Declared handler function '${node.id.name}()' in <script> block.`,
+        `${node.id.name}()`
+      );
+    } else if (node.type === 'ClassDeclaration' && node.id?.name) {
+      addVar(
+        node.id.name,
+        CompletionItemKind.Class,
+        'Component Class',
+        `Declared class '${node.id.name}' in <script> block.`
+      );
+    } else if (node.type === 'ImportDeclaration' && Array.isArray(node.specifiers)) {
+      for (const spec of node.specifiers) {
+        if (spec.local?.name) {
+          addVar(spec.local.name);
+        }
+      }
+    } else if (node.type === 'ExportNamedDeclaration' && node.declaration) {
+      processAstNode(node.declaration);
+    } else if (node.type === 'ExportDefaultDeclaration' && node.declaration) {
+      processAstNode(node.declaration);
+    }
+  };
+
+  // 1. Try parsing full script with Acorn
+  try {
+    const ast = acorn.parse(scriptBody, {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      allowReturnOutsideFunction: true,
+      allowAwaitOutsideFunction: true,
+      allowImportExportEverywhere: true,
+    }) as any;
+
+    if (ast && Array.isArray(ast.body)) {
+      for (const node of ast.body) {
+        processAstNode(node);
       }
     }
   } catch {
-    // Compiler may fail while user is typing in-progress template
-  }
-
-  // 2. Extract function declarations: function foo()
-  const fnRegex = /function\s+([a-zA-Z0-9_$]+)\s*\(/g;
-  let fnMatch: RegExpExecArray | null;
-  while ((fnMatch = fnRegex.exec(scriptBody)) !== null) {
-    const fnName = fnMatch[1];
-    if (fnName && !seen.has(fnName)) {
-      seen.add(fnName);
-      items.push({
-        label: fnName,
-        kind: CompletionItemKind.Function,
-        detail: 'Component Handler Function',
-        documentation: `Declared handler function '${fnName}()' in <script> block.`,
-        insertText: `${fnName}()`,
-      });
-    }
-  }
-
-  // 3. Fallback regex to capture comma-separated & destructuring variable declarations
-  const declBlockRegex = /(?:let|const|var)\s+([^;\r\n]+)(?:;|$)/g;
-  let declBlock: RegExpExecArray | null;
-  const reserved = new Set(['let', 'const', 'var', 'true', 'false', 'null', 'undefined', 'new', 'function', 'return', 'typeof', 'instanceof', 'in', 'of']);
-  while ((declBlock = declBlockRegex.exec(scriptBody)) !== null) {
-    const declContent = declBlock[1];
-    if (!declContent) continue;
-    const idRegex = /[a-zA-Z_$][a-zA-Z0-9_$]*/g;
-    let idMatch: RegExpExecArray | null;
-    while ((idMatch = idRegex.exec(declContent)) !== null) {
-      const name = idMatch[0];
-      if (!reserved.has(name) && !seen.has(name)) {
-        seen.add(name);
-        items.push({
-          label: name,
-          kind: CompletionItemKind.Variable,
-          detail: 'Reactive Component State Variable',
-          documentation: `Declared state variable '${name}' in <script> block.`,
-        });
+    // 2. If full script parsing fails (e.g. typing in progress), parse line by line or statement fragments
+    const lines = scriptBody.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const lineAst = acorn.parse(trimmed, {
+          ecmaVersion: 'latest',
+          sourceType: 'module',
+          allowReturnOutsideFunction: true,
+          allowAwaitOutsideFunction: true,
+          allowImportExportEverywhere: true,
+        }) as any;
+        if (lineAst && Array.isArray(lineAst.body)) {
+          for (const node of lineAst.body) {
+            processAstNode(node);
+          }
+        }
+      } catch {
+        // Incomplete line, ignore safely without catastrophic backtracking or RHS regex extraction
       }
     }
   }

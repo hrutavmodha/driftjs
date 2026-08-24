@@ -432,13 +432,172 @@ export class DriftParser {
   private parseForDirective(): ForNode {
     const forToken = this.consume(TokenType.DirectiveFor, 'Expected @for directive');
     const startLoc = forToken.loc.start;
-    let header = forToken.value.trim(); // e.g. "item in items" or "(item, index) in items"
+    let header = forToken.value.trim();
+
+    function isRegexStart(str: string, index: number): boolean {
+      let prevIdx = index - 1;
+      while (prevIdx >= 0 && /\s/.test(str[prevIdx]!)) {
+        prevIdx--;
+      }
+      if (prevIdx < 0) return true;
+      const prevChar = str[prevIdx]!;
+      return /[(,=:[!&|?+\-*/%^~<>]/.test(prevChar);
+    }
+
+    function scanHeader(
+      str: string,
+      onDepthZero: (index: number, ch: string) => boolean | number | void
+    ): number {
+      let parenDepth = 0;
+      let bracketDepth = 0;
+      let braceDepth = 0;
+      let inQuote: string | null = null;
+      let isEscaped = false;
+      let inLineComment = false;
+      let inBlockComment = false;
+      let inRegex = false;
+      let inRegexCharClass = false;
+      const templateBraceStack: number[] = [];
+
+      for (let i = 0; i < str.length; i++) {
+        const ch = str[i]!;
+
+        if (inQuote !== null) {
+          if (isEscaped) {
+            isEscaped = false;
+            continue;
+          }
+          if (ch === '\\') {
+            isEscaped = true;
+            continue;
+          }
+          if (inQuote === '`' && ch === '$' && str[i + 1] === '{') {
+            templateBraceStack.push(braceDepth);
+            inQuote = null;
+            i++;
+            braceDepth++;
+            continue;
+          }
+          if (ch === inQuote) {
+            inQuote = null;
+            continue;
+          }
+          continue;
+        }
+
+        if (inLineComment) {
+          if (ch === '\n') inLineComment = false;
+          continue;
+        }
+
+        if (inBlockComment) {
+          if (ch === '*' && str[i + 1] === '/') {
+            inBlockComment = false;
+            i++;
+          }
+          continue;
+        }
+
+        if (inRegex) {
+          if (isEscaped) {
+            isEscaped = false;
+            continue;
+          }
+          if (ch === '\\') {
+            isEscaped = true;
+            continue;
+          }
+          if (inRegexCharClass) {
+            if (ch === ']') inRegexCharClass = false;
+            continue;
+          }
+          if (ch === '[') {
+            inRegexCharClass = true;
+            continue;
+          }
+          if (ch === '/') {
+            inRegex = false;
+            continue;
+          }
+          continue;
+        }
+
+        if (ch === '/' && str[i + 1] === '/') {
+          inLineComment = true;
+          i++;
+          continue;
+        }
+        if (ch === '/' && str[i + 1] === '*') {
+          inBlockComment = true;
+          i++;
+          continue;
+        }
+        if (ch === '/' && isRegexStart(str, i)) {
+          inRegex = true;
+          inRegexCharClass = false;
+          continue;
+        }
+
+        if (ch === '\'' || ch === '"' || ch === '`') {
+          inQuote = ch;
+          continue;
+        }
+
+        if (ch === '(') {
+          parenDepth++;
+          continue;
+        }
+        if (ch === ')') {
+          parenDepth = Math.max(0, parenDepth - 1);
+          continue;
+        }
+        if (ch === '[') {
+          bracketDepth++;
+          continue;
+        }
+        if (ch === ']') {
+          bracketDepth = Math.max(0, bracketDepth - 1);
+          continue;
+        }
+        if (ch === '{') {
+          braceDepth++;
+          continue;
+        }
+        if (ch === '}') {
+          braceDepth = Math.max(0, braceDepth - 1);
+          if (
+            templateBraceStack.length > 0 &&
+            braceDepth === templateBraceStack[templateBraceStack.length - 1]
+          ) {
+            templateBraceStack.pop();
+            inQuote = '`';
+          }
+          continue;
+        }
+
+        if (
+          parenDepth === 0 &&
+          bracketDepth === 0 &&
+          braceDepth === 0 &&
+          inQuote === null &&
+          !inLineComment &&
+          !inBlockComment &&
+          !inRegex
+        ) {
+          const res = onDepthZero(i, ch);
+          if (typeof res === 'number') return res;
+          if (res === true) return i;
+        }
+      }
+      return -1;
+    }
 
     function hasMatchingOuterParens(str: string): boolean {
       if (!str.startsWith('(') || !str.endsWith(')')) return false;
-      let depth = 0;
+      let parenDepth = 0;
       let inQuote: string | null = null;
       let isEscaped = false;
+
       for (let i = 0; i < str.length - 1; i++) {
         const ch = str[i]!;
         if (inQuote !== null) {
@@ -448,53 +607,73 @@ export class DriftParser {
           continue;
         }
         if (ch === '"' || ch === "'" || ch === '`') inQuote = ch;
-        else if (ch === '(') depth++;
-        else if (ch === ')') depth--;
-        if (depth === 0) return false;
-      }
-      return depth === 1;
-    }
-
-    function findInIndex(str: string): number {
-      let parenDepth = 0;
-      let bracketDepth = 0;
-      let braceDepth = 0;
-      let inQuote: string | null = null;
-      let isEscaped = false;
-
-      for (let i = 0; i <= str.length - 4; i++) {
-        const ch = str[i]!;
-        if (inQuote !== null) {
-          if (isEscaped) {
-            isEscaped = false;
-          } else if (ch === '\\') {
-            isEscaped = true;
-          } else if (ch === inQuote) {
-            inQuote = null;
-          }
-          continue;
-        }
-        if (ch === '"' || ch === "'" || ch === '`') {
-          inQuote = ch;
-          continue;
-        }
-        if (ch === '(') parenDepth++;
+        else if (ch === '(') parenDepth++;
         else if (ch === ')') parenDepth--;
-        else if (ch === '[') bracketDepth++;
-        else if (ch === ']') bracketDepth--;
-        else if (ch === '{') braceDepth++;
-        else if (ch === '}') braceDepth--;
-        else if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0 && str.slice(i, i + 4) === ' in ') {
-          return i;
-        }
+        if (parenDepth === 0) return false;
       }
-      return -1;
+      return parenDepth === 1;
     }
 
-    let inIndex = findInIndex(header);
+    function findTopLevelIn(str: string): number {
+      return scanHeader(str, (i, ch) => {
+        if (ch === 'i' && str[i + 1] === 'n') {
+          const beforeWord = i === 0 || !/[a-zA-Z0-9_$]/.test(str[i - 1]!);
+          const afterWord = i + 2 >= str.length || !/[a-zA-Z0-9_$]/.test(str[i + 2]!);
+          if (beforeWord && afterWord) {
+            // Check preceding non-whitespace char is not dot property access (e.g. foo.in)
+            let prevIdx = i - 1;
+            while (prevIdx >= 0 && /\s/.test(str[prevIdx]!)) prevIdx--;
+            if (prevIdx < 0 || str[prevIdx] !== '.') {
+              return true;
+            }
+          }
+        }
+      });
+    }
+
+    function findTopLevelComma(str: string): number {
+      return scanHeader(str, (i, ch) => {
+        if (ch === ',') return true;
+      });
+    }
+
+    function findTopLevelKey(str: string): { index: number; keyExpr: string } | null {
+      let matchIdx = -1;
+      scanHeader(str, (i) => {
+        if (str.slice(i, i + 3) === 'key') {
+          const beforeWord = i === 0 || !/[a-zA-Z0-9_$]/.test(str[i - 1]!);
+          const afterWord = i + 3 >= str.length || !/[a-zA-Z0-9_$]/.test(str[i + 3]!);
+          if (beforeWord && afterWord) {
+            let prevIdx = i - 1;
+            while (prevIdx >= 0 && /\s/.test(str[prevIdx]!)) prevIdx--;
+            if (prevIdx < 0 || (str[prevIdx] !== '.' && str[prevIdx] !== '?')) {
+              const remaining = str.slice(i + 3).trim();
+              if (remaining.length > 0) {
+                matchIdx = i;
+                return true;
+              }
+            }
+          }
+        }
+      });
+
+      if (matchIdx !== -1) {
+        return {
+          index: matchIdx,
+          keyExpr: str.slice(matchIdx + 3).trim(),
+        };
+      }
+      return null;
+    }
+
+    while (hasMatchingOuterParens(header)) {
+      header = header.slice(1, -1).trim();
+    }
+
+    let inIndex = findTopLevelIn(header);
     if (inIndex === -1 && hasMatchingOuterParens(header)) {
       const stripped = header.slice(1, -1).trim();
-      const strippedIn = findInIndex(stripped);
+      const strippedIn = findTopLevelIn(stripped);
       if (strippedIn !== -1) {
         header = stripped;
         inIndex = strippedIn;
@@ -510,59 +689,17 @@ export class DriftParser {
       );
     }
 
-
     const lhs = header.slice(0, inIndex).trim();
-    let rawIterable = header.slice(inIndex + 4).trim();
+    let rhs = header.slice(inIndex + 2).trim();
+
     let key: string | null = null;
-
-    const keyMatchInfo = (() => {
-      let parenDepth = 0;
-      let bracketDepth = 0;
-      let braceDepth = 0;
-      let inQuote: string | null = null;
-      let isEscaped = false;
-
-      for (let i = 0; i < rawIterable.length; i++) {
-        const ch = rawIterable[i]!;
-        if (inQuote !== null) {
-          if (isEscaped) {
-            isEscaped = false;
-          } else if (ch === '\\') {
-            isEscaped = true;
-          } else if (ch === inQuote) {
-            inQuote = null;
-          }
-          continue;
-        }
-        if (ch === '"' || ch === "'" || ch === '`') {
-          inQuote = ch;
-          continue;
-        }
-        if (ch === '(') parenDepth++;
-        else if (ch === ')') parenDepth--;
-        else if (ch === '[') bracketDepth++;
-        else if (ch === ']') bracketDepth--;
-        else if (ch === '{') braceDepth++;
-        else if (ch === '}') braceDepth--;
-        else if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
-          const match = rawIterable.slice(i).match(/^(\s+key\s+)(.+)$/);
-          if (match && match[1] && match[2]) {
-            return {
-              iterableEnd: i,
-              key: match[2].trim(),
-            };
-          }
-        }
-      }
-      return null;
-    })();
-
-    if (keyMatchInfo) {
-      key = keyMatchInfo.key;
-      rawIterable = rawIterable.slice(0, keyMatchInfo.iterableEnd).trim();
+    const keyInfo = findTopLevelKey(rhs);
+    if (keyInfo) {
+      key = keyInfo.keyExpr;
+      rhs = rhs.slice(0, keyInfo.index).trim();
     }
 
-    const iterable = rawIterable;
+    const iterable = rhs;
 
     let item = lhs;
     let index: string | null = null;
@@ -571,36 +708,7 @@ export class DriftParser {
       item = item.slice(1, -1).trim();
     }
 
-
-    const commaIdx = (() => {
-      let parenDepth = 0;
-      let bracketDepth = 0;
-      let braceDepth = 0;
-      let inQuote: string | null = null;
-      let isEscaped = false;
-
-      for (let i = 0; i < item.length; i++) {
-        const ch = item[i]!;
-        if (inQuote !== null) {
-          if (isEscaped) isEscaped = false;
-          else if (ch === '\\') isEscaped = true;
-          else if (ch === inQuote) inQuote = null;
-          continue;
-        }
-        if (ch === '"' || ch === "'" || ch === '`') inQuote = ch;
-        else if (ch === '(') parenDepth++;
-        else if (ch === ')') parenDepth--;
-        else if (ch === '[') bracketDepth++;
-        else if (ch === ']') bracketDepth--;
-        else if (ch === '{') braceDepth++;
-        else if (ch === '}') braceDepth--;
-        else if (ch === ',' && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
-          return i;
-        }
-      }
-      return -1;
-    })();
-
+    const commaIdx = findTopLevelComma(item);
     if (commaIdx !== -1) {
       const firstPart = item.slice(0, commaIdx).trim();
       index = item.slice(commaIdx + 1).trim() || null;
@@ -608,6 +716,15 @@ export class DriftParser {
       while (hasMatchingOuterParens(item)) {
         item = item.slice(1, -1).trim();
       }
+    }
+
+    if (!item || !iterable) {
+      throw new DriftParserError(
+        `Invalid @for header syntax '${forToken.value.trim()}'. Expected format: 'item in list' or '(item, index) in list'`,
+        forToken.loc.start.line,
+        forToken.loc.start.column,
+        forToken.loc.start.offset
+      );
     }
 
     const body: TemplateChildNode[] = [];

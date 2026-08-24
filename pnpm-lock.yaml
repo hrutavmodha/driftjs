@@ -161,6 +161,9 @@ importers:
 
   packages/vscode-plugin:
     dependencies:
+      acorn:
+        specifier: ^8.17.0
+        version: 8.17.0
       driftjs-compiler:
         specifier: workspace:*
         version: link:../compiler
