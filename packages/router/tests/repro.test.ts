@@ -257,5 +257,31 @@ describe('DriftJS Router - Reproduction Test Cases', () => {
     expect(failure).toBeDefined();
     expect((failure as any).type).toBeDefined();
   });
+
+  it('router guard pipeline properly awaits 3-argument callback-based async guards (BUG-014)', async () => {
+    const history = createMemoryHistory('/');
+    const router = createRouter({
+      history,
+      routes: [
+        { path: '/', component: { bytecode: [], constants: [] } },
+        { path: '/protected', component: { bytecode: [], constants: [] } },
+      ],
+    });
+
+    let guardCompleted = false;
+    router.beforeEach((to, from, next) => {
+      setTimeout(() => {
+        guardCompleted = true;
+        next(false); // abort navigation
+      }, 20);
+    });
+
+    await router.isReady();
+    const res = await router.push('/protected');
+
+    expect(guardCompleted).toBe(true);
+    expect(res).toBeDefined();
+    expect(router.currentRoute.path).toBe('/');
+  });
 });
 

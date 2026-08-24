@@ -70,5 +70,19 @@ describe('DriftJS Shared / Utils - Reproduction Test Cases', () => {
     expect(res.polluted).toBeUndefined();
     expect((Object.prototype as any).polluted).toBeUndefined();
   });
+
+  it('populateItemScope populates defaults on nullish items and handles complex comma defaults (BUG-012)', async () => {
+    const { populateItemScope } = await import('../src/index.js');
+    const scope1: Record<string, any> = {};
+    populateItemScope(scope1, '{ id = 1, name = "anonymous" }', null, null, 0);
+    expect(scope1.id).toBe(1);
+    expect(scope1.name).toBe('anonymous');
+
+    const scope2: Record<string, any> = {};
+    populateItemScope(scope2, '{ a = [1, 2], b = "x,y" }', {}, null, 0);
+    expect(Array.isArray(scope2.a)).toBe(true);
+    expect(scope2.a).toEqual([1, 2]);
+    expect(scope2.b).toBe('x,y');
+  });
 });
 

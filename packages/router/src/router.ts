@@ -104,30 +104,47 @@ async function runGuardQueue(
 ): Promise<NavigationGuardReturn> {
   for (const guard of guards) {
     let guardRes: NavigationGuardReturn;
-    let nextCalled = false;
-    let nextResult: NavigationGuardReturn = undefined;
-
-    const next = (res?: boolean | string | RouteLocationRaw | Error) => {
-      nextCalled = true;
-      nextResult = res;
-    };
 
     try {
-      const returned = guard(to, from, next);
-      if (returned instanceof Promise) {
-        guardRes = await returned;
+      if (guard.length >= 3) {
+        // Callback-based guard: await next() invocation
+        guardRes = await new Promise<NavigationGuardReturn>((resolve, reject) => {
+          let hasCalled = false;
+          const next = (res?: boolean | string | RouteLocationRaw | Error) => {
+            if (hasCalled) return;
+            hasCalled = true;
+            resolve(res);
+          };
+
+          try {
+            const returned = guard(to, from, next);
+            if (returned instanceof Promise) {
+              returned
+                .then((pRes) => {
+                  if (!hasCalled) {
+                    hasCalled = true;
+                    resolve(pRes);
+                  }
+                })
+                .catch(reject);
+            }
+          } catch (e) {
+            reject(e);
+          }
+        });
       } else {
-        guardRes = returned;
+        const returned = guard(to, from, () => {});
+        if (returned instanceof Promise) {
+          guardRes = await returned;
+        } else {
+          guardRes = returned;
+        }
       }
     } catch (err: any) {
       return err instanceof Error ? err : new Error(String(err));
     }
 
-    if (nextCalled) {
-      if (nextResult !== undefined && nextResult !== true) {
-        return nextResult;
-      }
-    } else if (guardRes !== undefined && guardRes !== true) {
+    if (guardRes !== undefined && guardRes !== true) {
       return guardRes;
     }
   }

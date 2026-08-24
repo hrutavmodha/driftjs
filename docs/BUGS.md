@@ -8,7 +8,7 @@ Every bug is evaluated and categorized under three primary criteria:
 2. **Security** (XSS, prototype pollution, state contamination, path traversal, ReDoS)
 3. **Efficiency** (redundant microtask dispatching, memory leaks, uncollected regions, unneeded DOM thrashing)
 
-All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-023`).
+All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-034`).
 
 ---
 
@@ -25,11 +25,11 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-023`).
 | [`BUG-007`](#bug-007-dynamic-event-handlers-updating-to-nullundefined-fail-to-detach-listeners) | Dynamic Event Handlers Updating to `null`/`undefined` Fail to Detach Listeners | Correctness | **High** | `driftjs-dom` | **Resolved** |
 | [`BUG-008`](#bug-008-unmountsubtree-fails-to-unregister-active-reactiveregions) | `unmountSubtree` Fails to Unregister Active `ReactiveRegion`s | Efficiency / Memory Leak | **Medium** | `driftjs-dom` | **Resolved** |
 | [`BUG-009`](#bug-009-out-of-bounds-negative-index-access-in-lis-reconciler-getsequence) | Out-of-Bounds Negative Index Access in LIS Reconciler `getSequence` | Correctness | **Low** | `driftjs-dom` | **Resolved** |
-| [`BUG-010`](#bug-010-hydrationcursor-permanently-discards-intermediate-nodes-on-type-mismatch) | `HydrationCursor` Permanently Discards Intermediate Nodes on Type Mismatch | Correctness | **High** | `driftjs-dom` | Open |
+| [`BUG-010`](#bug-010-hydrationcursor-permanently-discards-intermediate-nodes-on-type-mismatch) | `HydrationCursor` Permanently Discards Intermediate Nodes on Type Mismatch | Correctness | **High** | `driftjs-dom` | **Resolved** |
 | [`BUG-011`](#bug-011-prototype-pollution-vulnerability-in-evaluatepropsspec) | Prototype Pollution Vulnerability in `evaluatePropsSpec` | Security | **High** | `driftjs-shared` | **Resolved** |
-| [`BUG-012`](#bug-012-populateitemscope-drops-default-values-on-nullish-items-and-splits-commas-naively) | `populateItemScope` Drops Default Values on Nullish Items & Splits Commas Naively | Correctness | **Medium** | `driftjs-shared` | Open |
+| [`BUG-012`](#bug-012-populateitemscope-drops-default-values-on-nullish-items-and-splits-commas-naively) | `populateItemScope` Drops Default Values on Nullish Items & Splits Commas Naively | Correctness | **Medium** | `driftjs-shared` | **Resolved** |
 | [`BUG-013`](#bug-013-uncontrolled-recursive-redirects-cause-call-stack-overflow-in-router) | Uncontrolled Recursive Redirects Cause Call Stack Overflow in Router | Correctness / Efficiency | **Critical** | `driftjs-router` | **Resolved** |
-| [`BUG-014`](#bug-014-router-guard-pipeline-prematurely-resolves-async-callback-guards) | Router Guard Pipeline Prematurely Resolves Async Callback Guards | Correctness | **High** | `driftjs-router` | Open |
+| [`BUG-014`](#bug-014-router-guard-pipeline-prematurely-resolves-async-callback-guards) | Router Guard Pipeline Prematurely Resolves Async Callback Guards | Correctness | **High** | `driftjs-router` | **Resolved** |
 | [`BUG-015`](#bug-015-arbitrary-directory-deletion-risk-in-cli-emptydirectory) | Arbitrary Directory Deletion Risk in CLI `emptyDirectory` | Security | **Critical** | `create-drift` | **Resolved** |
 | [`BUG-016`](#bug-016-catastrophic-backtracking-redos-in-language-server-extractscriptvars) | Catastrophic Backtracking (ReDoS) in Language Server `extractScriptVars` | Security / Efficiency | **Medium** | `drift-vscode` | **Resolved** |
 | [`BUG-017`](#bug-017-hover-provider-calculates-wrong-range-when-multiple-directives-occur-on-same-line) | Hover Provider Calculates Wrong Range When Multiple Directives Occur on Same Line | Correctness | **Low** | `drift-vscode` | **Resolved** |
@@ -39,6 +39,17 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-023`).
 | [`BUG-021`](#bug-021-monolithic-switch-ast-traversal-in-extractidentifiers-lacks-estree-visitor-pattern) | Monolithic `switch (node.type)` AST Traversal in `extractIdentifiers` Lacks ESTree Visitor Pattern | Correctness / Efficiency | **High** | `driftjs-compiler` | Open |
 | [`BUG-022`](#bug-022-heuristic-buffer-splitting-in-isregexstart-for-lexer-slash-disambiguation) | Heuristic Buffer Splitting in `isRegexStart` for Lexer Slash Disambiguation | Correctness | **Low** | `driftjs-compiler` | Open |
 | [`BUG-023`](#bug-023-ad-hoc-ast-transformation-in-drifttransformer-lacks-formal-visitor-pattern) | Ad-Hoc AST Transformation in `DriftTransformer` Lacks Formal Visitor Pattern | Efficiency / Architecture | **Medium** | `driftjs-compiler` | Open |
+| [`BUG-024`](#bug-024-triplicate-hardcoded-definition-of-html-void-elements-set-across-compiler-and-ssr) | Triplicate Hardcoded Definition of HTML Void Elements Set Across Compiler and SSR | Efficiency / Duplication | **Medium** | `driftjs-compiler` / `driftjs-ssr` | Open |
+| [`BUG-025`](#bug-025-redundant-reimplementation-of-resolveiterable-iterator-conversion-across-5-modules) | Redundant Reimplementation of `resolveIterable` Iterator Conversion Across 5 Modules | Efficiency / Duplication | **Medium** | `driftjs-dom` / `driftjs-ssr` / `driftjs-compiler` / `driftjs-shared` | Open |
+| [`BUG-026`](#bug-026-duplicate-ast-pattern-binding-extraction-in-generator-extractbindingidentifiers-vs-extractbindingnames) | Duplicate AST Pattern Binding Extraction in Generator (`extractBindingIdentifiers` vs `extractBindingNames`) | Efficiency / Duplication | **Low** | `driftjs-compiler` | Open |
+| [`BUG-027`](#bug-027-duplicate-destructuring-assignment-transpilation-logic-in-asttojs) | Duplicate Destructuring Assignment Transpilation Logic in `astToJS` | Duplication / Architecture | **Medium** | `driftjs-compiler` | Open |
+| [`BUG-028`](#bug-028-proliferation-of-8-disparate-character-level-bracket-and-quote-balancing-scanners) | Proliferation of 8 Disparate Character-Level Bracket and Quote Balancing Scanners | Correctness / Duplication | **High** | `driftjs-compiler` / `driftjs-shared` | Open |
+| [`BUG-029`](#bug-029-redundant-custom-recursive-object-cloner-cloneastnode-vs-native-structuredclone) | Redundant Custom Recursive Object Cloner (`cloneAstNode`) vs Native `structuredClone` | Redundancy / Efficiency | **Low** | `driftjs-compiler` | Open |
+| [`BUG-030`](#bug-030-redundant-custom-recursive-directory-copier-copydirectory-vs-native-fscpsync) | Redundant Custom Recursive Directory Copier (`copyDirectory`) vs Native `fs.cpSync` | Redundancy / Efficiency | **Low** | `create-drift` | Open |
+| [`BUG-031`](#bug-031-redundant-custom-url-query-string-parser--serializer-vs-native-urlsearchparams) | Redundant Custom URL Query String Parser & Serializer vs Native `URLSearchParams` | Redundancy / Correctness | **Low** | `driftjs-router` | Open |
+| [`BUG-032`](#bug-032-incomplete-hardcoded-html-entity-decoding-table-in-decodehtmlentities-vs-standard-html5-parser) | Incomplete Hardcoded HTML Entity Decoding Table in `decodeHTMLEntities` vs Standard HTML5 Parser | Correctness / Redundancy | **Medium** | `driftjs-compiler` | Open |
+| [`BUG-033`](#bug-033-duplicated-and-inconsistent-path-normalization--slash-slicing-logic-in-router) | Duplicated and Inconsistent Path Normalization & Slash Slicing Logic in Router | Duplication / Correctness | **Low** | `driftjs-router` | Open |
+| [`BUG-034`](#bug-034-regex-based-script-variable-extraction-in-language-server-duplicates-compiler-ast-parsing) | Regex-Based Script Variable Extraction in Language Server Duplicates Compiler AST Parsing | Duplication / Redundancy | **Medium** | `drift-vscode` | Open |
 
 ---
 
@@ -577,3 +588,227 @@ All Bug IDs are maintained in strict serial order (`BUG-001` through `BUG-023`).
   In `packages/compiler/src/transformer.ts`, `DriftTransformer` manually branches and clones nodes through ad-hoc recursion (`transformNode`, `transformChildren`, `cloneAstNode`).
 - **Impact:** Coupling AST traversal with whitespace stripping, script transformation, and directive rewriting prevents modular AST passes and increases the risk of missed subtree mutations.
 - **Remediation:** Provide an explicit Template AST Visitor (`traverse(ast, visitors)`) allowing isolated, composable compiler transformation passes.
+
+---
+
+### BUG-024: Triplicate Hardcoded Definition of HTML Void Elements Set Across Compiler and SSR
+
+- **Criteria:** Efficiency & Maintainability (Duplication)
+- **Severity:** Medium
+- **Component:** `driftjs-compiler` / `driftjs-ssr`
+- **Affected File:** [`packages/compiler/src/lexer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/lexer.ts#L84-L87), [`packages/compiler/src/parser.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/parser.ts#L21-L24), [`packages/ssr/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L41-L44)
+- **Description:**
+  The 14-element HTML void tag set (`area`, `base`, `br`, `col`, `embed`, `hr`, `img`, `input`, `link`, `meta`, `param`, `source`, `track`, `wbr`) is instantiated three separate times independently across compiler and SSR packages:
+  ```ts
+  // packages/compiler/src/lexer.ts line 84
+  const VOID_ELEMENTS = new Set([
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+    'link', 'meta', 'param', 'source', 'track', 'wbr'
+  ]);
+  // packages/compiler/src/parser.ts line 21
+  const VOID_ELEMENTS = new Set([
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+    'link', 'meta', 'param', 'source', 'track', 'wbr'
+  ]);
+  // packages/ssr/src/index.ts line 41
+  const VOID_ELEMENTS = new Set([
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+    'link', 'meta', 'param', 'source', 'track', 'wbr'
+  ]);
+  ```
+- **Impact:** Any updates or corrections to void tag parsing in HTML specifications must be manually synchronized across three disparate files in two packages. Inconsistencies could lead to lexer/parser/SSR desynchronization.
+- **Remediation:** Export a single canonical `VOID_ELEMENTS` constant from `driftjs-shared` (`packages/utils/src/constants.ts`) and import it wherever required across the monorepo.
+
+---
+
+### BUG-025: Redundant Reimplementation of `resolveIterable` Iterator Conversion Across 5 Modules
+
+- **Criteria:** Efficiency & Maintainability (Duplication)
+- **Severity:** Medium
+- **Component:** `driftjs-dom` / `driftjs-ssr` / `driftjs-compiler` / `driftjs-shared`
+- **Affected File:** [`packages/dom/src/reconciler.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/reconciler.ts#L87-L91), [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L705-L709), [`packages/ssr/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L285-L289), [`packages/utils/src/scope.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L229-L233), [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L841)
+- **Description:**
+  `driftjs-shared` provides a centralized `resolveIterable(rawIter)` helper function in [`packages/utils/src/evaluator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/evaluator.ts#L6-L12). However, five other locations across the codebase reimplement the identical logic inline:
+  ```ts
+  const items = Array.isArray(rawIter)
+    ? rawIter
+    : rawIter && typeof rawIter[Symbol.iterator] === 'function'
+    ? Array.from(rawIter)
+    : [];
+  ```
+- **Impact:** Violates single-responsibility and DRY principles. Any enhancements (e.g. generator handling or async iterables) require patching multiple disjoint locations.
+- **Remediation:** Replace all copy-pasted `Symbol.iterator` ternaries with calls to `resolveIterable(raw)` imported from `driftjs-shared`.
+
+---
+
+### BUG-026: Duplicate AST Pattern Binding Extraction in Generator (`extractBindingIdentifiers` vs `extractBindingNames`)
+
+- **Criteria:** Efficiency & Maintainability (Duplication)
+- **Severity:** Low
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L416-L439), [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L663-L683)
+- **Description:**
+  `packages/compiler/src/generator.ts` contains two separate functions implementing the exact same recursive ESTree pattern traversal to extract variable binding names:
+  1. `DriftGenerator.prototype.extractBindingIdentifiers(idNode)` (lines 416–439): Recursively traverses `Identifier`, `ObjectPattern`, `ArrayPattern`, `AssignmentPattern`, and `RestElement`, mutating `this.declaredVars`.
+  2. `extractBindingNames(node)` (lines 663–683): Recursively traverses `Identifier`, `ObjectPattern`, `ArrayPattern`, `AssignmentPattern`, and `RestElement`, returning a `string[]`.
+- **Impact:** Duplicate AST traversal implementations in the same file.
+- **Remediation:** Refactor `extractBindingIdentifiers` to delegate directly to `extractBindingNames(node)`.
+
+---
+
+### BUG-027: Duplicate Destructuring Assignment Transpilation Logic in `astToJS`
+
+- **Criteria:** Duplication & Architecture
+- **Severity:** Medium
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L806-L884), [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L1215-L1329)
+- **Description:**
+  In `packages/compiler/src/generator.ts`, `astToJS()` contains two large, nearly identical blocks of destructuring pattern unrolling:
+  1. In `case 'AssignmentExpression':` (lines 806–884) for `ArrayPattern` and `ObjectPattern`.
+  2. In `generatePatternAssignments()` under `case 'VariableDeclaration':` (lines 1215–1329) for `ArrayPattern` and `ObjectPattern`.
+  Both blocks duplicate key resolution, fallback default assignments, rest property slicing, and scope assignment emission.
+- **Impact:** Destructuring fixes (such as nested destructuring recursion) applied to variable declarations must be manually duplicated into assignment expressions, creating risk of diverged semantics.
+- **Remediation:** Unify destructuring code generation into a single reusable helper function handling both declarations and assignments.
+
+---
+
+### BUG-028: Proliferation of 8 Disparate Character-Level Bracket and Quote Balancing Scanners
+
+- **Criteria:** Correctness & Maintainability (Duplication)
+- **Severity:** High
+- **Component:** `driftjs-compiler` / `driftjs-shared`
+- **Affected File:** [`packages/compiler/src/lexer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/lexer.ts#L266-L411), [`packages/compiler/src/lexer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/lexer.ts#L679-L816), [`packages/compiler/src/parser.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/parser.ts#L437-L600), [`packages/utils/src/scope.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L102-L181)
+- **Description:**
+  Across `compiler` and `driftjs-shared`, 8 separate character-by-character loops implement disparate, ad-hoc state machines to track matching quotes (`"`, `'`, '`'), escape slashes (`\`), parens (`(`, `)`), brackets (`[`, `]`), and braces (`{`, `}`):
+  1. `readDirectiveHeader` in `lexer.ts` (lines 266–411)
+  2. `readInterpolationToken` in `lexer.ts` (lines 679–816)
+  3. `hasMatchingOuterParens` in `parser.ts` (lines 437–456)
+  4. `findInIndex` in `parser.ts` (lines 458–492)
+  5. `keyMatchInfo` in `parser.ts` (lines 518–558)
+  6. `commaIdx` in `parser.ts` (lines 575–600)
+  7. `splitPatternEntries` in `scope.ts` (lines 102–148)
+  8. `findTopLevelChar` in `scope.ts` (lines 150–181)
+- **Impact:** Each scanner has subtly different edge-case handling (some handle template literals and comments, while others omit them completely), causing inconsistent syntax parsing across directives, template expressions, and runtime destructuring.
+- **Remediation:** Centralize expression delimiter and balanced-token scanning into reusable scanner utilities in `driftjs-shared` or `driftjs-compiler`.
+
+---
+
+### BUG-029: Redundant Custom Recursive Object Cloner (`cloneAstNode`) vs Native `structuredClone`
+
+- **Criteria:** Efficiency & Redundancy
+- **Severity:** Low
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/transformer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/transformer.ts#L15-L23)
+- **Description:**
+  In `packages/compiler/src/transformer.ts`, `cloneAstNode()` implements custom recursive object cloning:
+  ```ts
+  function cloneAstNode<T>(node: T): T {
+    if (node === null || typeof node !== 'object') return node;
+    if (Array.isArray(node)) return node.map(cloneAstNode) as any;
+    const copy: any = {};
+    for (const key of Object.keys(node)) {
+      copy[key] = cloneAstNode((node as any)[key]);
+    }
+    return copy as T;
+  }
+  ```
+  JavaScript runtimes natively provide `structuredClone()` (standard in Node.js 17+ and all modern browser engines).
+- **Impact:** Redundant bespoke deep-cloning implementation that lacks cycle handling and object prototype fidelity compared to the native runtime API.
+- **Remediation:** Replace `cloneAstNode` with native `structuredClone()` or shallow spread where appropriate.
+
+---
+
+### BUG-030: Redundant Custom Recursive Directory Copier (`copyDirectory`) vs Native `fs.cpSync`
+
+- **Criteria:** Redundancy & Efficiency
+- **Severity:** Low
+- **Component:** `create-drift`
+- **Affected File:** [`packages/cli/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/cli/src/index.ts#L155-L170)
+- **Description:**
+  In `packages/cli/src/index.ts`, `copyDirectory()` manually walks directory structures using `fs.readdirSync`, `fs.mkdirSync`, and `fs.copyFileSync`:
+  ```ts
+  function copyDirectory(src: string, dest: string): void {
+    fs.mkdirSync(dest, { recursive: true });
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+    for (const entry of entries) {
+      const srcPath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+        copyDirectory(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+  ```
+  Node.js (>= 16.7.0) natively provides `fs.cpSync(src, dest, { recursive: true, filter: ... })`.
+- **Impact:** Unnecessary boilerplate and slower file system iteration compared to native libuv-backed `fs.cpSync`.
+- **Remediation:** Replace `copyDirectory` with native `fs.cpSync(src, dest, { recursive: true, filter: (src) => !src.includes('node_modules') && !src.includes('dist') })`.
+
+---
+
+### BUG-031: Redundant Custom URL Query String Parser & Serializer vs Native `URLSearchParams`
+
+- **Criteria:** Redundancy & Correctness
+- **Severity:** Low
+- **Component:** `driftjs-router`
+- **Affected File:** [`packages/router/src/matcher.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/matcher.ts#L25-L94)
+- **Description:**
+  In `packages/router/src/matcher.ts`, `parseQuery()` and `stringifyQuery()` manually implement custom tokenization and serialization for query strings (splitting `&`, splitting `=`, calling `decodeURIComponent` / `encodeURIComponent`, and managing multi-value key arrays).
+  Modern JavaScript runtimes natively provide `URLSearchParams` with full multi-value key support (`getAll`, `append`, `toString`).
+- **Impact:** Reinvents standard web API behavior with manual string splitting and custom prototype pollution workarounds.
+- **Remediation:** Leverage standard `URLSearchParams` for search query parsing and stringification.
+
+---
+
+### BUG-032: Incomplete Hardcoded HTML Entity Decoding Table in `decodeHTMLEntities` vs Standard HTML5 Parser
+
+- **Criteria:** Correctness & Redundancy
+- **Severity:** Medium
+- **Component:** `driftjs-compiler`
+- **Affected File:** [`packages/compiler/src/parser.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/parser.ts#L48-L109)
+- **Description:**
+  In `packages/compiler/src/parser.ts`, `decodeHTMLEntities()` manually implements a 30-entry switch statement for named HTML entities (`amp`, `lt`, `gt`, `quot`, `apos`, `nbsp`, `copy`, `reg`, `trade`, `mdash`, `ndash`, `hellip`, `euro`, etc.):
+  ```ts
+  switch (named) {
+    case 'amp': return '&';
+    case 'lt': return '<';
+    ...
+  }
+  ```
+  The HTML5 specification defines over 2,100 named character references (e.g. `&copy;`, `&infin;`, `&approx;`, `&sum;`, `&dagger;`). Any entity outside this hardcoded 30-case switch is left undecoded in text nodes.
+- **Impact:** Valid HTML entities in templates fail to decode properly during compilation.
+- **Remediation:** Utilize a standard HTML entity decoding library (such as `he`) or a comprehensive entity lookup table.
+
+---
+
+### BUG-033: Duplicated and Inconsistent Path Normalization & Slash Slicing Logic in Router
+
+- **Criteria:** Duplication & Maintainability
+- **Severity:** Low
+- **Component:** `driftjs-router`
+- **Affected File:** [`packages/router/src/history.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/history.ts#L12-L42), [`packages/router/src/history.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/history.ts#L154-L165), [`packages/router/src/matcher.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/matcher.ts#L99-L105)
+- **Description:**
+  Across `driftjs-router`, path normalization logic is duplicated in multiple ad-hoc functions:
+  - `normalizeBase(base)`: Trims, adds leading slash, removes trailing slash.
+  - `stripBase(pathname, base)`: Checks prefix, slices, ensures leading slash.
+  - `createHref(base, location)`: Normalizes location with ternary and prepends base.
+  - `formatHashHref(location)`: Normalizes location with ternary and prepends hash.
+  - `normalizePath(path)`: Regex replaces `/\/+/g` and manipulates leading/trailing slashes.
+- **Impact:** Fragmented path normalization across router drivers increases maintenance burden and risks subtle routing discrepancies between HTML5 history, hash history, and route matching.
+- **Remediation:** Centralize all URL and route path normalization into a unified path utility module within `driftjs-router`.
+
+---
+
+### BUG-034: Regex-Based Script Variable Extraction in Language Server Duplicates Compiler AST Parsing
+
+- **Criteria:** Duplication & Redundancy
+- **Severity:** Medium
+- **Component:** `drift-vscode`
+- **Affected File:** [`packages/vscode-plugin/src/server.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/vscode-plugin/src/server.ts#L85-L154)
+- **Description:**
+  In `packages/vscode-plugin/src/server.ts`, `extractScriptVars()` uses fallback regular expressions (`/(?:let|const|var)\s+([^;\r\n]+)/g`, `/[a-zA-Z_$][a-zA-Z0-9_$]*/g`, `/function\s+([a-zA-Z0-9_$]+)\s*\(/g`) to inspect `<script>` blocks for declarations. This duplicates the AST parsing and variable declaration extraction logic already implemented with Acorn in `driftjs-compiler` (`DriftTransformer.transformScriptElement` and `DriftGenerator.extractBindingNames`).
+- **Impact:** Duplicate and brittle variable detection in the language server that cannot handle complex JS syntax, destructuring with computed keys, or TypeScript annotations.
+- **Remediation:** Directly parse `<script>` blocks using `acorn` in the language server and reuse `driftjs-compiler` AST extraction routines.
+

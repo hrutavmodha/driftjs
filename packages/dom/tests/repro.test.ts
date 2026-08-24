@@ -639,5 +639,30 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     vm.unmount();
     doc.body.removeChild(container);
   });
+
+  it('HydrationCursor lookahead preserves intermediate nodes on mismatch without discarding comments (BUG-010)', async () => {
+    const doc = document;
+    const container = doc.createElement('div');
+    // Simulated SSR DOM with whitespace text node before comment delimiter
+    container.innerHTML = '<div>  <!--if--><span>Hydrated</span><!--/if--></div>';
+    doc.body.appendChild(container);
+
+    const { HydrationCursor } = await import('../src/hydration.js');
+    const cursor = new HydrationCursor(container, doc);
+
+    const el = cursor.claimElement('div', doc);
+    expect(el.tagName.toLowerCase()).toBe('div');
+
+    const comment = cursor.claimComment('if', doc);
+    expect(comment.data.trim()).toBe('if');
+
+    const span = cursor.claimElement('span', doc);
+    expect(span.tagName.toLowerCase()).toBe('span');
+
+    const endComment = cursor.claimComment('/if', doc);
+    expect(endComment.data.trim()).toBe('/if');
+
+    doc.body.removeChild(container);
+  });
 });
 
