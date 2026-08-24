@@ -17,11 +17,7 @@ import {
   ASTNodeType,
   DriftParserError,
 } from '../types/index.js';
-
-const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr'
-]);
+import { VOID_ELEMENTS } from 'driftjs-shared';
 
 class ArrayTokenSource implements TokenSource {
   private readonly tokens: readonly Token[];

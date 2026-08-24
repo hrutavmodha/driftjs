@@ -1,4 +1,5 @@
 import type { ItemRecord } from '../types/index.js';
+import { resolveIterable } from 'driftjs-shared';
 
 function getSequence(arr: Int32Array): number[] {
   const p = new Int32Array(arr.length);
@@ -84,11 +85,7 @@ export function reconcileKeyedList(
   const newCache: ItemRecord[] = [];
   const newKeySet = new Set<unknown>();
 
-  const safeList = Array.isArray(list)
-    ? list
-    : list && typeof (list as any)[Symbol.iterator] === 'function'
-    ? Array.from(list as any)
-    : [];
+  const safeList = resolveIterable(list);
 
   for (let i = 0; i < safeList.length; i++) {
     const itemVal = safeList[i];

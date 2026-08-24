@@ -351,5 +351,21 @@ describe('DriftGenerator', () => {
     expect(boundVars).toContain('d');
     expect(boundVars).toContain('user');
   });
+
+  it('BUG-026: extractBindingNames extracts identifiers across nested object/array destructuring, defaults, and rest elements', () => {
+    const src = `
+      <script>
+        const { a, b: { c = 10, d: [e, ...f] } = {}, ...restObj } = complexSource;
+      </script>
+      <div>{a}</div>
+    `;
+    const module = compile(src);
+
+    expect(module.declaredVars).toContain('a');
+    expect(module.declaredVars).toContain('c');
+    expect(module.declaredVars).toContain('e');
+    expect(module.declaredVars).toContain('f');
+    expect(module.declaredVars).toContain('restObj');
+  });
 });
 

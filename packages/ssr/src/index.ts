@@ -7,6 +7,8 @@ import {
   pushActiveVM,
   popActiveVM,
   populateItemScope,
+  resolveIterable,
+  VOID_ELEMENTS,
   createContext,
   provide,
   inject,
@@ -37,11 +39,6 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
-const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr'
-]);
 
 const VALID_ATTR_NAME_REGEX = /^[a-zA-Z_:][a-zA-Z0-9_.:-]*$/;
 const VALID_TAG_NAME_REGEX = /^[a-zA-Z_:][a-zA-Z0-9_.:-]*$/;
@@ -282,11 +279,7 @@ export class DriftServerVM {
           const bodyMod = constants[bodyIdx];
 
           const rawIter = evaluateExpression(iterExpr, this.scope, this.declaredVars);
-          const items = Array.isArray(rawIter)
-            ? rawIter
-            : rawIter && typeof rawIter[Symbol.iterator] === 'function'
-            ? Array.from(rawIter)
-            : [];
+          const items = resolveIterable(rawIter);
 
           parentNode.children.push({ type: 'comment', content: 'for', children: [] });
           for (let i = 0; i < items.length; i++) {

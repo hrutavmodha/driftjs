@@ -57,6 +57,9 @@ importers:
       acorn-walk:
         specifier: ^8.3.4
         version: 8.3.5
+      driftjs-shared:
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       '@types/acorn':
         specifier: ^6.0.4

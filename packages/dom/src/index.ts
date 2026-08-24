@@ -702,11 +702,7 @@ export class DriftClientVM {
 
           const renderFor = () => {
             const rawIter = evaluateExpression(iterExpr, scope, vm.declaredVars);
-            const items = Array.isArray(rawIter)
-              ? rawIter
-              : rawIter && typeof rawIter[Symbol.iterator] === 'function'
-              ? Array.from(rawIter)
-              : [];
+            const items = resolveIterable(rawIter);
 
             reconcileKeyedList(
               (actualEndAnchor && actualEndAnchor.parentNode) || parentElem,

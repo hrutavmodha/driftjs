@@ -1,3 +1,5 @@
+import { resolveIterable } from './evaluator.js';
+
 /**
  * Sets a variable in scope, updating parent scope if it exists higher in prototype chain.
  */
@@ -226,11 +228,7 @@ export function populateItemScope(
       }
     }
   } else if (itemName.startsWith('[') && itemName.endsWith(']')) {
-    const arr = Array.isArray(itemVal)
-      ? itemVal
-      : itemVal && typeof itemVal[Symbol.iterator] === 'function'
-      ? Array.from(itemVal)
-      : [];
+    const arr = resolveIterable(itemVal);
     const entries = splitPatternEntries(itemName.slice(1, -1));
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;

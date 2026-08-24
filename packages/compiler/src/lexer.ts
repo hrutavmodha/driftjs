@@ -10,6 +10,7 @@ import {
   DriftLexerError,
   LexerStateKind,
 } from '../types/index.js';
+import { VOID_ELEMENTS } from 'driftjs-shared';
 
 /**
  * Canonical lexer transition rules for Drift templates.
@@ -80,11 +81,6 @@ export function isRawTextTagName(tagName: string): tagName is RawTextTagName {
 }
 
 const KNOWN_DIRECTIVES = new Set(['if', 'else', 'for', 'switch', 'case', 'default']);
-
-const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr'
-]);
 
 const enum ExprTokenKind {
   Start,

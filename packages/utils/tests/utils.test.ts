@@ -9,11 +9,21 @@ import {
   normalizeStyle,
   camelToKebab,
   MAX_REGISTERS,
+  VOID_ELEMENTS,
 } from '../src/index.js';
 
 describe('driftjs-shared Module', () => {
   it('exports MAX_REGISTERS constant equal to 256', () => {
     expect(MAX_REGISTERS).toBe(256);
+  });
+
+  it('exports canonical VOID_ELEMENTS matching WHATWG HTML standard', () => {
+    expect(VOID_ELEMENTS).toBeInstanceOf(Set);
+    expect(VOID_ELEMENTS.has('input')).toBe(true);
+    expect(VOID_ELEMENTS.has('img')).toBe(true);
+    expect(VOID_ELEMENTS.has('br')).toBe(true);
+    expect(VOID_ELEMENTS.has('div')).toBe(false);
+    expect(VOID_ELEMENTS.size).toBe(14);
   });
 
   it('evaluates precompiled functions and closures', () => {

@@ -391,7 +391,9 @@ export class DriftGenerator {
     if (!node || typeof node !== 'object') return;
     if (node.type === 'VariableDeclaration') {
       for (const decl of node.declarations) {
-        this.extractBindingIdentifiers(decl.id);
+        for (const name of extractBindingNames(decl.id)) {
+          this.declaredVars.add(name);
+        }
       }
     } else if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id?.type === 'Identifier') {
       this.declaredVars.add(node.id.name);
@@ -413,29 +415,6 @@ export class DriftGenerator {
           }
         }
       }
-    }
-  }
-
-  private extractBindingIdentifiers(idNode: any): void {
-    if (!idNode || typeof idNode !== 'object') return;
-    if (idNode.type === 'Identifier') {
-      this.declaredVars.add(idNode.name);
-    } else if (idNode.type === 'ObjectPattern' && Array.isArray(idNode.properties)) {
-      for (const prop of idNode.properties) {
-        if (prop.type === 'Property') {
-          this.extractBindingIdentifiers(prop.value);
-        } else if (prop.type === 'RestElement') {
-          this.extractBindingIdentifiers(prop.argument);
-        }
-      }
-    } else if (idNode.type === 'ArrayPattern' && Array.isArray(idNode.elements)) {
-      for (const elem of idNode.elements) {
-        if (elem) this.extractBindingIdentifiers(elem);
-      }
-    } else if (idNode.type === 'AssignmentPattern') {
-      this.extractBindingIdentifiers(idNode.left);
-    } else if (idNode.type === 'RestElement') {
-      this.extractBindingIdentifiers(idNode.argument);
     }
   }
 
@@ -534,7 +513,7 @@ function getRootIdentifier(node: any): string | null {
   return null;
 }
 
-function extractBindingNames(node: any): string[] {
+export function extractBindingNames(node: any): string[] {
   const names: string[] = [];
   function walk(n: any) {
     if (!n || typeof n !== 'object') return;
@@ -712,7 +691,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
             }
           }
         }
-        return `(() => { const _raw = ${valJS}; const _val = (typeof resolveIterable === 'function' ? resolveIterable : (x) => Array.isArray(x) ? x : (x && typeof x[Symbol.iterator] === 'function' ? Array.from(x) : []))(_raw) || []; ${setCalls.join(' ')} return _raw; })()`;
+        return `(() => { const _raw = ${valJS}; const _val = (typeof resolveIterable === 'function' ? resolveIterable(_raw) : (_raw || [])); ${setCalls.join(' ')} return _raw; })()`;
       }
       if (node.left?.type === 'ObjectPattern') {
         const setCalls: string[] = [];
