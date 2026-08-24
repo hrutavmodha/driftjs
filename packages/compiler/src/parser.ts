@@ -17,7 +17,12 @@ import {
   ASTNodeType,
   DriftParserError,
 } from '../types/index.js';
-import { VOID_ELEMENTS } from 'driftjs-shared';
+import {
+  VOID_ELEMENTS,
+  scanBalancedDelimiters,
+  hasMatchingOuterParens,
+  findTopLevelChar,
+} from 'driftjs-shared';
 
 class ArrayTokenSource implements TokenSource {
   private readonly tokens: readonly Token[];
@@ -37,6 +42,33 @@ class ArrayTokenSource implements TokenSource {
     return token;
   }
 }
+
+const HTML_NAMED_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00A0',
+  copy: '©', reg: '®', trade: '™', mdash: '—', ndash: '–', hellip: '…',
+  laquo: '«', raquo: '»', ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’',
+  sbquo: '‚', bdquo: '„', bull: '•', times: '×', divide: '÷', plusmn: '±',
+  euro: '€', pound: '£', yen: '¥', cent: '¢', deg: '°', para: '¶',
+  sect: '§', micro: 'µ', middot: '·', frac14: '¼', frac12: '½', frac34: '¾',
+  sup1: '¹', sup2: '²', sup3: '³', dagger: '†', Dagger: '‡', permil: '‰',
+  prime: '′', Prime: '″', infin: '∞', radic: '√', sim: '∼', asymp: '≈',
+  ne: '≠', equiv: '≡', le: '≤', ge: '≥', sub: '⊂', sup: '⊃', nsub: '⊄',
+  sube: '⊆', supe: '⊇', oplus: '⊕', otimes: '⊗', perp: '⊥', sdot: '⋅',
+  sum: '∑', prod: '∏', minus: '−', lowast: '∗', forall: '∀', part: '∂',
+  exist: '∃', empty: '∅', nabla: '∇', isin: '∈', notin: '∉', ni: '∋',
+  and: '∧', or: '∨', cap: '∩', cup: '∪', int: '∫', there4: '∴', cong: '≅',
+  ang: '∠', loz: '◊', spades: '♠', clubs: '♣', hearts: '♥', diams: '♦',
+  larr: '←', uarr: '↑', rarr: '→', darr: '↓', harr: '↔', crarr: '↵',
+  Alpha: 'Α', Beta: 'Β', Gamma: 'Γ', Delta: 'Δ', Epsilon: 'Ε', Zeta: 'Ζ',
+  Eta: 'Η', Theta: 'Θ', Iota: 'Ι', Kappa: 'Κ', Lambda: 'Λ', Mu: 'Μ',
+  Nu: 'Ν', Xi: 'Ξ', Omicron: 'Ο', Pi: 'Π', Rho: 'Ρ', Sigma: 'Σ',
+  Tau: 'Τ', Upsilon: 'Υ', Phi: 'Φ', Chi: 'Χ', Psi: 'Ψ', Omega: 'Ω',
+  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', zeta: 'ζ',
+  eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ',
+  nu: 'ν', xi: 'ξ', omicron: 'ο', pi: 'π', rho: 'ρ', sigmaf: 'ς',
+  sigma: 'σ', tau: 'τ', upsilon: 'υ', phi: 'φ', chi: 'χ', psi: 'ψ',
+  omega: 'ω',
+};
 
 /**
  * Decodes standard named and numeric HTML character references in text nodes and attributes.
@@ -66,41 +98,10 @@ export function decodeHTMLEntities(text: string): string {
         return '\uFFFD';
       }
     }
-    switch (named) {
-      case 'amp': return '&';
-      case 'lt': return '<';
-      case 'gt': return '>';
-      case 'quot': return '"';
-      case 'apos': return "'";
-      case 'nbsp': return '\u00A0';
-      case 'copy': return '©';
-      case 'reg': return '®';
-      case 'trade': return '™';
-      case 'mdash': return '—';
-      case 'ndash': return '–';
-      case 'hellip': return '…';
-      case 'laquo': return '«';
-      case 'raquo': return '»';
-      case 'ldquo': return '“';
-      case 'rdquo': return '”';
-      case 'lsquo': return '‘';
-      case 'rsquo': return '’';
-      case 'bull': return '•';
-      case 'times': return '×';
-      case 'divide': return '÷';
-      case 'plusmn': return '±';
-      case 'euro': return '€';
-      case 'pound': return '£';
-      case 'yen': return '¥';
-      case 'cent': return '¢';
-      case 'deg': return '°';
-      case 'para': return '¶';
-      case 'sect': return '§';
-      case 'micro': return 'µ';
-      case 'middot': return '·';
-      default:
-        return match;
+    if (named) {
+      return HTML_NAMED_ENTITIES[named] || match;
     }
+    return match;
   });
 }
 
@@ -430,188 +431,8 @@ export class DriftParser {
     const startLoc = forToken.loc.start;
     let header = forToken.value.trim();
 
-    function isRegexStart(str: string, index: number): boolean {
-      let prevIdx = index - 1;
-      while (prevIdx >= 0 && /\s/.test(str[prevIdx]!)) {
-        prevIdx--;
-      }
-      if (prevIdx < 0) return true;
-      const prevChar = str[prevIdx]!;
-      return /[(,=:[!&|?+\-*/%^~<>]/.test(prevChar);
-    }
-
-    function scanHeader(
-      str: string,
-      onDepthZero: (index: number, ch: string) => boolean | number | void
-    ): number {
-      let parenDepth = 0;
-      let bracketDepth = 0;
-      let braceDepth = 0;
-      let inQuote: string | null = null;
-      let isEscaped = false;
-      let inLineComment = false;
-      let inBlockComment = false;
-      let inRegex = false;
-      let inRegexCharClass = false;
-      const templateBraceStack: number[] = [];
-
-      for (let i = 0; i < str.length; i++) {
-        const ch = str[i]!;
-
-        if (inQuote !== null) {
-          if (isEscaped) {
-            isEscaped = false;
-            continue;
-          }
-          if (ch === '\\') {
-            isEscaped = true;
-            continue;
-          }
-          if (inQuote === '`' && ch === '$' && str[i + 1] === '{') {
-            templateBraceStack.push(braceDepth);
-            inQuote = null;
-            i++;
-            braceDepth++;
-            continue;
-          }
-          if (ch === inQuote) {
-            inQuote = null;
-            continue;
-          }
-          continue;
-        }
-
-        if (inLineComment) {
-          if (ch === '\n') inLineComment = false;
-          continue;
-        }
-
-        if (inBlockComment) {
-          if (ch === '*' && str[i + 1] === '/') {
-            inBlockComment = false;
-            i++;
-          }
-          continue;
-        }
-
-        if (inRegex) {
-          if (isEscaped) {
-            isEscaped = false;
-            continue;
-          }
-          if (ch === '\\') {
-            isEscaped = true;
-            continue;
-          }
-          if (inRegexCharClass) {
-            if (ch === ']') inRegexCharClass = false;
-            continue;
-          }
-          if (ch === '[') {
-            inRegexCharClass = true;
-            continue;
-          }
-          if (ch === '/') {
-            inRegex = false;
-            continue;
-          }
-          continue;
-        }
-
-        if (ch === '/' && str[i + 1] === '/') {
-          inLineComment = true;
-          i++;
-          continue;
-        }
-        if (ch === '/' && str[i + 1] === '*') {
-          inBlockComment = true;
-          i++;
-          continue;
-        }
-        if (ch === '/' && isRegexStart(str, i)) {
-          inRegex = true;
-          inRegexCharClass = false;
-          continue;
-        }
-
-        if (ch === '\'' || ch === '"' || ch === '`') {
-          inQuote = ch;
-          continue;
-        }
-
-        if (ch === '(') {
-          parenDepth++;
-          continue;
-        }
-        if (ch === ')') {
-          parenDepth = Math.max(0, parenDepth - 1);
-          continue;
-        }
-        if (ch === '[') {
-          bracketDepth++;
-          continue;
-        }
-        if (ch === ']') {
-          bracketDepth = Math.max(0, bracketDepth - 1);
-          continue;
-        }
-        if (ch === '{') {
-          braceDepth++;
-          continue;
-        }
-        if (ch === '}') {
-          braceDepth = Math.max(0, braceDepth - 1);
-          if (
-            templateBraceStack.length > 0 &&
-            braceDepth === templateBraceStack[templateBraceStack.length - 1]
-          ) {
-            templateBraceStack.pop();
-            inQuote = '`';
-          }
-          continue;
-        }
-
-        if (
-          parenDepth === 0 &&
-          bracketDepth === 0 &&
-          braceDepth === 0 &&
-          inQuote === null &&
-          !inLineComment &&
-          !inBlockComment &&
-          !inRegex
-        ) {
-          const res = onDepthZero(i, ch);
-          if (typeof res === 'number') return res;
-          if (res === true) return i;
-        }
-      }
-      return -1;
-    }
-
-    function hasMatchingOuterParens(str: string): boolean {
-      if (!str.startsWith('(') || !str.endsWith(')')) return false;
-      let parenDepth = 0;
-      let inQuote: string | null = null;
-      let isEscaped = false;
-
-      for (let i = 0; i < str.length - 1; i++) {
-        const ch = str[i]!;
-        if (inQuote !== null) {
-          if (isEscaped) isEscaped = false;
-          else if (ch === '\\') isEscaped = true;
-          else if (ch === inQuote) inQuote = null;
-          continue;
-        }
-        if (ch === '"' || ch === "'" || ch === '`') inQuote = ch;
-        else if (ch === '(') parenDepth++;
-        else if (ch === ')') parenDepth--;
-        if (parenDepth === 0) return false;
-      }
-      return parenDepth === 1;
-    }
-
     function findTopLevelIn(str: string): number {
-      return scanHeader(str, (i, ch) => {
+      return scanBalancedDelimiters(str, (i, ch) => {
         if (ch === 'i' && str[i + 1] === 'n') {
           const beforeWord = i === 0 || !/[a-zA-Z0-9_$]/.test(str[i - 1]!);
           const afterWord = i + 2 >= str.length || !/[a-zA-Z0-9_$]/.test(str[i + 2]!);
@@ -628,14 +449,12 @@ export class DriftParser {
     }
 
     function findTopLevelComma(str: string): number {
-      return scanHeader(str, (i, ch) => {
-        if (ch === ',') return true;
-      });
+      return findTopLevelChar(str, ',');
     }
 
     function findTopLevelKey(str: string): { index: number; keyExpr: string } | null {
       let matchIdx = -1;
-      scanHeader(str, (i) => {
+      scanBalancedDelimiters(str, (i) => {
         if (str.slice(i, i + 3) === 'key') {
           const beforeWord = i === 0 || !/[a-zA-Z0-9_$]/.test(str[i - 1]!);
           const afterWord = i + 3 >= str.length || !/[a-zA-Z0-9_$]/.test(str[i + 3]!);

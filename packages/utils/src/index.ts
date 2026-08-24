@@ -4,3 +4,4 @@ export * from './scope.js';
 export * from './evaluator.js';
 export * from './context.js';
 export * from './style.js';
+export * from './scanner.js';

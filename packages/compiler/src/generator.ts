@@ -574,6 +574,131 @@ function paramToJS(node: any, outerLocals?: Set<string>): string {
   }
 }
 
+function emitAssign(varName: string, expr: string, locals?: Set<string>): string {
+  if (locals && locals.has(varName)) {
+    return `(${varName} = ${expr})`;
+  }
+  return `(typeof setScopeValue === 'function' && scope ? setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}) : ((scope || {})[${JSON.stringify(varName)}] = ${expr}))`;
+}
+
+function generatePatternAssignments(
+  pattern: any,
+  sourceVar: string,
+  locals?: Set<string>,
+  tmpCounterRef = { count: 0 }
+): string[] {
+  const stmts: string[] = [];
+  if (!pattern) return stmts;
+
+  if (pattern.type === 'Identifier') {
+    stmts.push(emitAssign(pattern.name, sourceVar, locals));
+    return stmts;
+  }
+
+  if (pattern.type === 'AssignmentPattern') {
+    const defaultVal = astToJS(pattern.right, locals);
+    const valExpr = `((${sourceVar} !== undefined) ? ${sourceVar} : ${defaultVal})`;
+    if (pattern.left?.type === 'Identifier') {
+      stmts.push(emitAssign(pattern.left.name, valExpr, locals));
+    } else {
+      const tmp = `_t${tmpCounterRef.count++}`;
+      stmts.push(`const ${tmp} = ${valExpr}`);
+      stmts.push(...generatePatternAssignments(pattern.left, tmp, locals, tmpCounterRef));
+    }
+    return stmts;
+  }
+
+  if (pattern.type === 'ObjectPattern') {
+    for (const prop of (pattern.properties || [])) {
+      if (prop.type === 'Property') {
+        const isComputed = Boolean(prop.computed);
+        const keyExpr = isComputed
+          ? astToJS(prop.key, locals)
+          : (prop.key?.name !== undefined
+              ? JSON.stringify(prop.key.name)
+              : (typeof prop.key?.value === 'string' || typeof prop.key?.value === 'number'
+                  ? JSON.stringify(prop.key.value)
+                  : astToJS(prop.key, locals)));
+
+        if (prop.value?.type === 'Identifier') {
+          const expr = `(${sourceVar} ? ${sourceVar}[${keyExpr}] : undefined)`;
+          stmts.push(emitAssign(prop.value.name, expr, locals));
+        } else if (prop.value?.type === 'AssignmentPattern') {
+          const defaultVal = astToJS(prop.value.right, locals);
+          const valExpr = `((${sourceVar} && ${sourceVar}[${keyExpr}] !== undefined) ? ${sourceVar}[${keyExpr}] : ${defaultVal})`;
+          if (prop.value.left?.type === 'Identifier') {
+            stmts.push(emitAssign(prop.value.left.name, valExpr, locals));
+          } else {
+            const tmp = `_t${tmpCounterRef.count++}`;
+            stmts.push(`const ${tmp} = ${valExpr}`);
+            stmts.push(...generatePatternAssignments(prop.value.left, tmp, locals, tmpCounterRef));
+          }
+        } else if (prop.value?.type === 'ObjectPattern' || prop.value?.type === 'ArrayPattern') {
+          const tmp = `_t${tmpCounterRef.count++}`;
+          const valExpr = `(${sourceVar} ? ${sourceVar}[${keyExpr}] : undefined)`;
+          stmts.push(`const ${tmp} = ${valExpr}`);
+          stmts.push(...generatePatternAssignments(prop.value, tmp, locals, tmpCounterRef));
+        } else {
+          const varName = prop.value?.name || astToJS(prop.value, locals);
+          if (varName) {
+            const expr = `(${sourceVar} ? ${sourceVar}[${keyExpr}] : undefined)`;
+            stmts.push(emitAssign(varName, expr, locals));
+          }
+        }
+      } else if (prop.type === 'RestElement') {
+        const varName = prop.argument?.name || astToJS(prop.argument, locals);
+        if (varName) {
+          const knownKeys = (pattern.properties || [])
+            .filter((p: any) => p.type === 'Property')
+            .map((p: any) => p.key?.name || (typeof p.key?.value === 'string' ? p.key.value : ''))
+            .filter(Boolean);
+          const expr = `(() => { const _r = Object.assign({}, ${sourceVar}); ${JSON.stringify(knownKeys)}.forEach(k => delete _r[k]); return _r; })()`;
+          stmts.push(emitAssign(varName, expr, locals));
+        }
+      }
+    }
+    return stmts;
+  }
+
+  if (pattern.type === 'ArrayPattern') {
+    const tmpArr = `_a${tmpCounterRef.count++}`;
+    stmts.push(`const ${tmpArr} = (typeof resolveIterable === 'function' ? resolveIterable(${sourceVar}) : (${sourceVar} || []))`);
+    const elems = pattern.elements || [];
+    for (let i = 0; i < elems.length; i++) {
+      const el = elems[i];
+      if (!el) continue;
+      if (el.type === 'Identifier') {
+        const expr = `(${tmpArr} ? ${tmpArr}[${i}] : undefined)`;
+        stmts.push(emitAssign(el.name, expr, locals));
+      } else if (el.type === 'AssignmentPattern') {
+        const defaultVal = astToJS(el.right, locals);
+        const valExpr = `((${tmpArr} && ${tmpArr}[${i}] !== undefined) ? ${tmpArr}[${i}] : ${defaultVal})`;
+        if (el.left?.type === 'Identifier') {
+          stmts.push(emitAssign(el.left.name, valExpr, locals));
+        } else {
+          const tmp = `_t${tmpCounterRef.count++}`;
+          stmts.push(`const ${tmp} = ${valExpr}`);
+          stmts.push(...generatePatternAssignments(el.left, tmp, locals, tmpCounterRef));
+        }
+      } else if (el.type === 'RestElement') {
+        const varName = el.argument?.name || astToJS(el.argument, locals);
+        if (varName) {
+          const expr = `((${tmpArr} && typeof ${tmpArr}.slice === 'function') ? ${tmpArr}.slice(${i}) : [])`;
+          stmts.push(emitAssign(varName, expr, locals));
+        }
+      } else if (el.type === 'ObjectPattern' || el.type === 'ArrayPattern') {
+        const tmp = `_t${tmpCounterRef.count++}`;
+        const valExpr = `(${tmpArr} ? ${tmpArr}[${i}] : undefined)`;
+        stmts.push(`const ${tmp} = ${valExpr}`);
+        stmts.push(...generatePatternAssignments(el, tmp, locals, tmpCounterRef));
+      }
+    }
+    return stmts;
+  }
+
+  return stmts;
+}
+
 /**
  * Converts Acorn AST nodes or arrays of statements into valid JavaScript source code strings.
  */
@@ -656,84 +781,9 @@ export function astToJS(node: any, locals?: Set<string>): string {
           return `(() => { const _res = ${rawAssign}; if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(rootName)}, scope[${JSON.stringify(rootName)}]); return _res; })()`;
         }
       }
-      if (node.left?.type === 'ArrayPattern') {
-        const setCalls: string[] = [];
-        const elems = node.left.elements || [];
-        for (let i = 0; i < elems.length; i++) {
-          const el = elems[i];
-          if (el?.type === 'Identifier') {
-            const varName = el.name;
-            if (locals && locals.has(varName)) {
-              setCalls.push(`${varName} = _val[${i}];`);
-            } else {
-              setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, _val[${i}]); else (scope || {})[${JSON.stringify(varName)}] = _val[${i}];`);
-            }
-          } else if (el?.type === 'AssignmentPattern') {
-            const varName = el.left?.name || astToJS(el.left, locals);
-            const defaultValJS = astToJS(el.right, locals);
-            if (varName) {
-              const expr = `(_val[${i}] !== undefined ? _val[${i}] : ${defaultValJS})`;
-              if (locals && locals.has(varName)) {
-                setCalls.push(`${varName} = ${expr};`);
-              } else {
-                setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
-              }
-            }
-          } else if (el?.type === 'RestElement') {
-            const varName = el.argument?.name || astToJS(el.argument, locals);
-            if (varName) {
-              const expr = `((_val && typeof _val.slice === 'function') ? _val.slice(${i}) : [])`;
-              if (locals && locals.has(varName)) {
-                setCalls.push(`${varName} = ${expr};`);
-              } else {
-                setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
-              }
-            }
-          }
-        }
-        return `(() => { const _raw = ${valJS}; const _val = (typeof resolveIterable === 'function' ? resolveIterable(_raw) : (_raw || [])); ${setCalls.join(' ')} return _raw; })()`;
-      }
-      if (node.left?.type === 'ObjectPattern') {
-        const setCalls: string[] = [];
-        const props = node.left.properties || [];
-        for (const p of props) {
-          if (p.type === 'Property' && p.value?.type === 'Identifier') {
-            const propKey = p.key?.name || (typeof p.key?.value === 'string' ? p.key.value : String(p.key?.value));
-            const varName = p.value.name;
-            if (locals && locals.has(varName)) {
-              setCalls.push(`${varName} = _val[${JSON.stringify(propKey)}];`);
-            } else {
-              setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, _val[${JSON.stringify(propKey)}]); else (scope || {})[${JSON.stringify(varName)}] = _val[${JSON.stringify(propKey)}];`);
-            }
-          } else if (p.type === 'Property' && p.value?.type === 'AssignmentPattern') {
-            const propKey = p.key?.name || (typeof p.key?.value === 'string' ? p.key.value : String(p.key?.value));
-            const varName = p.value.left?.name || astToJS(p.value.left, locals);
-            const defaultValJS = astToJS(p.value.right, locals);
-            if (varName) {
-              const expr = `(_val[${JSON.stringify(propKey)}] !== undefined ? _val[${JSON.stringify(propKey)}] : ${defaultValJS})`;
-              if (locals && locals.has(varName)) {
-                setCalls.push(`${varName} = ${expr};`);
-              } else {
-                setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
-              }
-            }
-          } else if (p.type === 'RestElement') {
-            const varName = p.argument?.name || astToJS(p.argument, locals);
-            if (varName) {
-              const knownKeys = (node.left.properties || [])
-                .filter((prop: any) => prop.type === 'Property')
-                .map((prop: any) => prop.key?.name || (typeof prop.key?.value === 'string' ? prop.key.value : ''))
-                .filter(Boolean);
-              const expr = `(() => { const _r = Object.assign({}, _val); ${JSON.stringify(knownKeys)}.forEach(k => delete _r[k]); return _r; })()`;
-              if (locals && locals.has(varName)) {
-                setCalls.push(`${varName} = ${expr};`);
-              } else {
-                setCalls.push(`if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(varName)}, ${expr}); else (scope || {})[${JSON.stringify(varName)}] = ${expr};`);
-              }
-            }
-          }
-        }
-        return `(() => { const _val = ${valJS} || {}; ${setCalls.join(' ')} return _val; })()`;
+      if (node.left?.type === 'ObjectPattern' || node.left?.type === 'ArrayPattern') {
+        const setCalls = generatePatternAssignments(node.left, '_val', locals);
+        return `((_val) => { ${setCalls.join('; ')}; return _val; })(${valJS})`;
       }
       return `(${astToJS(node.left, locals)} ${node.operator} ${valJS})`;
     }
@@ -1065,122 +1115,6 @@ export function astToJS(node: any, locals?: Set<string>): string {
       }
 
       const declsArr: string[] = [];
-function generatePatternAssignments(
-  pattern: any,
-  sourceVar: string,
-  locals?: Set<string>,
-  tmpCounterRef = { count: 0 }
-): string[] {
-  const stmts: string[] = [];
-  if (!pattern) return stmts;
-
-  if (pattern.type === 'Identifier') {
-    stmts.push(`((scope || {})[${JSON.stringify(pattern.name)}] = ${sourceVar})`);
-    return stmts;
-  }
-
-  if (pattern.type === 'AssignmentPattern') {
-    const defaultVal = astToJS(pattern.right, locals);
-    const valExpr = `((${sourceVar} !== undefined) ? ${sourceVar} : ${defaultVal})`;
-    if (pattern.left?.type === 'Identifier') {
-      stmts.push(`((scope || {})[${JSON.stringify(pattern.left.name)}] = ${valExpr})`);
-    } else {
-      const tmp = `_t${tmpCounterRef.count++}`;
-      stmts.push(`const ${tmp} = ${valExpr}`);
-      stmts.push(...generatePatternAssignments(pattern.left, tmp, locals, tmpCounterRef));
-    }
-    return stmts;
-  }
-
-  if (pattern.type === 'ObjectPattern') {
-    for (const prop of (pattern.properties || [])) {
-      if (prop.type === 'Property') {
-        const isComputed = Boolean(prop.computed);
-        const keyExpr = isComputed
-          ? astToJS(prop.key, locals)
-          : (prop.key?.name !== undefined
-              ? JSON.stringify(prop.key.name)
-              : (typeof prop.key?.value === 'string' || typeof prop.key?.value === 'number'
-                  ? JSON.stringify(prop.key.value)
-                  : astToJS(prop.key, locals)));
-
-        if (prop.value?.type === 'Identifier') {
-          const expr = `(${sourceVar} ? ${sourceVar}[${keyExpr}] : undefined)`;
-          stmts.push(`((scope || {})[${JSON.stringify(prop.value.name)}] = ${expr})`);
-        } else if (prop.value?.type === 'AssignmentPattern') {
-          const defaultVal = astToJS(prop.value.right, locals);
-          const valExpr = `((${sourceVar} && ${sourceVar}[${keyExpr}] !== undefined) ? ${sourceVar}[${keyExpr}] : ${defaultVal})`;
-          if (prop.value.left?.type === 'Identifier') {
-            stmts.push(`((scope || {})[${JSON.stringify(prop.value.left.name)}] = ${valExpr})`);
-          } else {
-            const tmp = `_t${tmpCounterRef.count++}`;
-            stmts.push(`const ${tmp} = ${valExpr}`);
-            stmts.push(...generatePatternAssignments(prop.value.left, tmp, locals, tmpCounterRef));
-          }
-        } else if (prop.value?.type === 'ObjectPattern' || prop.value?.type === 'ArrayPattern') {
-          const tmp = `_t${tmpCounterRef.count++}`;
-          const valExpr = `(${sourceVar} ? ${sourceVar}[${keyExpr}] : undefined)`;
-          stmts.push(`const ${tmp} = ${valExpr}`);
-          stmts.push(...generatePatternAssignments(prop.value, tmp, locals, tmpCounterRef));
-        } else {
-          const varName = prop.value?.name || astToJS(prop.value, locals);
-          if (varName) {
-            const expr = `(${sourceVar} ? ${sourceVar}[${keyExpr}] : undefined)`;
-            stmts.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
-          }
-        }
-      } else if (prop.type === 'RestElement') {
-        const varName = prop.argument?.name || astToJS(prop.argument, locals);
-        if (varName) {
-          const knownKeys = (pattern.properties || [])
-            .filter((p: any) => p.type === 'Property')
-            .map((p: any) => p.key?.name || (typeof p.key?.value === 'string' ? p.key.value : ''))
-            .filter(Boolean);
-          const expr = `(() => { const _r = Object.assign({}, ${sourceVar}); ${JSON.stringify(knownKeys)}.forEach(k => delete _r[k]); return _r; })()`;
-          stmts.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
-        }
-      }
-    }
-    return stmts;
-  }
-
-  if (pattern.type === 'ArrayPattern') {
-    const elems = pattern.elements || [];
-    for (let i = 0; i < elems.length; i++) {
-      const el = elems[i];
-      if (!el) continue;
-      if (el.type === 'Identifier') {
-        const expr = `(${sourceVar} ? ${sourceVar}[${i}] : undefined)`;
-        stmts.push(`((scope || {})[${JSON.stringify(el.name)}] = ${expr})`);
-      } else if (el.type === 'AssignmentPattern') {
-        const defaultVal = astToJS(el.right, locals);
-        const valExpr = `((${sourceVar} && ${sourceVar}[${i}] !== undefined) ? ${sourceVar}[${i}] : ${defaultVal})`;
-        if (el.left?.type === 'Identifier') {
-          stmts.push(`((scope || {})[${JSON.stringify(el.left.name)}] = ${valExpr})`);
-        } else {
-          const tmp = `_t${tmpCounterRef.count++}`;
-          stmts.push(`const ${tmp} = ${valExpr}`);
-          stmts.push(...generatePatternAssignments(el.left, tmp, locals, tmpCounterRef));
-        }
-      } else if (el.type === 'RestElement') {
-        const varName = el.argument?.name || astToJS(el.argument, locals);
-        if (varName) {
-          const expr = `((${sourceVar} && typeof ${sourceVar}.slice === 'function') ? ${sourceVar}.slice(${i}) : [])`;
-          stmts.push(`((scope || {})[${JSON.stringify(varName)}] = ${expr})`);
-        }
-      } else if (el.type === 'ObjectPattern' || el.type === 'ArrayPattern') {
-        const tmp = `_t${tmpCounterRef.count++}`;
-        const valExpr = `(${sourceVar} ? ${sourceVar}[${i}] : undefined)`;
-        stmts.push(`const ${tmp} = ${valExpr}`);
-        stmts.push(...generatePatternAssignments(el, tmp, locals, tmpCounterRef));
-      }
-    }
-    return stmts;
-  }
-
-  return stmts;
-}
-
       if (node.declarations) {
         for (const d of node.declarations) {
           if (d.id?.type === 'ObjectPattern' || d.id?.type === 'ArrayPattern') {

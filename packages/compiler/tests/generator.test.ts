@@ -367,5 +367,22 @@ describe('DriftGenerator', () => {
     expect(module.declaredVars).toContain('f');
     expect(module.declaredVars).toContain('restObj');
   });
+
+  it('BUG-027: unified destructuring assignments support nested objects, arrays, and defaults in expressions and statements', () => {
+    const src = `
+      <script>
+        let x = 0;
+        let y = 0;
+        function update(source) {
+          ({ a: x, b: { c: y = 42 } } = source);
+        }
+      </script>
+      <button onclick={ () => update({ a: 1, b: {} }) }>Click</button>
+    `;
+    const module = compile(src);
+    expect(module.declaredVars).toContain('x');
+    expect(module.declaredVars).toContain('y');
+    expect(module.declaredVars).toContain('update');
+  });
 });
 

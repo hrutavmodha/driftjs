@@ -31,7 +31,8 @@
   "license": "MIT",
   "dependencies": {
     "driftjs-dom": "workspace:*",
-    "driftjs-shared": "workspace:*"
+    "driftjs-shared": "workspace:*",
+    "path-to-regexp": "^6.3.0"
   },
   "devDependencies": {
     "driftjs-compiler": "workspace:*",

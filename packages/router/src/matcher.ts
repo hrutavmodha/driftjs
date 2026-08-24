@@ -7,6 +7,9 @@ import type {
   RouteQuery,
   RouteComponent,
 } from '../types/index.js';
+import { normalizePath } from './path.js';
+
+export { normalizePath };
 
 /**
  * Safely decodes a URI component.
@@ -20,7 +23,7 @@ function safeDecode(str: string): string {
 }
 
 /**
- * Parses a search query string into a RouteQuery object.
+ * Parses a search query string into a RouteQuery object using URLSearchParams.
  */
 export function parseQuery(search: string): RouteQuery {
   const query: RouteQuery = Object.create(null);
@@ -29,41 +32,39 @@ export function parseQuery(search: string): RouteQuery {
   const raw = search.startsWith('?') ? search.slice(1) : search;
   if (!raw) return query;
 
-  const pairs = raw.split('&');
-  for (const pair of pairs) {
-    if (!pair) continue;
-    const eqIdx = pair.indexOf('=');
-    let key: string;
-    let val: string | null = null;
+  const params = new URLSearchParams(raw);
+  const seenKeys = new Set<string>();
 
+  for (const key of params.keys()) {
+    if (key === '__proto__' || seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    const values = params.getAll(key);
+    query[key] = values.length > 1 ? values : (values[0] ?? null);
+  }
+
+  // Handle boolean flags without '=' (e.g. '?flag&tag=a')
+  for (const segment of raw.split('&')) {
+    if (!segment) continue;
+    const eqIdx = segment.indexOf('=');
     if (eqIdx === -1) {
-      key = safeDecode(pair);
-      val = null;
-    } else {
-      key = safeDecode(pair.slice(0, eqIdx));
-      val = safeDecode(pair.slice(eqIdx + 1));
-    }
-
-    if (key === '__proto__') continue;
-
-    if (Object.prototype.hasOwnProperty.call(query, key)) {
-      const existing = query[key];
-      if (Array.isArray(existing)) {
-        (existing as (string | null)[]).push(val);
-      } else if (existing !== undefined) {
-        query[key] = [existing as string | null, val];
+      try {
+        const decoded = decodeURIComponent(segment);
+        if (decoded !== '__proto__' && query[decoded] === '') {
+          query[decoded] = null;
+        }
+      } catch {
+        if (segment !== '__proto__' && query[segment] === '') {
+          query[segment] = null;
+        }
       }
-    } else {
-      query[key] = val;
     }
-
   }
 
   return query;
 }
 
 /**
- * Serializes a RouteQuery object into an encoded search query string.
+ * Serializes a RouteQuery object into an encoded search query string using URLSearchParams.
  */
 export function stringifyQuery(query: RouteQuery): string {
   const keys = Object.keys(query);
@@ -71,6 +72,7 @@ export function stringifyQuery(query: RouteQuery): string {
 
   const parts: string[] = [];
   for (const key of keys) {
+    if (key === '__proto__') continue;
     const val = query[key];
     if (val === undefined) continue;
 
@@ -93,142 +95,25 @@ export function stringifyQuery(query: RouteQuery): string {
   return parts.length > 0 ? '?' + parts.join('&') : '';
 }
 
-/**
- * Normalizes a URL path string (strips redundant slashes and trailing slashes).
- */
-export function normalizePath(path: string): string {
-  if (!path || path === '/') return '/';
-  let norm = path.replace(/\/+/g, '/');
-  if (!norm.startsWith('/')) norm = '/' + norm;
-  if (norm.length > 1 && norm.endsWith('/')) norm = norm.slice(0, -1);
-  return norm;
-}
+
+import { pathToRegexp, compile as compilePath, type Key } from 'path-to-regexp';
 
 function interpolatePathParams(path: string, params: Record<string, any>): string {
-  let result = '';
-  let i = 0;
-  const len = path.length;
-
-  while (i < len) {
-    const ch = path[i]!;
-
-    if (ch === '/') {
-      // Check for wildcard /*
-      if (path[i + 1] === '*') {
-        if ('pathMatch' in params) {
-          const val = params['pathMatch'];
-          if (val !== undefined && val !== null) {
-            result += '/' + (Array.isArray(val) ? val.join('/') : String(val));
-          }
-        }
-        i += 2;
-        continue;
+  try {
+    const normalized = path.replace(/\/\*$/, '/:pathMatch(.*)');
+    const toPath = compilePath(normalized, { validate: false, encode: (v) => v });
+    return toPath(params);
+  } catch {
+    let result = path;
+    for (const [k, v] of Object.entries(params)) {
+      if (k === 'pathMatch') {
+        result = result.replace(/\/\*$/, '/' + (Array.isArray(v) ? v.join('/') : String(v)));
+      } else {
+        result = result.replace(new RegExp(`:${k}\\b(?:\\([^)]+\\))?[?*+]?`, 'g'), Array.isArray(v) ? v.join('/') : String(v));
       }
-      // Check for optional param following /: e.g. /:id? or /:id(\d+)?
-      if (path[i + 1] === ':') {
-        let peek = i + 2;
-        let pName = '';
-        while (peek < len && /[a-zA-Z0-9_$]/.test(path[peek]!)) {
-          pName += path[peek]!;
-          peek++;
-        }
-        if (peek < len && path[peek] === '(') {
-          peek++;
-          let depth = 1;
-          while (peek < len && depth > 0) {
-            if (path[peek] === '\\') {
-              peek += 2;
-              continue;
-            }
-            if (path[peek] === '(') depth++;
-            if (path[peek] === ')') {
-              depth--;
-              if (depth === 0) {
-                peek++;
-                break;
-              }
-            }
-            peek++;
-          }
-        }
-        let modifier = '';
-        if (peek < len && (path[peek] === '?' || path[peek] === '*' || path[peek] === '+')) {
-          modifier = path[peek]!;
-          peek++;
-        }
-
-        if (modifier === '?' && (peek === len || path[peek] === '/')) {
-          const val = params[pName];
-          if (val !== undefined && val !== null) {
-            result += '/' + (Array.isArray(val) ? val.join('/') : String(val));
-          }
-          i = peek;
-          continue;
-        }
-      }
-
-      result += '/';
-      i++;
-      continue;
     }
-
-    if (ch === '*') {
-      if ('pathMatch' in params) {
-        const val = params['pathMatch'];
-        if (val !== undefined && val !== null) {
-          result += Array.isArray(val) ? val.join('/') : String(val);
-        }
-      }
-      i++;
-      continue;
-    }
-
-    if (ch === ':') {
-      i++;
-      let paramName = '';
-      while (i < len && /[a-zA-Z0-9_$]/.test(path[i]!)) {
-        paramName += path[i]!;
-        i++;
-      }
-
-      if (i < len && path[i] === '(') {
-        i++;
-        let depth = 1;
-        while (i < len && depth > 0) {
-          if (path[i] === '\\') {
-            i += 2;
-            continue;
-          }
-          if (path[i] === '(') depth++;
-          if (path[i] === ')') {
-            depth--;
-            if (depth === 0) {
-              i++;
-              break;
-            }
-          }
-          i++;
-        }
-      }
-
-      if (i < len && (path[i] === '?' || path[i] === '*' || path[i] === '+')) {
-        i++;
-      }
-
-      if (paramName in params) {
-        const val = params[paramName];
-        if (val !== undefined && val !== null) {
-          result += Array.isArray(val) ? val.join('/') : String(val);
-        }
-      }
-      continue;
-    }
-
-    result += ch;
-    i++;
+    return result;
   }
-
-  return result;
 }
 
 interface PathTokens {
@@ -237,62 +122,10 @@ interface PathTokens {
   score: number;
 }
 
-function toNonCapturing(pattern: string): string {
-  let result = '';
-  let inCharClass = false;
-  let isEscaped = false;
-
-  for (let i = 0; i < pattern.length; i++) {
-    const ch = pattern[i]!;
-
-    if (isEscaped) {
-      result += ch;
-      isEscaped = false;
-      continue;
-    }
-
-    if (ch === '\\') {
-      result += ch;
-      isEscaped = true;
-      continue;
-    }
-
-    if (inCharClass) {
-      result += ch;
-      if (ch === ']') {
-        inCharClass = false;
-      }
-      continue;
-    }
-
-    if (ch === '[') {
-      inCharClass = true;
-      result += ch;
-      continue;
-    }
-
-    if (ch === '(') {
-      if (pattern[i + 1] === '?') {
-        result += ch;
-      } else {
-        result += '(?:';
-      }
-      continue;
-    }
-
-    result += ch;
-  }
-
-  return result;
-}
-
 /**
- * Compiles a path pattern string into a RegExp and parameter list.
+ * Compiles a path pattern string into a RegExp and parameter list using path-to-regexp.
  */
 export function compilePathToRegex(path: string): PathTokens {
-  const paramNames: string[] = [];
-  let score = 0;
-
   if (path === '/' || path === '') {
     return {
       regex: /^\/?$/,
@@ -301,241 +134,35 @@ export function compilePathToRegex(path: string): PathTokens {
     };
   }
 
-  let regexStr = '^';
-  let i = 0;
-  const len = path.length;
+  const normalized = path.replace(/\/\*$/, '/(.*)');
+  const keys: Key[] = [];
+  const regex = pathToRegexp(normalized, keys, {
+    sensitive: false,
+    strict: false,
+    end: true,
+  });
 
-  while (i < len) {
-    const ch = path[i]!;
+  const paramNames = keys.map((k) => (typeof k.name === 'number' ? 'pathMatch' : String(k.name)));
 
-    if (ch === '/') {
-      // Wildcard /*
-      if (path[i + 1] === '*') {
-        paramNames.push('pathMatch');
-        regexStr += '(?:/(.*))?';
-        score += 1;
-        i += 2;
-        continue;
-      }
-
-      // Check if following parameter is an optional segment (e.g. /:id? or /:id(\d+)?)
-      if (path[i + 1] === ':') {
-        let peek = i + 2;
-        let pName = '';
-        while (peek < len && /[a-zA-Z0-9_$]/.test(path[peek]!)) {
-          pName += path[peek]!;
-          peek++;
-        }
-
-        let customRegex: string | null = null;
-        if (peek < len && path[peek] === '(') {
-          peek++;
-          let depth = 1;
-          let inCharClass = false;
-          let isEscaped = false;
-          let cReg = '';
-          while (peek < len && depth > 0) {
-            const c = path[peek]!;
-            if (isEscaped) {
-              cReg += c;
-              isEscaped = false;
-              peek++;
-              continue;
-            }
-            if (c === '\\') {
-              cReg += c;
-              isEscaped = true;
-              peek++;
-              continue;
-            }
-            if (inCharClass) {
-              cReg += c;
-              if (c === ']') inCharClass = false;
-              peek++;
-              continue;
-            }
-            if (c === '[') {
-              inCharClass = true;
-              cReg += c;
-              peek++;
-              continue;
-            }
-            if (c === '(') {
-              depth++;
-              cReg += c;
-              peek++;
-              continue;
-            }
-            if (c === ')') {
-              depth--;
-              if (depth === 0) {
-                peek++;
-                break;
-              } else {
-                cReg += c;
-                peek++;
-                continue;
-              }
-            }
-            cReg += c;
-            peek++;
-          }
-          customRegex = cReg;
-        }
-
-        let modifier = '';
-        if (peek < len && (path[peek] === '?' || path[peek] === '*' || path[peek] === '+')) {
-          modifier = path[peek]!;
-          peek++;
-        }
-
-        if (modifier === '?' && (peek === len || path[peek] === '/')) {
-          paramNames.push(pName);
-          if (customRegex !== null) {
-            const nonCap = toNonCapturing(customRegex);
-            regexStr += `(?:/(${nonCap}))?`;
-            score += 25;
-          } else {
-            regexStr += '(?:/([^/]+))?';
-            score += 15;
-          }
-          i = peek;
-          continue;
-        }
-      }
-
-      regexStr += '/';
-      score += 10;
-      i++;
-      continue;
-    }
-
-    if (ch === '*') {
-      paramNames.push('pathMatch');
-      regexStr += '(?:/(.*))?';
+  let score = 0;
+  for (const segment of path.split('/').filter(Boolean)) {
+    if (segment === '*') {
       score += 1;
-      i++;
-      continue;
-    }
-
-    if (ch === ':') {
-      i++;
-      let paramName = '';
-      while (i < len && /[a-zA-Z0-9_$]/.test(path[i]!)) {
-        paramName += path[i]!;
-        i++;
-      }
-
-      let customRegex: string | null = null;
-      if (i < len && path[i] === '(') {
-        i++;
-        let depth = 1;
-        let inCharClass = false;
-        let isEscaped = false;
-        let cReg = '';
-        while (i < len && depth > 0) {
-          const c = path[i]!;
-          if (isEscaped) {
-            cReg += c;
-            isEscaped = false;
-            i++;
-            continue;
-          }
-          if (c === '\\') {
-            cReg += c;
-            isEscaped = true;
-            i++;
-            continue;
-          }
-          if (inCharClass) {
-            cReg += c;
-            if (c === ']') inCharClass = false;
-            i++;
-            continue;
-          }
-          if (c === '[') {
-            inCharClass = true;
-            cReg += c;
-            i++;
-            continue;
-          }
-          if (c === '(') {
-            depth++;
-            cReg += c;
-            i++;
-            continue;
-          }
-          if (c === ')') {
-            depth--;
-            if (depth === 0) {
-              i++;
-              break;
-            } else {
-              cReg += c;
-              i++;
-              continue;
-            }
-          }
-          cReg += c;
-          i++;
-        }
-        customRegex = cReg;
-      }
-
-      let modifier = '';
-      if (i < len && (path[i] === '?' || path[i] === '*' || path[i] === '+')) {
-        modifier = path[i]!;
-        i++;
-      }
-
-      paramNames.push(paramName);
-
-      if (customRegex !== null) {
-        const nonCap = toNonCapturing(customRegex);
-        if (modifier === '?') {
-          regexStr += `(${nonCap})?`;
-          score += 25;
-        } else if (modifier === '*') {
-          regexStr += `(${nonCap})*`;
-          score += 5;
-        } else if (modifier === '+') {
-          regexStr += `(${nonCap})+`;
-          score += 30;
-        } else {
-          regexStr += `(${nonCap})`;
-          score += 30;
-        }
+    } else if (segment.includes(':')) {
+      if (segment.includes('(')) {
+        score += 30;
+      } else if (segment.includes('?')) {
+        score += 15;
       } else {
-        if (modifier === '?') {
-          regexStr += '([^/]+)?';
-          score += 15;
-        } else if (modifier === '*') {
-          regexStr += '(.*)';
-          score += 5;
-        } else if (modifier === '+') {
-          regexStr += '([^/]+)';
-          score += 20;
-        } else {
-          regexStr += '([^/]+)';
-          score += 20;
-        }
+        score += 20;
       }
-      continue;
-    }
-
-    if (/[.*+?^${}()|[\]\\]/.test(ch)) {
-      regexStr += '\\' + ch;
     } else {
-      regexStr += ch;
+      score += 10;
     }
-    score += 10;
-    i++;
   }
 
-  regexStr += '/?$';
-
   return {
-    regex: new RegExp(regexStr),
+    regex,
     paramNames,
     score,
   };

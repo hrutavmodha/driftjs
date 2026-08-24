@@ -10,6 +10,10 @@ import {
   camelToKebab,
   MAX_REGISTERS,
   VOID_ELEMENTS,
+  scanBalancedDelimiters,
+  findTopLevelChar,
+  splitPatternEntries,
+  hasMatchingOuterParens,
 } from '../src/index.js';
 
 describe('driftjs-shared Module', () => {
@@ -154,6 +158,31 @@ describe('driftjs-shared Module', () => {
         { backgroundColor: 'blue', borderRadius: 4 },
       ];
       expect(normalizeStyle(styles)).toBe('color: red; padding: 8px; background-color: blue; border-radius: 4px');
+    });
+  });
+
+  describe('Balanced Scanner Utilities (BUG-028)', () => {
+    it('findTopLevelChar correctly finds chars at depth 0 ignoring quotes, comments, regex, and brackets', () => {
+      const expr = `(a, b = "x,y", c = [1, 2], d = { key: 'a,b' }) => a + b`;
+      expect(findTopLevelChar(expr, '>')).toBe(48);
+      expect(findTopLevelChar(`a, b /* comment with , */, c`, ',')).toBe(1);
+    });
+
+    it('splitPatternEntries splits top-level pattern commas accurately', () => {
+      const pattern = `a, { b, c = 10, d: [e, f = 'hello, world'] }, ...rest`;
+      const entries = splitPatternEntries(pattern);
+      expect(entries).toEqual([
+        'a',
+        "{ b, c = 10, d: [e, f = 'hello, world'] }",
+        '...rest',
+      ]);
+    });
+
+    it('hasMatchingOuterParens determines if string is enclosed in matching parens', () => {
+      expect(hasMatchingOuterParens('(item, index)')).toBe(true);
+      expect(hasMatchingOuterParens('(item, index) in list')).toBe(false);
+      expect(hasMatchingOuterParens('(a) + (b)')).toBe(false);
+      expect(hasMatchingOuterParens('item')).toBe(false);
     });
   });
 });

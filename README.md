@@ -8,6 +8,14 @@
   <img src="assets/icon.png" alt="DriftJS Logo" width="180" />
 </div>
 
+
+
+Have questions, feature ideas, or want to discuss compiler optimizations and register VM architecture?
+
+[![Join Discord](<https://img.shields.io/badge/%20Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white>)](https://discord.gg/T66TStRvd)
+
+Connect with core developers, ask questions, share feedback, and help shape the future of DriftJS.
+
 ---
 
 ## 📌 Overview
@@ -55,9 +63,9 @@ npm create drift my-app
 
 DriftJS is organized as a monorepo published on npm:
 
-| Package | Path | Description |
-| :--- | :--- | :--- |
-| **`create-drift`** | [`packages/cli`](packages/cli) | Interactive CLI scaffolding tool (`npm create drift`) |
+| Package                           | Path                                                | Description                                                                          |
+| :-------------------------------- | :-------------------------------------------------- | :----------------------------------------------------------------------------------- |
+| **`create-drift`**        | [`packages/cli`](packages/cli)                     | Interactive CLI scaffolding tool (`npm create drift`)                              |
 | **`driftjs-compiler`**    | [`packages/compiler`](packages/compiler)           | Lexer, Parser, Transformer, & Bytecode Generator emitting`CompiledModule` bytecode |
 | **`driftjs-dom`**         | [`packages/dom`](packages/dom)                     | 256-Register Client VM, Expression Engine, Keyed LIS reconciler, &`mount()` API    |
 | **`driftjs-ssr`**         | [`packages/ssr`](packages/ssr)                     | Headless Server-Side Rendering VM engine (`renderToString()`)                      |
@@ -375,16 +383,6 @@ We welcome contributions of all kinds! Whether you want to fix bugs, optimize VM
 4. Open a Pull Request detailing your changes.
 
 Together, let's make DriftJS a production-grade, ultra-fast UI framework!
-
----
-
-## 💬 Community & Discussion
-
-Have questions, feature ideas, or want to discuss compiler optimizations and register VM architecture?
-
-[![Join Discord](https://img.shields.io/badge/%20Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/T66TStRvd)
-
-Connect with core developers, ask questions, share feedback, and help shape the future of DriftJS.
 
 ---
 

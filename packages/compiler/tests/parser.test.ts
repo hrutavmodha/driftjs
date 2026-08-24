@@ -409,5 +409,13 @@ describe('DriftParser', () => {
     expect(text.type).toBe(ASTNodeType.Text);
     expect(text.content).toBe('Current: {count} & <h1> @if "hello"');
   });
+
+  it('BUG-032: decodes extended HTML5 named entities (mathematical, typographic, Greek, currency)', () => {
+    const src = '<span>&copy; &reg; &trade; &infin; &sum; &prod; &radic; &euro; &pound; &yen; &alpha; &beta; &omega; &mdash; &hellip;</span>';
+    const ast = new DriftParser(new DriftLexer(src)).parse();
+    const span = ast.body[0] as ElementNode;
+    const text = span.children[0] as TextNode;
+    expect(text.content).toBe('© ® ™ ∞ ∑ ∏ √ € £ ¥ α β ω — …');
+  });
 });
 

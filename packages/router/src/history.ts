@@ -5,41 +5,19 @@ import type {
   NavigationInformation,
   NavigationDirection,
 } from '../types/index.js';
+import {
+  normalizeBase,
+  stripBase,
+  createHref,
+  formatHashHref,
+} from './path.js';
 
-/**
- * Normalizes a base URL to ensure consistent leading and no redundant trailing slashes.
- */
-export function normalizeBase(base?: string): string {
-  if (!base) return '';
-  let normalized = base.trim();
-  if (!normalized.startsWith('/')) {
-    normalized = '/' + normalized;
-  }
-  if (normalized.length > 1 && normalized.endsWith('/')) {
-    normalized = normalized.slice(0, -1);
-  }
-  return normalized === '/' ? '' : normalized;
-}
-
-/**
- * Strips the base path from the beginning of a pathname.
- */
-export function stripBase(pathname: string, base: string): string {
-  if (!base) return pathname;
-  if (pathname.startsWith(base)) {
-    const stripped = pathname.slice(base.length);
-    return stripped.startsWith('/') ? stripped : '/' + stripped;
-  }
-  return pathname;
-}
-
-/**
- * Constructs a full URL href by combining the base path with the location.
- */
-export function createHref(base: string, location: string): string {
-  const normLoc = location.startsWith('/') ? location : '/' + location;
-  return base ? base + normLoc : normLoc;
-}
+export {
+  normalizeBase,
+  stripBase,
+  createHref,
+  formatHashHref,
+};
 
 /**
  * Creates an HTML5 History API driver (BrowserHistory).
@@ -159,11 +137,6 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
     return raw.startsWith('/') ? raw : '/' + raw;
   };
 
-  const formatHashHref = (location: string): string => {
-    const cleanLoc = location.startsWith('/') ? location : '/' + location;
-    return (normalizedBase ? normalizedBase : '') + '#' + cleanLoc;
-  };
-
   let currentLocation = getHashLocation();
   let currentPos = (typeof window !== 'undefined' && window.history.state && typeof window.history.state.__drift_pos === 'number')
     ? window.history.state.__drift_pos
@@ -171,7 +144,7 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
 
   if (typeof window !== 'undefined' && (window.history.state == null || typeof window.history.state.__drift_pos !== 'number')) {
     const existing = window.history.state || {};
-    window.history.replaceState({ ...existing, __drift_pos: currentPos }, '', formatHashHref(currentLocation));
+    window.history.replaceState({ ...existing, __drift_pos: currentPos }, '', formatHashHref(normalizedBase, currentLocation));
   }
 
   const changeListener = (_event: Event) => {
@@ -227,14 +200,14 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
     push(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
       currentPos++;
-      const href = formatHashHref(to);
+      const href = formatHashHref(normalizedBase, to);
       const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
       window.history.pushState(stateObj, '', href);
       currentLocation = to;
     },
     replace(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
-      const href = formatHashHref(to);
+      const href = formatHashHref(normalizedBase, to);
       const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
       window.history.replaceState(stateObj, '', href);
       currentLocation = to;

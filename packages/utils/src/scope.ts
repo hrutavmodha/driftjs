@@ -1,4 +1,5 @@
 import { resolveIterable } from './evaluator.js';
+import { splitPatternEntries, findTopLevelChar } from './scanner.js';
 
 /**
  * Sets a variable in scope, updating parent scope if it exists higher in prototype chain.
@@ -99,87 +100,6 @@ export const _get = getScopeValue;
 
 if (typeof globalThis !== 'undefined' && !(globalThis as any)._get) {
   (globalThis as any)._get = getScopeValue;
-}
-
-function splitPatternEntries(str: string): string[] {
-  const entries: string[] = [];
-  let current = '';
-  let parenDepth = 0;
-  let bracketDepth = 0;
-  let braceDepth = 0;
-  let inQuote: string | null = null;
-  let isEscaped = false;
-
-  for (let i = 0; i < str.length; i++) {
-    const ch = str[i]!;
-    if (inQuote !== null) {
-      current += ch;
-      if (isEscaped) {
-        isEscaped = false;
-      } else if (ch === '\\') {
-        isEscaped = true;
-      } else if (ch === inQuote) {
-        inQuote = null;
-      }
-      continue;
-    }
-
-    if (ch === '"' || ch === "'" || ch === '`') {
-      inQuote = ch;
-      current += ch;
-      continue;
-    }
-
-    if (ch === '(') parenDepth++;
-    else if (ch === ')') parenDepth--;
-    else if (ch === '[') bracketDepth++;
-    else if (ch === ']') bracketDepth--;
-    else if (ch === '{') braceDepth++;
-    else if (ch === '}') braceDepth--;
-
-    if (ch === ',' && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
-      if (current.trim()) entries.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
-    }
-  }
-
-  if (current.trim()) entries.push(current.trim());
-  return entries;
-}
-
-function findTopLevelChar(str: string, targetChar: string): number {
-  let parenDepth = 0;
-  let bracketDepth = 0;
-  let braceDepth = 0;
-  let inQuote: string | null = null;
-  let isEscaped = false;
-
-  for (let i = 0; i < str.length; i++) {
-    const ch = str[i]!;
-    if (inQuote !== null) {
-      if (isEscaped) isEscaped = false;
-      else if (ch === '\\') isEscaped = true;
-      else if (ch === inQuote) inQuote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'" || ch === '`') {
-      inQuote = ch;
-      continue;
-    }
-    if (ch === '(') parenDepth++;
-    else if (ch === ')') parenDepth--;
-    else if (ch === '[') bracketDepth++;
-    else if (ch === ']') bracketDepth--;
-    else if (ch === '{') braceDepth++;
-    else if (ch === '}') braceDepth--;
-
-    if (ch === targetChar && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
-      return i;
-    }
-  }
-  return -1;
 }
 
 /**

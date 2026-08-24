@@ -28,7 +28,13 @@ export function scaffoldProject(options: ScaffoldOptions): void {
   }
 
   // Copy template files recursively
-  copyDirectory(templateDir, targetDir);
+  fs.cpSync(templateDir, targetDir, {
+    recursive: true,
+    filter: (src) => {
+      const base = path.basename(src);
+      return base !== 'node_modules' && base !== 'dist';
+    },
+  });
 
   // Update target package.json with custom project name and rendering dependencies
   const targetPkgPath = path.join(targetDir, 'package.json');
@@ -150,21 +156,4 @@ export function isDirectoryNotEmpty(dirPath: string): boolean {
   if (!fs.existsSync(dirPath)) return false;
   const files = fs.readdirSync(dirPath);
   return files.length > 0 && !(files.length === 1 && files[0] === '.git');
-}
-
-function copyDirectory(src: string, dest: string): void {
-  fs.mkdirSync(dest, { recursive: true });
-  const entries = fs.readdirSync(src, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-
-    if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
-      copyDirectory(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
 }

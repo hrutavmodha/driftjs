@@ -16,16 +16,6 @@ import {
   DriftParserError,
 } from '../types/index.js';
 
-function cloneAstNode<T>(node: T): T {
-  if (node === null || typeof node !== 'object') return node;
-  if (Array.isArray(node)) return node.map(cloneAstNode) as any;
-  const copy: any = {};
-  for (const key of Object.keys(node)) {
-    copy[key] = cloneAstNode((node as any)[key]);
-  }
-  return copy as T;
-}
-
 /**
  * Visitor methods for traversing and transforming Template AST nodes.
  */
@@ -337,7 +327,7 @@ export class DriftTransformer {
 
       let leftNode: acorn.Node;
       if (isSimple) {
-        leftNode = cloneAstNode(discAst);
+        leftNode = structuredClone(discAst);
       } else if (isFirstCase) {
         isFirstCase = false;
         leftNode = {
@@ -349,7 +339,7 @@ export class DriftTransformer {
             start: 0,
             end: 0,
           },
-          right: cloneAstNode(discAst),
+          right: structuredClone(discAst),
           start: 0,
           end: 0,
         } as any;
@@ -386,7 +376,7 @@ export class DriftTransformer {
         test: parsedTest,
         consequent,
         alternate,
-        extraDeps: cloneAstNode(discAst),
+        extraDeps: structuredClone(discAst),
         loc: c.loc,
       };
     };
