@@ -30,6 +30,24 @@ export function serializeValueToJS(val: unknown): string {
       const fnStr = (val as any).__drift_fn__;
       return `{ __drift_fn__: ${typeof fnStr === 'function' ? fnStr.toString() : fnStr} }`;
     }
+    if (val instanceof RegExp) {
+      return val.toString();
+    }
+    if (val instanceof Date) {
+      return `new Date(${val.getTime()})`;
+    }
+    if (val instanceof Set) {
+      return `new Set([${Array.from(val).map(serializeValueToJS).join(', ')}])`;
+    }
+    if (val instanceof Map) {
+      return `new Map([${Array.from(val.entries()).map(([k, v]) => `[${serializeValueToJS(k)}, ${serializeValueToJS(v)}]`).join(', ')}])`;
+    }
+    if (val instanceof Uint8Array) {
+      return `new Uint8Array([${Array.from(val).join(', ')}])`;
+    }
+    if (val instanceof Uint32Array) {
+      return `new Uint32Array([${Array.from(val).join(', ')}])`;
+    }
     if (Array.isArray(val)) {
       return `[${val.map(serializeValueToJS).join(', ')}]`;
     }

@@ -87,3 +87,49 @@ export interface ProgramNode extends BaseASTNode {
   readonly type: typeof ASTNodeType.Program;
   readonly body: readonly TemplateChildNode[];
 }
+
+/**
+ * Visitor methods for traversing and transforming Template AST nodes.
+ */
+export interface TemplateASTVisitor {
+  enter?: (
+    node: TemplateChildNode | ProgramNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | ProgramNode | TemplateChildNode[] | null | void;
+  leave?: (
+    node: TemplateChildNode | ProgramNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | ProgramNode | TemplateChildNode[] | null | void;
+  Element?: (
+    node: ElementNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | TemplateChildNode[] | null | void;
+  Text?: (
+    node: TextNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | TemplateChildNode[] | null | void;
+  Interpolation?: (
+    node: InterpolationNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | TemplateChildNode[] | null | void;
+  Comment?: (
+    node: CommentNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | TemplateChildNode[] | null | void;
+  If?: (
+    node: IfNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | TemplateChildNode[] | null | void;
+  For?: (
+    node: ForNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | TemplateChildNode[] | null | void;
+  Switch?: (
+    node: SwitchNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | TemplateChildNode[] | null | void;
+  Attribute?: (
+    node: AttributeNode,
+    parent: ElementNode
+  ) => AttributeNode | null | void;
+}

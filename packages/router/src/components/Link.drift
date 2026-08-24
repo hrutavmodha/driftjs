@@ -9,8 +9,6 @@
   let rel = props.rel || '';
   let customClass = props.class || '';
   let label = props.label || props.title || '';
-  let activeClass = '';
-  let href = '';
   let currentPath = router && router.currentRoute ? router.currentRoute.path : '';
 
   function getHref(targetTo, r) {
@@ -39,26 +37,10 @@
     return custom;
   }
 
-  function updateLink() {
-    to = props.to || to || '/';
-    replace = props.replace !== undefined ? props.replace : replace;
-    target = props.target || target || '_self';
-    rel = props.rel || rel || '';
-    customClass = props.class || customClass || '';
-    label = props.label || props.title || label || '';
-    href = getHref(to, router);
-    activeClass = getActiveClass(to, router, customClass, props.activeClass, props.exactActiveClass, currentPath);
-  }
-
-  updateLink();
-
   if (router && typeof router.subscribe === 'function') {
     const unsubscribe = router.subscribe(() => {
       currentPath = router.currentRoute.path;
-      updateLink();
       if (typeof __drift_mark_dirty__ === 'function') {
-        __drift_mark_dirty__('href');
-        __drift_mark_dirty__('activeClass');
         __drift_mark_dirty__('currentPath');
       }
     });

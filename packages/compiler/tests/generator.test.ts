@@ -384,5 +384,26 @@ describe('DriftGenerator', () => {
     expect(module.declaredVars).toContain('y');
     expect(module.declaredVars).toContain('update');
   });
+
+  it('correctly compiles CatchClause with destructured parameters and defaults (BUG-009)', () => {
+    const src = `
+      <script>
+        let result = '';
+        try {
+          throw { message: 'failed', code: 500 };
+        } catch ({ message = 'unknown', code = 0 }) {
+          result = message + ':' + code;
+        }
+      </script>
+      <div>{result}</div>
+    `;
+    const module = compile(src);
+    const scriptConst = module.constants.find((c) => typeof c === 'object' && c !== null && '__drift_fn__' in c);
+    expect(scriptConst).toBeDefined();
+    const fnStr = (scriptConst as any).__drift_fn__;
+    expect(fnStr).toContain('catch');
+    expect(fnStr).toContain('message');
+    expect(fnStr).toContain('code');
+  });
 });
 

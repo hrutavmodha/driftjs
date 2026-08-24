@@ -946,7 +946,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
         for (const name of extractBindingNames(node.param)) {
           newLocals.add(name);
         }
-        paramJS = paramToJS(node.param, locals);
+        paramJS = paramToJS(node.param, newLocals);
       }
       const bodyJS = astToJS(node.body, newLocals);
       return paramJS ? `catch (${paramJS}) ${bodyJS}` : `catch ${bodyJS}`;

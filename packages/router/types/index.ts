@@ -183,3 +183,17 @@ export interface LinkProps {
   rel?: string | undefined;
   class?: string | undefined;
 }
+
+export interface PathTokens {
+  regex: RegExp;
+  paramNames: string[];
+  score: number;
+}
+
+export interface RouteMatcher {
+  resolve(to: RouteLocationRaw, currentLocation?: RouteLocationNormalized): RouteLocationNormalized;
+  addRoute(parentOrRoute: string | RouteRecordRaw, route?: RouteRecordRaw): () => void;
+  removeRoute(name: string): void;
+  hasRoute(name: string): boolean;
+  getRoutes(): RouteRecordNormalized[];
+}

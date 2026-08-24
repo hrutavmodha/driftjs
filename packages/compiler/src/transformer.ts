@@ -10,57 +10,12 @@ import type {
   IfNode,
   ForNode,
   SwitchNode,
+  TemplateASTVisitor,
 } from '../types/index.js';
 import {
   ASTNodeType,
   DriftParserError,
 } from '../types/index.js';
-
-/**
- * Visitor methods for traversing and transforming Template AST nodes.
- */
-export interface TemplateASTVisitor {
-  enter?: (
-    node: TemplateChildNode | ProgramNode,
-    parent: TemplateChildNode | ProgramNode | null
-  ) => TemplateChildNode | ProgramNode | TemplateChildNode[] | null | void;
-  leave?: (
-    node: TemplateChildNode | ProgramNode,
-    parent: TemplateChildNode | ProgramNode | null
-  ) => TemplateChildNode | ProgramNode | TemplateChildNode[] | null | void;
-  Element?: (
-    node: ElementNode,
-    parent: TemplateChildNode | ProgramNode | null
-  ) => TemplateChildNode | TemplateChildNode[] | null | void;
-  Text?: (
-    node: TextNode,
-    parent: TemplateChildNode | ProgramNode | null
-  ) => TemplateChildNode | TemplateChildNode[] | null | void;
-  Interpolation?: (
-    node: InterpolationNode,
-    parent: TemplateChildNode | ProgramNode | null
-  ) => TemplateChildNode | TemplateChildNode[] | null | void;
-  Comment?: (
-    node: CommentNode,
-    parent: TemplateChildNode | ProgramNode | null
-  ) => TemplateChildNode | TemplateChildNode[] | null | void;
-  If?: (
-    node: IfNode,
-    parent: TemplateChildNode | ProgramNode | null
-  ) => TemplateChildNode | TemplateChildNode[] | null | void;
-  For?: (
-    node: ForNode,
-    parent: TemplateChildNode | ProgramNode | null
-  ) => TemplateChildNode | TemplateChildNode[] | null | void;
-  Switch?: (
-    node: SwitchNode,
-    parent: TemplateChildNode | ProgramNode | null
-  ) => TemplateChildNode | TemplateChildNode[] | null | void;
-  Attribute?: (
-    node: AttributeNode,
-    parent: ElementNode
-  ) => AttributeNode | null | void;
-}
 
 /**
  * Formal Template AST Visitor that traverses the AST hierarchy and applies visitors.
@@ -490,16 +445,9 @@ export class DriftTransformer {
   }
 
   /**
-   * Checks if string consists only of whitespace characters (space, tab, newline, carriage return) using ASCII codes.
+   * Checks if string consists only of whitespace characters.
    */
   private isWhitespaceOnly(text: string): boolean {
-    if (text.length === 0) return false;
-    for (let i = 0; i < text.length; i++) {
-      const code = text.charCodeAt(i);
-      if (code !== 32 && code !== 9 && code !== 10 && code !== 13) {
-        return false;
-      }
-    }
-    return true;
+    return text.length > 0 && /^\s*$/.test(text);
   }
 }

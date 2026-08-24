@@ -243,4 +243,54 @@ describe('DriftJS @for Directive Integration Suite', () => {
 
     document.body.removeChild(container);
   });
+
+  it('correctly moves items to the tail of a keyed list when refNode is null (BUG-008)', () => {
+    const src = `
+      <script>
+        let items = [
+          { id: 'a', text: 'A' },
+          { id: 'b', text: 'B' },
+          { id: 'c', text: 'C' }
+        ];
+        function moveHeadToTail() {
+          items = [
+            { id: 'b', text: 'B' },
+            { id: 'c', text: 'C' },
+            { id: 'a', text: 'A' }
+          ];
+        }
+      </script>
+      <div>
+        <button id="move-btn" onclick={moveHeadToTail}>Move</button>
+        <ul>
+          @for item in items key item.id {
+            <li id={"node-" + item.id}>{item.text}</li>
+          }
+        </ul>
+      </div>
+    `;
+
+    const mod = compile(src);
+    const vm = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = vm.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    let lis = container.querySelectorAll('li');
+    expect(lis).toHaveLength(3);
+    expect(lis[0]?.textContent).toBe('A');
+    expect(lis[1]?.textContent).toBe('B');
+    expect(lis[2]?.textContent).toBe('C');
+
+    (container.querySelector('#move-btn') as HTMLButtonElement).click();
+
+    lis = container.querySelectorAll('li');
+    expect(lis).toHaveLength(3);
+    expect(lis[0]?.textContent).toBe('B');
+    expect(lis[1]?.textContent).toBe('C');
+    expect(lis[2]?.textContent).toBe('A');
+
+    document.body.removeChild(container);
+  });
 });

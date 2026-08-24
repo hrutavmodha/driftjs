@@ -81,7 +81,7 @@ export class DriftClientVM {
   private delegatedEvents = new Set<string>();
   private static eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
   private cursor: HydrationCursor | null = null;
-  private childVMs = new WeakMap<Node, { vm: DriftClientVM; scope: Record<string, any>; propsSpec: any }>();
+  private childVMs = new WeakMap<Node, { vm: DriftClientVM; scope: Record<string, any>; propsSpec: any; nodes?: Node[] }>();
   private mountedChildVMs = new Set<DriftClientVM>();
   private pendingDirtyVars = new Set<string>();
   private isUpdateScheduled = false;
@@ -89,14 +89,102 @@ export class DriftClientVM {
   private static readonly MAX_FLUSH_ITERATIONS = 100;
   private flushRecursionCount = 0;
 
-
-
   public parentVM: DriftClientVM | null = null;
   public contextMap = new Map<symbol | string, any>();
   public unmountCallbacks: (() => void)[] = [];
 
   constructor() {
     DriftClientVM.activeVMCount++;
+  }
+
+  public applyDOMAttribute(
+    elem: Node | null,
+    attrName: string,
+    val: any,
+    _scope: Record<string, any>,
+  ): void {
+    if (!elem) return;
+
+    if (attrName.startsWith('on')) {
+      const eventName = attrName.slice(2).toLowerCase();
+      if (typeof val === 'function') {
+        let handlers = DriftClientVM.eventHandlersMap.get(elem);
+        if (!handlers) {
+          handlers = {};
+          DriftClientVM.eventHandlersMap.set(elem, handlers);
+        }
+
+        const existingHandler = handlers[eventName];
+        if (existingHandler && (existingHandler as any)._fn) {
+          (existingHandler as any)._fn = val;
+          (existingHandler as any)._vm = this;
+        } else {
+          const vm = this;
+          const wrappedHandler = function (this: any, ...args: any[]) {
+            const targetVM = (wrappedHandler as any)._vm || vm;
+            const currentFn = (wrappedHandler as any)._fn;
+            if (typeof currentFn !== 'function') return;
+            const scopeSnapshot = new Map<string, any>();
+            if (targetVM.declaredVars) {
+              for (const key of targetVM.declaredVars) {
+                scopeSnapshot.set(key, targetVM.scope[key]);
+              }
+            }
+            const result = currentFn.apply(this, args);
+            const changedVars = new Set<string>();
+            if (targetVM.declaredVars) {
+              for (const key of targetVM.declaredVars) {
+                if (targetVM.scope[key] !== scopeSnapshot.get(key)) changedVars.add(key);
+              }
+            }
+            for (const dirtyVar of targetVM.pendingDirtyVars) {
+              changedVars.add(dirtyVar);
+            }
+            if (changedVars.size > 0) {
+              targetVM.pendingDirtyVars.clear();
+              targetVM.triggerUpdates(changedVars);
+            }
+            if (targetVM.pendingDirtyVars.size > 0) targetVM.flushUpdates();
+            return result;
+          };
+          (wrappedHandler as any)._fn = val;
+          (wrappedHandler as any)._vm = this;
+          handlers[eventName] = wrappedHandler;
+        }
+        this.ensureEventDelegated(eventName);
+      } else {
+        const handlers = DriftClientVM.eventHandlersMap.get(elem);
+        if (handlers && handlers[eventName]) {
+          delete handlers[eventName];
+        }
+        if (typeof (elem as Element).removeAttribute === 'function') {
+          (elem as Element).removeAttribute(attrName);
+        }
+      }
+    } else {
+      if (attrName === 'style') {
+        val = normalizeStyle(val);
+      }
+      if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
+        (elem as any)[attrName] = val ?? '';
+      }
+      if (typeof (elem as Element).setAttribute === 'function') {
+        const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
+        if (val === true) {
+          (elem as Element).setAttribute(attrName, isAriaOrData ? 'true' : '');
+        } else if (val === false) {
+          if (isAriaOrData) {
+            (elem as Element).setAttribute(attrName, 'false');
+          } else if (typeof (elem as Element).removeAttribute === 'function') {
+            (elem as Element).removeAttribute(attrName);
+          }
+        } else if (val == null || (attrName === 'style' && val === '')) {
+          if (typeof (elem as Element).removeAttribute === 'function') (elem as Element).removeAttribute(attrName);
+        } else {
+          (elem as Element).setAttribute(attrName, String(val));
+        }
+      }
+    }
   }
 
   public unmountSubtree(node: Node | null): void {
@@ -108,7 +196,13 @@ export class DriftClientVM {
         this.mountedChildVMs.delete(entry.vm);
         entry.vm.unmount();
       }
-      this.childVMs.delete(node);
+      if (entry.nodes) {
+        for (const n of entry.nodes) {
+          this.childVMs.delete(n);
+        }
+      } else {
+        this.childVMs.delete(node);
+      }
     }
 
     for (const region of Array.from(this.reactiveRegions)) {
@@ -402,11 +496,14 @@ export class DriftClientVM {
             const compNode = childVM.execute(compMod, { scope: propsScope, document: doc });
             this.updateChildComponentProps(childVM.scope, childVM, propsObj);
             if (compNode) {
-              const childEntry = { vm: childVM, scope: childVM.scope, propsSpec };
+              const childEntry = { vm: childVM, scope: childVM.scope, propsSpec, nodes: [] as Node[] };
               this.childVMs.set(compNode, childEntry);
+              childEntry.nodes.push(compNode);
               if (compNode.nodeType === 11) {
                 for (let i = 0; i < compNode.childNodes.length; i++) {
-                  this.childVMs.set(compNode.childNodes[i]!, childEntry);
+                  const childNode = compNode.childNodes[i]!;
+                  this.childVMs.set(childNode, childEntry);
+                  childEntry.nodes.push(childNode);
                 }
               }
               this.mountedChildVMs.add(childVM);
@@ -460,90 +557,8 @@ export class DriftClientVM {
           const attrName = String(constants[bytecode[pc + 2]!]);
           const rawVal = constants[bytecode[pc + 3]!];
           const isDynamic = bytecode[pc + 4]!;
-          let val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
-
-          if (elem) {
-            if (attrName.startsWith('on')) {
-              const eventName = attrName.slice(2).toLowerCase();
-              if (typeof val === 'function') {
-                let handlers = DriftClientVM.eventHandlersMap.get(elem);
-                if (!handlers) {
-                  handlers = {};
-                  DriftClientVM.eventHandlersMap.set(elem, handlers);
-                }
-
-                const existingHandler = handlers[eventName];
-                if (existingHandler && (existingHandler as any)._fn) {
-                  (existingHandler as any)._fn = val;
-                  (existingHandler as any)._vm = this;
-                } else {
-                  const vm = this;
-                  const wrappedHandler = function (this: any, ...args: any[]) {
-                    const targetVM = (wrappedHandler as any)._vm || vm;
-                    const currentFn = (wrappedHandler as any)._fn;
-                    if (typeof currentFn !== 'function') return;
-                    const scopeSnapshot = new Map<string, any>();
-                    if (targetVM.declaredVars) {
-                      for (const key of targetVM.declaredVars) {
-                        scopeSnapshot.set(key, targetVM.scope[key]);
-                      }
-                    }
-                    const result = currentFn.apply(this, args);
-                    const changedVars = new Set<string>();
-                    if (targetVM.declaredVars) {
-                      for (const key of targetVM.declaredVars) {
-                        if (targetVM.scope[key] !== scopeSnapshot.get(key)) changedVars.add(key);
-                      }
-                    }
-                    for (const dirtyVar of targetVM.pendingDirtyVars) {
-                      changedVars.add(dirtyVar);
-                    }
-                    if (changedVars.size > 0) {
-                      targetVM.pendingDirtyVars.clear();
-                      targetVM.triggerUpdates(changedVars);
-                    }
-                    if (targetVM.pendingDirtyVars.size > 0) targetVM.flushUpdates();
-                    return result;
-                  };
-                  (wrappedHandler as any)._fn = val;
-                  (wrappedHandler as any)._vm = this;
-                  handlers[eventName] = wrappedHandler;
-                }
-                this.ensureEventDelegated(eventName);
-              } else {
-                const handlers = DriftClientVM.eventHandlersMap.get(elem);
-                if (handlers && handlers[eventName]) {
-                  delete handlers[eventName];
-                }
-                if (typeof elem.removeAttribute === 'function') {
-                  elem.removeAttribute(attrName);
-                }
-              }
-            } else {
-              if (attrName === 'style') {
-                val = normalizeStyle(val);
-              }
-              if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
-                (elem as any)[attrName] = val ?? '';
-              }
-              if (typeof elem.setAttribute === 'function') {
-                const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
-                if (val === true) {
-                  elem.setAttribute(attrName, isAriaOrData ? 'true' : '');
-                } else if (val === false) {
-                  if (isAriaOrData) {
-                    elem.setAttribute(attrName, 'false');
-                  } else if (typeof elem.removeAttribute === 'function') {
-                    elem.removeAttribute(attrName);
-                  }
-                } else if (val == null || (attrName === 'style' && val === '')) {
-                  if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
-                } else {
-                  elem.setAttribute(attrName, String(val));
-                }
-              }
-            }
-          }
+          const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
+          this.applyDOMAttribute(elem, attrName, val, scope);
           pc += 5;
           break;
         }
@@ -1019,34 +1034,9 @@ export class DriftClientVM {
           const isDynamic = bytecode[pc + 4]!;
 
           const targetNode = regs.get(targetReg) ?? (targetReg === rootReg && nodes.length === 1 ? nodes[0] : null);
-          if (targetNode && targetNode.nodeType === 1 && isDynamic === 1) {
-            const elem = targetNode as Element;
-            let val = evaluateExpression(rawVal, childScope, this.declaredVars);
-            if (attrName === 'style') {
-              val = normalizeStyle(val);
-            }
-            if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
-              (elem as any)[attrName] = val ?? '';
-            }
-            const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
-            let targetVal: string | null = null;
-            if (val === true) {
-              targetVal = isAriaOrData ? 'true' : '';
-            } else if (val === false) {
-              targetVal = isAriaOrData ? 'false' : null;
-            } else if (val == null || (attrName === 'style' && val === '')) {
-              targetVal = null;
-            } else {
-              targetVal = String(val);
-            }
-            const currentVal = elem.hasAttribute(attrName) ? elem.getAttribute(attrName) : null;
-            if (targetVal !== currentVal) {
-              if (targetVal === null) {
-                elem.removeAttribute(attrName);
-              } else {
-                elem.setAttribute(attrName, targetVal);
-              }
-            }
+          if (targetNode && isDynamic === 1) {
+            const val = evaluateExpression(rawVal, childScope, this.declaredVars);
+            this.applyDOMAttribute(targetNode, attrName, val, childScope);
           }
           pc += 5;
           break;
@@ -1141,90 +1131,8 @@ export class DriftClientVM {
         const attrName = String(constants[bytecode[pc + 2]!]);
         const rawVal = constants[bytecode[pc + 3]!];
         const isDynamic = bytecode[pc + 4]!;
-        let val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
-
-        if (elem) {
-          if (attrName.startsWith('on')) {
-            const eventName = attrName.slice(2).toLowerCase();
-            if (typeof val === 'function') {
-              let handlers = DriftClientVM.eventHandlersMap.get(elem);
-              if (!handlers) {
-                handlers = {};
-                DriftClientVM.eventHandlersMap.set(elem, handlers);
-              }
-
-              const existingHandler = handlers[eventName];
-              if (existingHandler && (existingHandler as any)._fn) {
-                (existingHandler as any)._fn = val;
-                (existingHandler as any)._vm = this;
-              } else {
-                const vm = this;
-                const wrappedHandler = function (this: any, ...args: any[]) {
-                  const targetVM = (wrappedHandler as any)._vm || vm;
-                  const currentFn = (wrappedHandler as any)._fn;
-                  if (typeof currentFn !== 'function') return;
-                  const scopeSnapshot = new Map<string, any>();
-                  if (targetVM.declaredVars) {
-                    for (const key of targetVM.declaredVars) {
-                      scopeSnapshot.set(key, targetVM.scope[key]);
-                    }
-                  }
-                  const result = currentFn.apply(this, args);
-                  const changedVars = new Set<string>();
-                  if (targetVM.declaredVars) {
-                    for (const key of targetVM.declaredVars) {
-                      if (targetVM.scope[key] !== scopeSnapshot.get(key)) changedVars.add(key);
-                    }
-                  }
-                  for (const dirtyVar of targetVM.pendingDirtyVars) {
-                    changedVars.add(dirtyVar);
-                  }
-                  if (changedVars.size > 0) {
-                    targetVM.pendingDirtyVars.clear();
-                    targetVM.triggerUpdates(changedVars);
-                  }
-                  if (targetVM.pendingDirtyVars.size > 0) targetVM.flushUpdates();
-                  return result;
-                };
-                (wrappedHandler as any)._fn = val;
-                (wrappedHandler as any)._vm = this;
-                handlers[eventName] = wrappedHandler;
-              }
-              this.ensureEventDelegated(eventName);
-            } else {
-              const handlers = DriftClientVM.eventHandlersMap.get(elem);
-              if (handlers && handlers[eventName]) {
-                delete handlers[eventName];
-              }
-              if (typeof elem.removeAttribute === 'function') {
-                elem.removeAttribute(attrName);
-              }
-            }
-          } else {
-            if (attrName === 'style') {
-              val = normalizeStyle(val);
-            }
-            if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
-              (elem as any)[attrName] = val ?? '';
-            }
-            if (typeof elem.setAttribute === 'function') {
-              const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
-              if (val === true) {
-                elem.setAttribute(attrName, isAriaOrData ? 'true' : '');
-              } else if (val === false) {
-                if (isAriaOrData) {
-                  elem.setAttribute(attrName, 'false');
-                } else if (typeof elem.removeAttribute === 'function') {
-                  elem.removeAttribute(attrName);
-                }
-              } else if (val == null || (attrName === 'style' && val === '')) {
-                if (typeof elem.removeAttribute === 'function') elem.removeAttribute(attrName);
-              } else {
-                elem.setAttribute(attrName, String(val));
-              }
-            }
-          }
-        }
+        const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
+        this.applyDOMAttribute(elem, attrName, val, scope);
         break;
       }
       case Opcode.MOUNT_COMPONENT: {

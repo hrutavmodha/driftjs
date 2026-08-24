@@ -1,4 +1,4 @@
-import { resolveIterable } from './evaluator.js';
+import { resolveIterable, evaluateExpression } from './evaluator.js';
 import { splitPatternEntries, findTopLevelChar } from './scanner.js';
 
 /**
@@ -128,7 +128,7 @@ export function populateItemScope(
           const varName = target.slice(0, eqIdx).trim();
           const defValStr = target.slice(eqIdx + 1).trim();
           const val = (safeObj as any)[propName];
-          scope[varName] = val !== undefined ? val : parseDefaultValue(defValStr);
+          scope[varName] = val !== undefined ? val : parseDefaultValue(defValStr, scope);
         } else if (target.startsWith('{') || target.startsWith('[')) {
           const val = (safeObj as any)[propName];
           populateItemScope(scope, target, val, null, 0);
@@ -141,7 +141,7 @@ export function populateItemScope(
           const propName = entry.slice(0, eqIdx).trim();
           const defValStr = entry.slice(eqIdx + 1).trim();
           const val = (safeObj as any)[propName];
-          scope[propName] = val !== undefined ? val : parseDefaultValue(defValStr);
+          scope[propName] = val !== undefined ? val : parseDefaultValue(defValStr, scope);
         } else {
           scope[entry] = (safeObj as any)[entry];
         }
@@ -157,7 +157,7 @@ export function populateItemScope(
         const varName = entry.slice(0, eqIdx).trim();
         const defValStr = entry.slice(eqIdx + 1).trim();
         const val = arr[i];
-        scope[varName] = val !== undefined ? val : parseDefaultValue(defValStr);
+        scope[varName] = val !== undefined ? val : parseDefaultValue(defValStr, scope);
       } else if (entry.startsWith('{') || entry.startsWith('[')) {
         populateItemScope(scope, entry, arr[i], null, 0);
       } else {
@@ -167,7 +167,7 @@ export function populateItemScope(
   }
 }
 
-function parseDefaultValue(defStr: string): any {
+function parseDefaultValue(defStr: string, scope?: Record<string, any>): any {
   const trimmed = defStr.trim();
   if (trimmed === 'true') return true;
   if (trimmed === 'false') return false;
@@ -185,6 +185,23 @@ function parseDefaultValue(defStr: string): any {
   try {
     return JSON.parse(trimmed);
   } catch {
+    if (scope) {
+      if (inScopeChain(scope, trimmed)) {
+        return getScopeValue(scope, trimmed);
+      }
+      try {
+        const validIdentifierRegex = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+        const validKeys = Object.keys(scope).filter((k) => validIdentifierRegex.test(k));
+        const vals = validKeys.map((k) => scope[k]);
+        return new Function(...validKeys, `return (${trimmed});`)(...vals);
+      } catch {
+        try {
+          return new Function(`return (${trimmed});`)();
+        } catch {
+          return trimmed;
+        }
+      }
+    }
     return trimmed;
   }
 }

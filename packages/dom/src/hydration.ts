@@ -18,25 +18,16 @@ export class HydrationCursor {
     this.current = this.walker.nextNode();
   }
 
-  public claimElement(tag: string, doc: Document): Element {
-    const targetTag = tag.toLowerCase();
-
+  private claimNode<T extends Node>(predicate: (n: Node) => boolean, fallback: () => T): T {
     // 1. Check unclaimed pool first
-    const poolIdx = this.unclaimed.findIndex(
-      (n) => n.nodeType === 1 && (n as Element).tagName.toLowerCase() === targetTag
-    );
+    const poolIdx = this.unclaimed.findIndex(predicate);
     if (poolIdx !== -1) {
-      const matched = this.unclaimed.splice(poolIdx, 1)[0] as Element;
-      return matched;
+      return this.unclaimed.splice(poolIdx, 1)[0] as T;
     }
 
     // 2. Check current node
-    if (
-      this.current &&
-      this.current.nodeType === 1 &&
-      (this.current as Element).tagName.toLowerCase() === targetTag
-    ) {
-      const node = this.current as Element;
+    if (this.current && predicate(this.current)) {
+      const node = this.current as T;
       this.current = this.walker.nextNode();
       return node;
     }
@@ -44,11 +35,8 @@ export class HydrationCursor {
     // 3. Lookahead in TreeWalker preserving uncollected intermediate nodes
     let steps = 0;
     while (this.current && steps < HydrationCursor.MAX_LOOKAHEAD) {
-      if (
-        this.current.nodeType === 1 &&
-        (this.current as Element).tagName.toLowerCase() === targetTag
-      ) {
-        const node = this.current as Element;
+      if (predicate(this.current)) {
+        const node = this.current as T;
         this.current = this.walker.nextNode();
         return node;
       }
@@ -57,80 +45,30 @@ export class HydrationCursor {
       steps++;
     }
 
-    return doc.createElement(tag);
+    return fallback();
+  }
+
+  public claimElement(tag: string, doc: Document): Element {
+    const targetTag = tag.toLowerCase();
+    return this.claimNode(
+      (n) => n.nodeType === 1 && (n as Element).tagName.toLowerCase() === targetTag,
+      () => doc.createElement(tag)
+    );
   }
 
   public claimText(doc: Document): Text {
-    // 1. Check unclaimed pool first
-    const poolIdx = this.unclaimed.findIndex((n) => n.nodeType === 3);
-    if (poolIdx !== -1) {
-      const matched = this.unclaimed.splice(poolIdx, 1)[0] as Text;
-      return matched;
-    }
-
-    // 2. Check current node
-    if (this.current && this.current.nodeType === 3) {
-      const node = this.current as Text;
-      this.current = this.walker.nextNode();
-      return node;
-    }
-
-    // 3. Lookahead preserving intermediates
-    let steps = 0;
-    while (this.current && steps < HydrationCursor.MAX_LOOKAHEAD) {
-      if (this.current.nodeType === 3) {
-        const node = this.current as Text;
-        this.current = this.walker.nextNode();
-        return node;
-      }
-      this.unclaimed.push(this.current);
-      this.current = this.walker.nextNode();
-      steps++;
-    }
-
-    return doc.createTextNode('');
+    return this.claimNode(
+      (n) => n.nodeType === 3,
+      () => doc.createTextNode('')
+    );
   }
 
   public claimComment(expectedContent: string, doc: Document): Comment {
     const trimmedExpected = expectedContent.trim();
-
-    // 1. Check unclaimed pool first
-    const poolIdx = this.unclaimed.findIndex(
-      (n) => n.nodeType === 8 && (n as Comment).data.trim() === trimmedExpected
+    return this.claimNode(
+      (n) => n.nodeType === 8 && (n as Comment).data.trim() === trimmedExpected,
+      () => doc.createComment(expectedContent)
     );
-    if (poolIdx !== -1) {
-      const matched = this.unclaimed.splice(poolIdx, 1)[0] as Comment;
-      return matched;
-    }
-
-    // 2. Check current node
-    if (
-      this.current &&
-      this.current.nodeType === 8 &&
-      (this.current as Comment).data.trim() === trimmedExpected
-    ) {
-      const comment = this.current as Comment;
-      this.current = this.walker.nextNode();
-      return comment;
-    }
-
-    // 3. Lookahead preserving intermediates
-    let steps = 0;
-    while (this.current && steps < HydrationCursor.MAX_LOOKAHEAD) {
-      if (
-        this.current.nodeType === 8 &&
-        (this.current as Comment).data.trim() === trimmedExpected
-      ) {
-        const comment = this.current as Comment;
-        this.current = this.walker.nextNode();
-        return comment;
-      }
-      this.unclaimed.push(this.current);
-      this.current = this.walker.nextNode();
-      steps++;
-    }
-
-    return doc.createComment(expectedContent);
   }
 }
 

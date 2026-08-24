@@ -9,6 +9,7 @@ import {
   TokenType,
   DriftLexerError,
   LexerStateKind,
+  ExprTokenKind,
 } from '../types/index.js';
 import { VOID_ELEMENTS } from 'driftjs-shared';
 
@@ -81,14 +82,6 @@ export function isRawTextTagName(tagName: string): tagName is RawTextTagName {
 }
 
 const KNOWN_DIRECTIVES = new Set(['if', 'else', 'for', 'switch', 'case', 'default']);
-
-const enum ExprTokenKind {
-  Start,
-  Punctuator,
-  Keyword,
-  IdentifierOrLiteral,
-  PostfixOp,
-}
 
 const REGEX_PRECEDING_KEYWORDS = new Set([
   'return',

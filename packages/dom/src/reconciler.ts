@@ -202,7 +202,13 @@ export function reconcileKeyedList(
           const itemRecord = newCache[newIndex]!;
           for (let nIdx = 0; nIdx < itemRecord.nodes.length; nIdx++) {
             const n = itemRecord.nodes[nIdx];
-            if (n && refNode && refNode.parentNode) refNode.parentNode.insertBefore(n, refNode);
+            if (n) {
+              if (refNode && refNode.parentNode) {
+                refNode.parentNode.insertBefore(n, refNode);
+              } else if (parent && typeof (parent as any).insertBefore === 'function') {
+                (parent as any).insertBefore(n, null);
+              }
+            }
           }
         } else {
           lisIdx--;

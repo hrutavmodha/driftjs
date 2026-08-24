@@ -182,4 +182,16 @@ describe('driftPlugin – HMR', () => {
     expect(serialized).toContain('-0');
     expect(serialized).not.toContain('null');
   });
+
+  it('serializes RegExp, Date, Set, Map, and TypedArrays correctly (BUG-003)', () => {
+    expect(serializeValueToJS(/^[a-z]+$/gi)).toBe('/^[a-z]+$/gi');
+    const date = new Date(1700000000000);
+    expect(serializeValueToJS(date)).toBe('new Date(1700000000000)');
+    const set = new Set([1, 2, 'three']);
+    expect(serializeValueToJS(set)).toBe('new Set([1, 2, "three"])');
+    const map = new Map([['key', 42]]);
+    expect(serializeValueToJS(map)).toBe('new Map([["key", 42]])');
+    const uint8 = new Uint8Array([10, 20, 30]);
+    expect(serializeValueToJS(uint8)).toBe('new Uint8Array([10, 20, 30])');
+  });
 });

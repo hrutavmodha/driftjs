@@ -20,11 +20,60 @@ export {
 };
 
 /**
+ * Creates a centralized history listener registry.
+ */
+export function createHistoryListeners() {
+  const listeners: NavigationCallback[] = [];
+  return {
+    get list(): NavigationCallback[] {
+      return listeners;
+    },
+    listen(callback: NavigationCallback): () => void {
+      listeners.push(callback);
+      return () => {
+        const idx = listeners.indexOf(callback);
+        if (idx !== -1) listeners.splice(idx, 1);
+      };
+    },
+    notify(to: string, from: string, info: NavigationInformation): void {
+      for (const listener of listeners) {
+        listener(to, from, info);
+      }
+    },
+    clear(): void {
+      listeners.length = 0;
+    },
+  };
+}
+
+/**
+ * Extracts clean user state from raw history state, stripping internal __drift tracking keys.
+ */
+export function extractHistoryState(rawState: any): HistoryState {
+  if (typeof window === 'undefined') return null;
+  const s = rawState ?? window.history.state;
+  if (!s || typeof s !== 'object') return s ?? null;
+  const { __drift_pos, __drift_has_data, ...rest } = s;
+  return (Object.keys(rest).length > 0 || __drift_has_data) ? rest : null;
+}
+
+/**
+ * Packs user data with internal position tracking keys for window.history.
+ */
+export function buildHistoryState(data: HistoryState | undefined, pos: number): Record<string, any> {
+  return {
+    ...(data || {}),
+    __drift_pos: pos,
+    ...(data !== undefined ? { __drift_has_data: true } : {}),
+  };
+}
+
+/**
  * Creates an HTML5 History API driver (BrowserHistory).
  */
 export function createWebHistory(base: string = ''): RouterHistory {
   const normalizedBase = normalizeBase(base);
-  const listeners: NavigationCallback[] = [];
+  const listenerRegistry = createHistoryListeners();
 
   const getFullLocation = (): string => {
     if (typeof window === 'undefined') return '/';
@@ -63,9 +112,7 @@ export function createWebHistory(base: string = ''): RouterHistory {
       type: 'pop',
     };
 
-    for (const listener of listeners) {
-      listener(to, from, info);
-    }
+    listenerRegistry.notify(to, from, info);
   };
 
   if (typeof window !== 'undefined') {
@@ -80,31 +127,23 @@ export function createWebHistory(base: string = ''): RouterHistory {
       return getLocation();
     },
     get state(): HistoryState {
-      if (typeof window === 'undefined') return null;
-      const s = window.history.state;
-      if (!s || typeof s !== 'object') return s ?? null;
-      const { __drift_pos, __drift_has_data, ...rest } = s;
-      return (Object.keys(rest).length > 0 || __drift_has_data) ? rest : null;
+      return extractHistoryState(window.history.state);
     },
     listen(callback: NavigationCallback): () => void {
-      listeners.push(callback);
-      return () => {
-        const idx = listeners.indexOf(callback);
-        if (idx !== -1) listeners.splice(idx, 1);
-      };
+      return listenerRegistry.listen(callback);
     },
     push(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
       currentPos++;
       const href = createHref(normalizedBase, to);
-      const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
+      const stateObj = buildHistoryState(data, currentPos);
       window.history.pushState(stateObj, '', href);
       currentLocation = to;
     },
     replace(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
       const href = createHref(normalizedBase, to);
-      const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
+      const stateObj = buildHistoryState(data, currentPos);
       window.history.replaceState(stateObj, '', href);
       currentLocation = to;
     },
@@ -117,7 +156,7 @@ export function createWebHistory(base: string = ''): RouterHistory {
       if (typeof window !== 'undefined') {
         window.removeEventListener('popstate', popstateListener);
       }
-      listeners.length = 0;
+      listenerRegistry.clear();
     },
   };
 }
@@ -127,7 +166,7 @@ export function createWebHistory(base: string = ''): RouterHistory {
  */
 export function createWebHashHistory(base: string = ''): RouterHistory {
   const normalizedBase = normalizeBase(base);
-  const listeners: NavigationCallback[] = [];
+  const listenerRegistry = createHistoryListeners();
 
   const getHashLocation = (): string => {
     if (typeof window === 'undefined') return '/';
@@ -166,9 +205,7 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
       type: 'pop',
     };
 
-    for (const listener of listeners) {
-      listener(to, from, info);
-    }
+    listenerRegistry.notify(to, from, info);
   };
 
   if (typeof window !== 'undefined') {
@@ -184,31 +221,23 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
       return getHashLocation();
     },
     get state(): HistoryState {
-      if (typeof window === 'undefined') return null;
-      const s = window.history.state;
-      if (!s || typeof s !== 'object') return s ?? null;
-      const { __drift_pos, __drift_has_data, ...rest } = s;
-      return (Object.keys(rest).length > 0 || __drift_has_data) ? rest : null;
+      return extractHistoryState(window.history.state);
     },
     listen(callback: NavigationCallback): () => void {
-      listeners.push(callback);
-      return () => {
-        const idx = listeners.indexOf(callback);
-        if (idx !== -1) listeners.splice(idx, 1);
-      };
+      return listenerRegistry.listen(callback);
     },
     push(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
       currentPos++;
       const href = formatHashHref(normalizedBase, to);
-      const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
+      const stateObj = buildHistoryState(data, currentPos);
       window.history.pushState(stateObj, '', href);
       currentLocation = to;
     },
     replace(to: string, data?: HistoryState): void {
       if (typeof window === 'undefined') return;
       const href = formatHashHref(normalizedBase, to);
-      const stateObj = { ...(data || {}), __drift_pos: currentPos, ...(data !== undefined ? { __drift_has_data: true } : {}) };
+      const stateObj = buildHistoryState(data, currentPos);
       window.history.replaceState(stateObj, '', href);
       currentLocation = to;
     },
@@ -222,7 +251,7 @@ export function createWebHashHistory(base: string = ''): RouterHistory {
         window.removeEventListener('popstate', changeListener);
         window.removeEventListener('hashchange', changeListener);
       }
-      listeners.length = 0;
+      listenerRegistry.clear();
     },
   };
 }

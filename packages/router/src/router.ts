@@ -12,9 +12,10 @@ import type {
   NavigationFailure,
   RouterHistory,
   ScrollPosition,
+  RouteMatcher,
 } from '../types/index.js';
 import { NavigationFailureType } from '../types/index.js';
-import { createMatcher, type RouteMatcher } from './matcher.js';
+import { createMatcher } from './matcher.js';
 import { createHref } from './history.js';
 
 /**

@@ -114,5 +114,13 @@ export interface LexerStateTransition {
   readonly emits: string;
 }
 
+export enum ExprTokenKind {
+  Start = 0,
+  Punctuator = 1,
+  Keyword = 2,
+  IdentifierOrLiteral = 3,
+  PostfixOp = 4,
+}
+
 
 

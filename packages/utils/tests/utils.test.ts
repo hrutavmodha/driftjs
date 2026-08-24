@@ -3,6 +3,7 @@ import {
   evaluateExpression,
   setScopeValue,
   inScopeChain,
+  populateItemScope,
   resolveIterable,
   resolveComponentModule,
   evaluatePropsSpec,
@@ -183,6 +184,22 @@ describe('driftjs-shared Module', () => {
       expect(hasMatchingOuterParens('(item, index) in list')).toBe(false);
       expect(hasMatchingOuterParens('(a) + (b)')).toBe(false);
       expect(hasMatchingOuterParens('item')).toBe(false);
+    });
+  });
+
+  describe('populateItemScope (BUG-004)', () => {
+    it('evaluates dynamic default expressions against active scope in destructuring patterns', () => {
+      const scope: Record<string, any> = {
+        basePrefix: 'user_',
+        defaultRole: 'member',
+        getFallbackName: () => 'Anonymous',
+      };
+
+      populateItemScope(scope, '{ id, name = getFallbackName(), role = defaultRole }', { id: 101 }, null, 0);
+
+      expect(scope.id).toBe(101);
+      expect(scope.name).toBe('Anonymous');
+      expect(scope.role).toBe('member');
     });
   });
 });

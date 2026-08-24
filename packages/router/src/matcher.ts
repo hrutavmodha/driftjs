@@ -6,6 +6,8 @@ import type {
   RouteParams,
   RouteQuery,
   RouteComponent,
+  PathTokens,
+  RouteMatcher,
 } from '../types/index.js';
 import { normalizePath } from './path.js';
 
@@ -174,12 +176,6 @@ function interpolatePathParams(path: string, params: Record<string, any>): strin
   }
 }
 
-interface PathTokens {
-  regex: RegExp;
-  paramNames: string[];
-  score: number;
-}
-
 /**
  * Compiles a path pattern string into a RegExp and parameter list using path-to-regexp.
  */
@@ -287,14 +283,6 @@ export function normalizeRouteRecord(
   }
 
   return normalized;
-}
-
-export interface RouteMatcher {
-  resolve(to: RouteLocationRaw, currentLocation?: RouteLocationNormalized): RouteLocationNormalized;
-  addRoute(parentOrRoute: string | RouteRecordRaw, route?: RouteRecordRaw): () => void;
-  removeRoute(name: string): void;
-  hasRoute(name: string): boolean;
-  getRoutes(): RouteRecordNormalized[];
 }
 
 /**
