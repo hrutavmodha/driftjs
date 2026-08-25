@@ -824,6 +824,25 @@ body {
   margin: 0.25rem 0;
 }
 
+.counter-double {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0.25rem 0;
+  background: #f8fafc;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+}
+
+.counter-double .double-value {
+  color: #3b82f6;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
 .status-pill {
   margin-top: 0.5rem;
 }

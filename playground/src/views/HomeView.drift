@@ -1,43 +1,37 @@
 <script>
   import { Link } from 'driftjs-router';
-  import { CounterContext } from '../context.js';
 
-  const counterStore = CounterContext.inject();
+  let count = 0;
+  let historyLogs = [];
 
-  let counter = counterStore ? counterStore.counter : 0;
-  let historyLogs = counterStore ? counterStore.historyLogs : [];
+  // Reactive derived values (direct expression + chained derivation)
+  let double = derive(count * 2);
+  let quad = derive(double * 2);
+
+  // Reactive derived value with function logic
+  let statusText = derive(() => {
+    if (count === 0) return 'Neutral (0)';
+    return count > 0 ? 'Positive (+' + count + ')' : 'Negative (' + count + ')';
+  });
+
+  let statusClass = derive(() => {
+    if (count === 0) return 'badge badge-zero';
+    return count > 0 ? 'badge badge-positive' : 'badge badge-negative';
+  });
 
   function increment() {
-    if (counterStore) {
-      counterStore.increment();
-      counter = counterStore.counter;
-      historyLogs = counterStore.historyLogs;
-    } else {
-      counter++;
-      historyLogs = ['Incremented to ' + counter, ...historyLogs.slice(0, 4)];
-    }
+    count++;
+    historyLogs = ['Incremented to ' + count, ...historyLogs.slice(0, 4)];
   }
 
   function decrement() {
-    if (counterStore) {
-      counterStore.decrement();
-      counter = counterStore.counter;
-      historyLogs = counterStore.historyLogs;
-    } else {
-      counter--;
-      historyLogs = ['Decremented to ' + counter, ...historyLogs.slice(0, 4)];
-    }
+    count--;
+    historyLogs = ['Decremented to ' + count, ...historyLogs.slice(0, 4)];
   }
 
   function reset() {
-    if (counterStore) {
-      counterStore.reset();
-      counter = counterStore.counter;
-      historyLogs = counterStore.historyLogs;
-    } else {
-      counter = 0;
-      historyLogs = ['Reset counter to 0', ...historyLogs.slice(0, 4)];
-    }
+    count = 0;
+    historyLogs = ['Reset counter to 0', ...historyLogs.slice(0, 4)];
   }
 </script>
 
@@ -70,15 +64,15 @@
     <div class="demo-card">
       <div class="counter-display">
         <span class="counter-label">Current VM State</span>
-        <div class="counter-number">{counter}</div>
+        <div class="counter-number">{count}</div>
+        <div class="counter-double">
+          <span class="double-label">Double (2x):</span>
+          <strong class="double-value">{double}</strong>
+          <span class="quad-label" style="margin-left: 12px; opacity: 0.75;">Quad (4x):</span>
+          <strong class="quad-value">{quad}</strong>
+        </div>
         <div class="status-pill">
-          @if counter === 0 {
-            <span class="badge badge-zero">Neutral (0)</span>
-          } @else if counter > 0 {
-            <span class="badge badge-positive">Positive (+{counter})</span>
-          } @else {
-            <span class="badge badge-negative">Negative ({counter})</span>
-          }
+          <span class={statusClass}>{statusText}</span>
         </div>
       </div>
 
