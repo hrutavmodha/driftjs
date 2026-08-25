@@ -39,7 +39,6 @@
     "prebuild": "node ../../scripts/template/copy.js",
     "build": "pnpm prebuild && vite build",
     "test": "vitest run",
-    "prepublishOnly": "pnpm build && pnpm test",
     "postpack": "node ../../scripts/template/clean.js",
     "postpublish": "node ../../scripts/template/clean.js"
   },

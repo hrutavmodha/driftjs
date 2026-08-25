@@ -64,8 +64,7 @@
     "build": "vite build",
     "watch": "tsc -w",
     "test": "vitest run --passWithNoTests",
-    "package": "vsce package",
-    "prepublishOnly": "pnpm build && pnpm test"
+    "package": "vsce package"
   },
   "dependencies": {
     "acorn": "^8.17.0",

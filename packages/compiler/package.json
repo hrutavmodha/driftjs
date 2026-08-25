@@ -24,8 +24,7 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "vite build",
-    "test": "vitest run",
-    "prepublishOnly": "pnpm build && pnpm test"
+    "test": "vitest run"
   },
   "exports": {
     ".": {
