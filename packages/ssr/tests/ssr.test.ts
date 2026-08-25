@@ -259,4 +259,34 @@ describe('DriftServerVM (SSR Engine)', () => {
     expect(html).toContain('<span>8</span>');
     expect(html).toContain('<span>Positive</span>');
   });
+
+  it('renders custom component children slot to HTML string in SSR', () => {
+    const cardSfc = `
+      <div class="card">
+        <h3>{title}</h3>
+        <div class="body">{children}</div>
+      </div>
+    `;
+
+    const appSfc = `
+      <script>
+        import Card from './Card.drift';
+      </script>
+      <section class="container">
+        <Card title="Server Rendered Card">
+          <p class="server-text">Hello from slotted server children!</p>
+        </Card>
+      </section>
+    `;
+
+    const cardModule = compile(cardSfc);
+    const appModule = compile(appSfc);
+
+    const html = renderToString(appModule, {
+      scope: { Card: cardModule },
+    });
+
+    expect(html).toContain('<h3>Server Rendered Card</h3>');
+    expect(html).toContain('<div class="body"><p class="server-text">Hello from slotted server children!</p></div>');
+  });
 });

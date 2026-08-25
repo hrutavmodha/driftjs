@@ -86,22 +86,40 @@ Eliminate manual `value={val} oninput={(e) => val = e.target.value}` boilerplate
 
 ---
 
-## 🧩 Priority 4: Component Slots & Content Projection (`<slot />`)
+---
 
-### Proposed Design
-Enable child components to accept and project parent template content:
+## ✅ Completed: Custom Component Children (`{children}`)
+
+### Overview
+In DriftJS, custom components can receive child elements/nodes, mounted in the component template via `{children}` and accessible as the independent `children` variable in `<script>`:
 
 ```drift
 <!-- Card.drift -->
+<script>
+  let hasChildren = derive(() => Boolean(children));
+</script>
+
 <div class="card">
-  <div class="card-header">
-    <slot name="header" />
-  </div>
-  <div class="card-body">
-    <slot />
-  </div>
+  <h3>{title}</h3>
+  @if hasChildren {
+    <div class="card-body">
+      {children}
+    </div>
+  }
 </div>
 ```
+
+```drift
+<!-- Parent.drift -->
+<Card title="Dashboard">
+  <p class="stats">Live user count: {userCount}</p>
+</Card>
+```
+
+### Key Architectural Characteristics
+- **Separation of Props and Children:** `props` strictly contains explicit attributes (e.g. `props.title`). `children` is an independent first-class scope entity.
+- **Compiler Sub-Module Generation:** Children passed between `<CustomComponent>...</CustomComponent>` are compiled into an isolated sub-module and passed via `propsSpec.__drift_children__`.
+- **Client & SSR Parity:** Evaluates in parent's reactive scope and mounts seamlessly via `INTERPOLATE_TEXT` in both DOM (`DriftClientVM`) and Server (`DriftServerVM`).
 
 ---
 

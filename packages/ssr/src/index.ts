@@ -135,10 +135,24 @@ export class DriftServerVM {
             if (compMod) {
               const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
               const propsObj = evaluatePropsSpec(propsSpec, this.scope, this.declaredVars);
+
+              let childrenNode: ServerNode | undefined = undefined;
+              if (propsSpec && (propsSpec as any).__drift_children__ !== undefined) {
+                const childrenSubMod = constants[(propsSpec as any).__drift_children__] ?? (propsSpec as any).__drift_children__;
+                if (childrenSubMod) {
+                  const childrenVm = new DriftServerVM();
+                  childrenVm.parentVM = this;
+                  childrenNode = childrenVm.execute(childrenSubMod, { scope: this.scope }) ?? undefined;
+                }
+              }
+
               const subVm = new DriftServerVM();
               subVm.parentVM = this;
-              const propsScope = Object.assign(Object.create(this.scope), { props: propsObj }, propsObj);
-              const compNode = subVm.execute(compMod, { scope: propsScope });
+              const childScope = Object.assign(Object.create(this.scope), { props: propsObj }, propsObj);
+              if (childrenNode !== undefined) {
+                childScope.children = childrenNode;
+              }
+              const compNode = subVm.execute(compMod, { scope: childScope });
               if (compNode) this.setRegister(dstReg, compNode);
             }
             pc += 4;
@@ -213,7 +227,11 @@ export class DriftServerVM {
           }
 
           if (!elemNode.attrs) elemNode.attrs = new Map();
-          elemNode.attrs.set(attrName, val);
+          if (attrName === 'className') {
+            elemNode.attrs.set('class', val);
+          } else {
+            elemNode.attrs.set(attrName, val);
+          }
           pc += 5;
           break;
         }
@@ -223,17 +241,19 @@ export class DriftServerVM {
           const exprIdx = bytecode[pc + 2]!;
           const expr = constants[exprIdx];
           const val = evaluateExpression(expr, this.scope, this.declaredVars);
-          const content = val != null ? String(val) : '';
-          this.setRegister(dstReg, {
-            type: 'text',
-            content,
-            children: [],
-          });
+          if (val && typeof val === 'object' && 'type' in val && Array.isArray(val.children)) {
+            this.setRegister(dstReg, val);
+          } else {
+            const content = val != null ? String(val) : '';
+            this.setRegister(dstReg, {
+              type: 'text',
+              content,
+              children: [],
+            });
+          }
           pc += 3;
           break;
         }
-
-
 
         case Opcode.EXEC_SCRIPT: {
           const scriptIdx = bytecode[pc + 1]!;

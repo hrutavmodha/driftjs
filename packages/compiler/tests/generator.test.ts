@@ -450,5 +450,34 @@ describe('DriftGenerator', () => {
       expect(statusBinding?.deps).toEqual(['count']);
     });
   });
+
+  describe('Custom Component Children Slot Compilation', () => {
+    it('compiles component children into a sub-module in propsSpec.__drift_children__', () => {
+      const src = `
+        <script>
+          import Card from './Card.drift';
+          let count = 10;
+        </script>
+        <Card title="Analytics">
+          <p>Count is {count}</p>
+        </Card>
+      `;
+      const module = compile(src);
+      expect(Array.from(module.bytecode)).toContain(Opcode.MOUNT_COMPONENT);
+
+      // Find propsSpec in constants
+      const propsSpec = module.constants.find((c) => c && typeof c === 'object' && c.__drift_props__);
+      expect(propsSpec).toBeDefined();
+      expect(propsSpec.title).toBe('Analytics');
+      expect(propsSpec.__drift_children__).toBeDefined();
+
+      const childrenSubMod = module.constants[propsSpec.__drift_children__];
+      expect(childrenSubMod).toBeDefined();
+      expect(childrenSubMod.bytecode).toBeDefined();
+      expect(childrenSubMod.reactiveBindings).toEqual([
+        { variable: 'count', positions: [{ pc: 11, opcode: Opcode.INTERPOLATE_TEXT }] },
+      ]);
+    });
+  });
 });
 

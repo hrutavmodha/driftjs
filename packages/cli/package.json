@@ -1,6 +1,6 @@
 {
   "name": "create-drift",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Interactive CLI scaffolding tool for DriftJS register VM client and server applications.",
   "keywords": [
     "create-drift",

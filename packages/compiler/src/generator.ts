@@ -201,14 +201,40 @@ export class DriftGenerator {
           }
         }
       }
-      const hasAttributes = Object.keys(propsSpec).length > 1;
-      const propsSpecIdx = hasAttributes ? this.addConstant(propsSpec) : 0xFF;
+
+      let childrenSubMod: { bytecode: number[]; constants: any[]; reactiveBindings: ReactiveBinding[] } | null = null;
+      if (node.children && node.children.length > 0) {
+        const filteredChildren = node.children.filter((c) => {
+          if (c.type === ASTNodeType.Text && typeof c.content === 'string' && c.content.trim() === '') {
+            return false;
+          }
+          return true;
+        });
+        if (filteredChildren.length > 0) {
+          childrenSubMod = this.compileNodesToSubModule(filteredChildren);
+          const childrenSubModIdx = this.addConstant(childrenSubMod);
+          propsSpec.__drift_children__ = childrenSubModIdx;
+        }
+      }
+
+      const hasPropsOrChildren = Object.keys(propsSpec).length > 1;
+      const propsSpecIdx = hasPropsOrChildren ? this.addConstant(propsSpec) : 0xFF;
       const pc = this.bytecode.length;
       this.emit(Opcode.MOUNT_COMPONENT, targetReg, tagConstIdx, propsSpecIdx);
 
       for (const attr of node.attributes) {
         if (attr.type === ASTNodeType.Attribute && attr.value !== null && typeof attr.value !== 'string' && attr.value.type === ASTNodeType.Interpolation) {
           this.recordBindingPositions(attr.value.expression, pc, Opcode.MOUNT_COMPONENT);
+        }
+      }
+      if (childrenSubMod) {
+        for (const binding of childrenSubMod.reactiveBindings) {
+          if (this.declaredVars.has(binding.variable)) {
+            if (!this.bindingPositions.has(binding.variable)) {
+              this.bindingPositions.set(binding.variable, []);
+            }
+            this.bindingPositions.get(binding.variable)!.push({ pc, opcode: Opcode.MOUNT_COMPONENT });
+          }
         }
       }
     } else {

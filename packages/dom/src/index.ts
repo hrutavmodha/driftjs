@@ -509,13 +509,28 @@ export class DriftClientVM {
           if (compMod) {
             const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
             const propsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
+
+            let childrenNode: Node | undefined = undefined;
+            let childrenVM: DriftClientVM | null = null;
+            if (propsSpec && propsSpec.__drift_children__ !== undefined) {
+              const childrenSubMod = constants[propsSpec.__drift_children__] ?? propsSpec.__drift_children__;
+              if (childrenSubMod) {
+                childrenVM = new DriftClientVM();
+                childrenVM.parentVM = this;
+                childrenNode = childrenVM.execute(childrenSubMod, { scope, document: doc }) as Node | undefined;
+              }
+            }
+
             const childVM = new DriftClientVM();
             childVM.parentVM = this;
-            const propsScope = Object.assign(Object.create(scope), { props: propsObj }, propsObj);
-            const compNode = childVM.execute(compMod, { scope: propsScope, document: doc });
+            const childScope = Object.assign(Object.create(scope), { props: propsObj }, propsObj);
+            if (childrenNode !== undefined) {
+              childScope.children = childrenNode;
+            }
+            const compNode = childVM.execute(compMod, { scope: childScope, document: doc });
             this.updateChildComponentProps(childVM.scope, childVM, propsObj);
             if (compNode) {
-              const childEntry = { vm: childVM, scope: childVM.scope, propsSpec, nodes: [] as Node[] };
+              const childEntry = { vm: childVM, scope: childVM.scope, propsSpec, nodes: [] as Node[], childrenVM };
               this.childVMs.set(compNode, childEntry);
               childEntry.nodes.push(compNode);
               if (compNode.nodeType === 11) {
@@ -526,6 +541,7 @@ export class DriftClientVM {
                 }
               }
               this.mountedChildVMs.add(childVM);
+              if (childrenVM) this.mountedChildVMs.add(childrenVM);
               this.setRegister(dstReg, compNode);
             }
           }
@@ -586,9 +602,13 @@ export class DriftClientVM {
           const dstReg = bytecode[pc + 1]!;
           const expr = constants[bytecode[pc + 2]!];
           const val = evaluateExpression(expr, scope, this.declaredVars);
-          const textNode = this.cursor ? this.cursor.claimText(doc) : doc.createTextNode(val != null ? String(val) : '');
-          textNode.nodeValue = val != null ? String(val) : '';
-          this.setRegister(dstReg, textNode);
+          if (val && typeof val === 'object' && ('nodeType' in val)) {
+            this.setRegister(dstReg, val);
+          } else {
+            const textNode = this.cursor ? this.cursor.claimText(doc) : doc.createTextNode(val != null ? String(val) : '');
+            textNode.nodeValue = val != null ? String(val) : '';
+            this.setRegister(dstReg, textNode);
+          }
           pc += 3;
           break;
         }
@@ -1192,10 +1212,15 @@ export class DriftClientVM {
         const dstReg = bytecode[pc + 1]!;
         const compNode = this.getRegister(dstReg);
         const childEntry = compNode ? this.childVMs.get(compNode) : null;
-        if (childEntry && childEntry.propsSpec) {
-          const { vm: childVM, scope: childScope, propsSpec } = childEntry;
-          const newPropsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
-          this.updateChildComponentProps(childScope, childVM, newPropsObj);
+        if (childEntry) {
+          if (childEntry.propsSpec) {
+            const { vm: childVM, scope: childScope, propsSpec } = childEntry;
+            const newPropsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
+            this.updateChildComponentProps(childScope, childVM, newPropsObj);
+          }
+          if (childEntry.childrenVM) {
+            childEntry.childrenVM.triggerUpdates(new Set(this.declaredVars));
+          }
         }
         break;
       }
