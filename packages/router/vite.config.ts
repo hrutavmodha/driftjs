@@ -6,11 +6,12 @@ export default defineConfig({
   plugins: [driftPlugin()],
   build: {
     lib: {
+      formats: ['es', 'cjs'],
       entry: path.resolve(__dirname, 'src/index.ts'),
       name: 'DriftRouter',
       fileName: (format) => `index-${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: ['driftjs-shared', 'driftjs-dom', 'driftjs-compiler'],
     },
   },

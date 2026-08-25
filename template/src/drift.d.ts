@@ -7,3 +7,8 @@ declare module '*.drift' {
 }
 
 declare module '*.css';
+
+/**
+ * Declares a reactive computed / derived value in DriftJS Single File Components.
+ */
+declare function derive<T>(exprOrFn: T | (() => T)): T;

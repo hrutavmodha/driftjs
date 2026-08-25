@@ -19,7 +19,9 @@
     "dist",
     "README.md"
   ],
-  "main": "./dist/index-es.js",
+  "main": "./dist/index-cjs.js",
+  "module": "./dist/index-es.js",
+  "types": "./src/index.ts",
   "scripts": {
     "build": "vite build",
     "test": "vitest run",
@@ -29,7 +31,12 @@
     "driftjs-shared": "workspace:*"
   },
   "exports": {
-    ".": "./dist/index-es.js"
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index-es.js",
+      "require": "./dist/index-cjs.js",
+      "default": "./dist/index-es.js"
+    }
   },
   "devDependencies": {
     "typescript": "^7.0.2",

@@ -194,4 +194,17 @@ describe('driftPlugin – HMR', () => {
     const uint8 = new Uint8Array([10, 20, 30]);
     expect(serializeValueToJS(uint8)).toBe('new Uint8Array([10, 20, 30])');
   });
+
+  it('serializes derived reactive bindings in compiledModule', () => {
+    const plugin = makePlugin();
+    const sfc = `
+      <script>
+        let count = 1;
+        let double = derive(count * 2);
+      </script>
+      <div>{double}</div>
+    `;
+    const code = transform(plugin, sfc)!;
+    expect(code).toContain('derived: [{"name":"double","deps":["count"],"exprIdx":');
+  });
 });

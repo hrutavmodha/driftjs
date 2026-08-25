@@ -1,4 +1,4 @@
-import { resolveIterable, evaluateExpression } from './evaluator.js';
+import { resolveIterable } from './evaluator.js';
 import { splitPatternEntries, findTopLevelChar } from './scanner.js';
 
 /**
@@ -6,7 +6,7 @@ import { splitPatternEntries, findTopLevelChar } from './scanner.js';
  */
 export function setScopeValue<T = any>(targetScope: Record<string, any>, name: string, val: T): T {
   if (!targetScope || typeof targetScope !== 'object') return val;
-  if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+  if (name === '__proto__' || name === 'constructor' || name === 'prototype' || name === '__drift_mark_dirty__') {
     return val;
   }
 
@@ -47,8 +47,8 @@ export function setScopeValue<T = any>(targetScope: Record<string, any>, name: s
     for (const fn of dirtyFns) {
       try {
         fn(name);
-      } catch {
-        // ignore errors
+      } catch (err) {
+        console.error(`[DriftJS] Error notifying dirty update for "${name}":`, err);
       }
     }
   }
@@ -82,7 +82,7 @@ export function getScopeValue(scope: any, name: string): any {
     return scope[name];
   }
   if (typeof globalThis !== 'undefined' && globalThis) {
-    if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+    if (name === '__proto__' || name === 'constructor' || name === 'prototype' || name === '__drift_mark_dirty__') {
       return undefined;
     }
     let curr: any = globalThis;
@@ -102,6 +102,14 @@ if (typeof globalThis !== 'undefined' && !(globalThis as any)._get) {
   (globalThis as any)._get = getScopeValue;
 }
 
+function safeSetScopeProp(scope: Record<string, any>, key: string, val: any): void {
+  if (!scope || typeof scope !== 'object') return;
+  if (key === '__proto__' || key === 'constructor' || key === 'prototype' || key === '__drift_mark_dirty__') {
+    return;
+  }
+  scope[key] = val;
+}
+
 /**
  * Populates scope for @for loop items, supporting object and array destructuring patterns with aliasing and defaults.
  */
@@ -112,8 +120,8 @@ export function populateItemScope(
   indexName: string | null,
   indexVal: number
 ): void {
-  scope[itemName] = itemVal;
-  if (indexName) scope[indexName] = indexVal;
+  safeSetScopeProp(scope, itemName, itemVal);
+  if (indexName) safeSetScopeProp(scope, indexName, indexVal);
 
   if (itemName.startsWith('{') && itemName.endsWith('}')) {
     const safeObj = itemVal && typeof itemVal === 'object' ? itemVal : {};
@@ -127,23 +135,25 @@ export function populateItemScope(
         if (eqIdx !== -1) {
           const varName = target.slice(0, eqIdx).trim();
           const defValStr = target.slice(eqIdx + 1).trim();
-          const val = (safeObj as any)[propName];
-          scope[varName] = val !== undefined ? val : parseDefaultValue(defValStr, scope);
+          const val = Object.prototype.hasOwnProperty.call(safeObj, propName) ? (safeObj as any)[propName] : undefined;
+          safeSetScopeProp(scope, varName, val !== undefined ? val : parseDefaultValue(defValStr, scope));
         } else if (target.startsWith('{') || target.startsWith('[')) {
-          const val = (safeObj as any)[propName];
+          const val = Object.prototype.hasOwnProperty.call(safeObj, propName) ? (safeObj as any)[propName] : undefined;
           populateItemScope(scope, target, val, null, 0);
         } else {
-          scope[target] = (safeObj as any)[propName];
+          const val = Object.prototype.hasOwnProperty.call(safeObj, propName) ? (safeObj as any)[propName] : undefined;
+          safeSetScopeProp(scope, target, val);
         }
       } else {
         const eqIdx = findTopLevelChar(entry, '=');
         if (eqIdx !== -1) {
           const propName = entry.slice(0, eqIdx).trim();
           const defValStr = entry.slice(eqIdx + 1).trim();
-          const val = (safeObj as any)[propName];
-          scope[propName] = val !== undefined ? val : parseDefaultValue(defValStr, scope);
+          const val = Object.prototype.hasOwnProperty.call(safeObj, propName) ? (safeObj as any)[propName] : undefined;
+          safeSetScopeProp(scope, propName, val !== undefined ? val : parseDefaultValue(defValStr, scope));
         } else {
-          scope[entry] = (safeObj as any)[entry];
+          const val = Object.prototype.hasOwnProperty.call(safeObj, entry) ? (safeObj as any)[entry] : undefined;
+          safeSetScopeProp(scope, entry, val);
         }
       }
     }
@@ -157,11 +167,11 @@ export function populateItemScope(
         const varName = entry.slice(0, eqIdx).trim();
         const defValStr = entry.slice(eqIdx + 1).trim();
         const val = arr[i];
-        scope[varName] = val !== undefined ? val : parseDefaultValue(defValStr, scope);
+        safeSetScopeProp(scope, varName, val !== undefined ? val : parseDefaultValue(defValStr, scope));
       } else if (entry.startsWith('{') || entry.startsWith('[')) {
         populateItemScope(scope, entry, arr[i], null, 0);
       } else {
-        scope[entry] = arr[i];
+        safeSetScopeProp(scope, entry, arr[i]);
       }
     }
   }
@@ -175,7 +185,8 @@ function parseDefaultValue(defStr: string, scope?: Record<string, any>): any {
   if (trimmed === 'undefined') return undefined;
   if (
     (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+    (trimmed.startsWith('`') && trimmed.endsWith('`'))
   ) {
     return trimmed.slice(1, -1);
   }
@@ -185,22 +196,8 @@ function parseDefaultValue(defStr: string, scope?: Record<string, any>): any {
   try {
     return JSON.parse(trimmed);
   } catch {
-    if (scope) {
-      if (inScopeChain(scope, trimmed)) {
-        return getScopeValue(scope, trimmed);
-      }
-      try {
-        const validIdentifierRegex = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
-        const validKeys = Object.keys(scope).filter((k) => validIdentifierRegex.test(k));
-        const vals = validKeys.map((k) => scope[k]);
-        return new Function(...validKeys, `return (${trimmed});`)(...vals);
-      } catch {
-        try {
-          return new Function(`return (${trimmed});`)();
-        } catch {
-          return trimmed;
-        }
-      }
+    if (scope && inScopeChain(scope, trimmed)) {
+      return getScopeValue(scope, trimmed);
     }
     return trimmed;
   }

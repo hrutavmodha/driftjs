@@ -11,6 +11,7 @@ import type {
   SwitchNode,
   CompiledModule,
   ReactiveBinding,
+  DerivedBinding,
   ImportSpec,
 } from '../types/index.js';
 import {
@@ -32,6 +33,8 @@ export class DriftGenerator {
   private declaredVars: Set<string> = new Set();
   private imports: ImportSpec[] = [];
   private bindingPositions: Map<string, { pc: number; opcode: Opcode }[]> = new Map();
+  private derivedBindings: DerivedBinding[] = [];
+  private pendingDerived: { name: string; arg: any }[] = [];
 
   constructor(ast: ProgramNode) {
     this.ast = ast;
@@ -48,8 +51,11 @@ export class DriftGenerator {
     this.declaredVars = new Set();
     this.imports = [];
     this.bindingPositions = new Map();
+    this.derivedBindings = [];
+    this.pendingDerived = [];
 
     this.collectDeclaredVars(this.ast.body);
+    this.processDerivedBindings();
 
     if (this.ast.body.length === 0) {
       const rootReg = this.allocRegister();
@@ -60,6 +66,7 @@ export class DriftGenerator {
         constants: this.constants,
         reactiveBindings: this.buildReactiveBindings(),
         declaredVars: [...this.declaredVars],
+        derived: this.derivedBindings,
         imports: this.imports,
       };
     }
@@ -82,6 +89,7 @@ export class DriftGenerator {
       constants: this.constants,
       reactiveBindings: this.buildReactiveBindings(),
       declaredVars: [...this.declaredVars],
+      derived: this.derivedBindings,
       imports: this.imports,
     };
   }
@@ -119,13 +127,29 @@ export class DriftGenerator {
 
   private filterRuntimeScriptAst(content: any): any {
     if (Array.isArray(content)) {
-      const filtered = content.filter((stmt: any) => stmt && stmt.type !== 'ImportDeclaration');
+      const filtered = content
+        .map((stmt: any) => this.filterScriptStatement(stmt))
+        .filter(Boolean);
       return filtered.length === 1 ? filtered[0] : filtered;
     }
-    if (content && typeof content === 'object' && content.type === 'ImportDeclaration') {
-      return null;
+    return this.filterScriptStatement(content);
+  }
+
+  private filterScriptStatement(stmt: any): any {
+    if (!stmt || typeof stmt !== 'object') return stmt;
+    if (stmt.type === 'ImportDeclaration') return null;
+    if (stmt.type === 'VariableDeclaration') {
+      const nonDerivedDecls = stmt.declarations.filter((decl: any) => {
+        return !(
+          decl.init?.type === 'CallExpression' &&
+          decl.init.callee?.type === 'Identifier' &&
+          decl.init.callee.name === 'derive'
+        );
+      });
+      if (nonDerivedDecls.length === 0) return null;
+      return { ...stmt, declarations: nonDerivedDecls };
     }
-    return content;
+    return stmt;
   }
 
   /**
@@ -394,6 +418,16 @@ export class DriftGenerator {
         for (const name of extractBindingNames(decl.id)) {
           this.declaredVars.add(name);
         }
+        if (
+          decl.id?.type === 'Identifier' &&
+          decl.init?.type === 'CallExpression' &&
+          decl.init.callee?.type === 'Identifier' &&
+          decl.init.callee.name === 'derive' &&
+          decl.init.arguments &&
+          decl.init.arguments.length > 0
+        ) {
+          this.pendingDerived.push({ name: decl.id.name, arg: decl.init.arguments[0] });
+        }
       }
     } else if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id?.type === 'Identifier') {
       this.declaredVars.add(node.id.name);
@@ -415,6 +449,41 @@ export class DriftGenerator {
           }
         }
       }
+    }
+  }
+
+  private processDerivedBindings(): void {
+    for (const item of this.pendingDerived) {
+      const { name, arg } = item;
+      let exprAST = arg;
+      let isFunctionBlock = false;
+
+      if (arg.type === 'ArrowFunctionExpression' || arg.type === 'FunctionExpression') {
+        if (arg.body?.type === 'BlockStatement') {
+          isFunctionBlock = true;
+          exprAST = arg.body;
+        } else {
+          exprAST = arg.body;
+        }
+      }
+
+      const ids = this.extractIdentifiers(exprAST);
+      const deps = [...ids].filter((id) => id !== name && this.declaredVars.has(id));
+
+      const codeStr = astToJS(exprAST);
+      let fnVal: any;
+      if (isFunctionBlock) {
+        fnVal = {
+          __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => ${codeStr}`
+        };
+      } else {
+        fnVal = {
+          __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => (${codeStr})`
+        };
+      }
+
+      const exprIdx = this.addConstant(fnVal);
+      this.derivedBindings.push({ name, deps, exprIdx });
     }
   }
 
@@ -754,7 +823,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
         const methodName = node.callee.property.name;
         const arrayMutators = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'];
         if (rootObjName && arrayMutators.includes(methodName) && (!locals || !locals.has(rootObjName))) {
-          return `(() => { const _res = ${rawCall}; if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(rootObjName)}, scope[${JSON.stringify(rootObjName)}]); return _res; })()`;
+          return `(() => { const _res = ${rawCall}; if (typeof setScopeValue === 'function' && scope && typeof inScopeChain === 'function' && inScopeChain(scope, ${JSON.stringify(rootObjName)})) setScopeValue(scope, ${JSON.stringify(rootObjName)}, scope[${JSON.stringify(rootObjName)}]); return _res; })()`;
         }
       }
       return rawCall;
@@ -778,7 +847,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
         const rootName = getRootIdentifier(node.left);
         const rawAssign = `(${astToJS(node.left, locals)} ${node.operator} ${valJS})`;
         if (rootName && (!locals || !locals.has(rootName))) {
-          return `(() => { const _res = ${rawAssign}; if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(rootName)}, scope[${JSON.stringify(rootName)}]); return _res; })()`;
+          return `(() => { const _res = ${rawAssign}; if (typeof setScopeValue === 'function' && scope && typeof inScopeChain === 'function' && inScopeChain(scope, ${JSON.stringify(rootName)})) setScopeValue(scope, ${JSON.stringify(rootName)}, scope[${JSON.stringify(rootName)}]); return _res; })()`;
         }
       }
       if (node.left?.type === 'ObjectPattern' || node.left?.type === 'ArrayPattern') {
@@ -808,7 +877,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
           ? `(${node.operator}${astToJS(node.argument, locals)})`
           : `(${astToJS(node.argument, locals)}${node.operator})`;
         if (rootName && (!locals || !locals.has(rootName))) {
-          return `(() => { const _res = ${rawUpdate}; if (typeof setScopeValue === 'function' && scope) setScopeValue(scope, ${JSON.stringify(rootName)}, scope[${JSON.stringify(rootName)}]); return _res; })()`;
+          return `(() => { const _res = ${rawUpdate}; if (typeof setScopeValue === 'function' && scope && typeof inScopeChain === 'function' && inScopeChain(scope, ${JSON.stringify(rootName)})) setScopeValue(scope, ${JSON.stringify(rootName)}, scope[${JSON.stringify(rootName)}]); return _res; })()`;
         }
       }
       return node.prefix

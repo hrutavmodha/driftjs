@@ -405,5 +405,50 @@ describe('DriftGenerator', () => {
     expect(fnStr).toContain('message');
     expect(fnStr).toContain('code');
   });
+
+  describe('derive() Computed State Compilation', () => {
+    it('extracts derive(expr) bindings, dependencies, and creates constants', () => {
+      const src = `
+        <script>
+          let count = 0;
+          let double = derive(count * 2);
+          let quad = derive(double * 2);
+        </script>
+        <div>{double} - {quad}</div>
+      `;
+      const module = compile(src);
+      expect(module.declaredVars).toContain('count');
+      expect(module.declaredVars).toContain('double');
+      expect(module.declaredVars).toContain('quad');
+
+      expect(module.derived).toBeDefined();
+      expect(module.derived?.length).toBe(2);
+
+      const doubleBinding = module.derived?.find((d) => d.name === 'double');
+      expect(doubleBinding).toBeDefined();
+      expect(doubleBinding?.deps).toEqual(['count']);
+
+      const quadBinding = module.derived?.find((d) => d.name === 'quad');
+      expect(quadBinding).toBeDefined();
+      expect(quadBinding?.deps).toEqual(['double']);
+    });
+
+    it('extracts derive(() => { ... }) function block bindings', () => {
+      const src = `
+        <script>
+          let count = 5;
+          let status = derive(() => {
+            if (count > 0) return 'Positive';
+            return 'ZeroOrNegative';
+          });
+        </script>
+        <div>{status}</div>
+      `;
+      const module = compile(src);
+      const statusBinding = module.derived?.find((d) => d.name === 'status');
+      expect(statusBinding).toBeDefined();
+      expect(statusBinding?.deps).toEqual(['count']);
+    });
+  });
 });
 

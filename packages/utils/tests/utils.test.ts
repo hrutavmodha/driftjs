@@ -188,18 +188,39 @@ describe('driftjs-shared Module', () => {
   });
 
   describe('populateItemScope (BUG-004)', () => {
-    it('evaluates dynamic default expressions against active scope in destructuring patterns', () => {
+    it('resolves literals and scope variables in destructuring default values', () => {
       const scope: Record<string, any> = {
-        basePrefix: 'user_',
         defaultRole: 'member',
-        getFallbackName: () => 'Anonymous',
+        defaultCount: 10,
       };
 
-      populateItemScope(scope, '{ id, name = getFallbackName(), role = defaultRole }', { id: 101 }, null, 0);
+      populateItemScope(
+        scope,
+        '{ id, name = "Anonymous", role = defaultRole, count = defaultCount }',
+        { id: 101 },
+        null,
+        0
+      );
 
       expect(scope.id).toBe(101);
       expect(scope.name).toBe('Anonymous');
       expect(scope.role).toBe('member');
+      expect(scope.count).toBe(10);
+    });
+
+    it('strictly prevents prototype pollution via __proto__, constructor, and prototype', () => {
+      const scope: Record<string, any> = {};
+
+      populateItemScope(scope, '__proto__', { polluted: true }, null, 0);
+      populateItemScope(scope, '{ __proto__: p1, constructor: c1, prototype: pr1 }', { __proto__: { evil: true } }, null, 0);
+      setScopeValue(scope, '__proto__', { polluted: true });
+      setScopeValue(scope, 'constructor', { polluted: true });
+      setScopeValue(scope, 'prototype', { polluted: true });
+      setScopeValue(scope, '__drift_mark_dirty__', () => {});
+
+      expect((Object.prototype as any).polluted).toBeUndefined();
+      expect((Object.prototype as any).evil).toBeUndefined();
+      expect(scope.__proto__).toBe(Object.prototype);
     });
   });
 });

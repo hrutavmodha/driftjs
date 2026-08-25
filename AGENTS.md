@@ -48,6 +48,7 @@ driftjs/
 │   │   │   └── index.ts   # VMExecutionOptions, ReactiveRegion, LoopFrame, ItemRecord
 │   │   ├── tests/
 │   │   │   ├── client.test.ts
+│   │   │   ├── derived.test.ts
 │   │   │   ├── edge-cases.test.ts
 │   │   │   ├── context.test.ts
 │   │   │   ├── async.test.ts
@@ -155,7 +156,8 @@ driftjs/
 │   ├── ISA.md             # Virtual Machine Instruction Set Architecture reference
 │   ├── BUGS.md            # Bug audit report & known defect tracking
 │   ├── TESTS.md           # Full test suite matrix
-│   └── RESULTS.md         # Benchmark & performance test results
+│   ├── RESULTS.md         # Benchmark & performance test results
+│   └── TODO.md            # Feature implementation roadmap ($derived, $effect, @bind, slots)
 │
 ├── scripts/               # Workspace helper scripts (versioning, template sync)
 ├── package.json           # Root monorepo config (pnpm workspaces)
@@ -183,7 +185,7 @@ driftjs/
 
 ```bash
 pnpm install          # Install all workspace dependencies
-pnpm build            # Build all packages (runs `tsc` in each package)
+pnpm build            # Build all packages (runs `vite build` in each package)
 pnpm test             # Run full Vitest test suite (160+ unit & integration tests)
 pnpm typecheck        # Type-check workspace across all packages (tsc --noEmit)
 ```

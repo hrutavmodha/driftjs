@@ -71,7 +71,11 @@ export function reconcileKeyedList(
 ): void {
   const removeRecordNodes = (rec: ItemRecord) => {
     if (removeItem) {
-      try { removeItem(rec); } catch {}
+      try {
+        removeItem(rec);
+      } catch (e) {
+        console.error('[DriftDOM] Error in removeItem cleanup handler:', e);
+      }
     }
     for (let nIdx = 0; nIdx < rec.nodes.length; nIdx++) {
       const n = rec.nodes[nIdx];

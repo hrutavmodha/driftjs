@@ -38,7 +38,7 @@ export function parseQuery(search: string): RouteQuery {
   const seenKeys = new Set<string>();
 
   for (const key of params.keys()) {
-    if (key === '__proto__' || seenKeys.has(key)) continue;
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype' || seenKeys.has(key)) continue;
     seenKeys.add(key);
     const values = params.getAll(key);
     query[key] = values.length > 1 ? values : (values[0] ?? null);
@@ -51,11 +51,11 @@ export function parseQuery(search: string): RouteQuery {
     if (eqIdx === -1) {
       try {
         const decoded = decodeURIComponent(segment);
-        if (decoded !== '__proto__' && query[decoded] === '') {
+        if (decoded !== '__proto__' && decoded !== 'constructor' && decoded !== 'prototype' && query[decoded] === '') {
           query[decoded] = null;
         }
       } catch {
-        if (segment !== '__proto__' && query[segment] === '') {
+        if (segment !== '__proto__' && segment !== 'constructor' && segment !== 'prototype' && query[segment] === '') {
           query[segment] = null;
         }
       }

@@ -39,6 +39,15 @@ describe('Route Matcher & Query Parser (driftjs-router)', () => {
       expect(stringifyQuery({ q: 'drift', page: '2' })).toBe('?q=drift&page=2');
       expect(stringifyQuery({ tag: ['a', 'b'], flag: null })).toBe('?tag=a&tag=b&flag');
     });
+
+    it('strictly filters __proto__, constructor, and prototype to prevent prototype pollution', () => {
+      const q = parseQuery('?__proto__[polluted]=true&constructor=admin&prototype=root&valid=123');
+      expect(q.valid).toBe('123');
+      expect((q as any).__proto__).toBeUndefined();
+      expect((q as any).constructor).toBeUndefined();
+      expect((q as any).prototype).toBeUndefined();
+      expect((Object.prototype as any).polluted).toBeUndefined();
+    });
   });
 
   describe('Path Regex Compiler & Normalizer', () => {

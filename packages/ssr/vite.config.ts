@@ -4,11 +4,12 @@ import path from 'path';
 export default defineConfig({
   build: {
     lib: {
+      formats: ['es', 'cjs'],
       entry: path.resolve(__dirname, 'src/index.ts'),
       name: 'DriftSSR',
       fileName: (format) => `index-${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: ['driftjs-shared'],
     },
   },

@@ -19,7 +19,7 @@ export default defineConfig({
       name: 'DriftVitePlugin',
       fileName: (format: string) => `index-${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
         'vite',
         /^node:/,

@@ -7,10 +7,10 @@ export default defineConfig({
     ssr: true,
     lib: {
       entry: path.resolve(__dirname, 'src/index.ts'),
-      formats: ['es'],
-      fileName: () => 'index.js',
+      formats: ['es', 'cjs'],
+      fileName: (format: string) => (format === 'es' ? 'index.js' : 'index-cjs.js'),
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
         'node:fs',
         'node:path',

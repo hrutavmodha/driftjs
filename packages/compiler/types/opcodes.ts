@@ -39,6 +39,15 @@ export interface ImportSpec {
 }
 
 /**
+ * Describes a computed / derived reactive variable and its state dependencies.
+ */
+export interface DerivedBinding {
+  readonly name: string;
+  readonly deps: readonly string[];
+  readonly exprIdx: number;
+}
+
+/**
  * Output module emitted by DriftGenerator.
  */
 export interface CompiledModule {
@@ -47,6 +56,8 @@ export interface CompiledModule {
   readonly reactiveBindings?: readonly ReactiveBinding[];
   /** All variable names declared in the component's <script> block. Used by the runtime for change-detection. */
   readonly declaredVars?: readonly string[];
+  /** Derived/computed state variables declared with derive(...) */
+  readonly derived?: readonly DerivedBinding[];
   /** Import statements declared in the component's <script> block. */
   readonly imports?: readonly ImportSpec[];
   /** Component scope containing imported components or scope bindings. */

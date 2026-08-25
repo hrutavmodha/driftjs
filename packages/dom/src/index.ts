@@ -1,6 +1,7 @@
 import type {
   CompiledModule,
   ReactiveBinding,
+  DerivedBinding,
   ItemRecord,
   VMExecutionOptions,
   ReactiveRegion,
@@ -87,7 +88,8 @@ export class DriftClientVM {
   private isUpdateScheduled = false;
   private isUnmounted = false;
   private static readonly MAX_FLUSH_ITERATIONS = 100;
-  private flushRecursionCount = 0;
+  private depToDerived = new Map<string, DerivedBinding[]>();
+  private derivedCache = new Map<string, { val: any; isDirty: boolean; exprConst: any }>();
 
   public parentVM: DriftClientVM | null = null;
   public contextMap = new Map<symbol | string, any>();
@@ -299,6 +301,8 @@ export class DriftClientVM {
 
     this.registers.fill(null);
     this.pendingDirtyVars.clear();
+    this.depToDerived.clear();
+    this.derivedCache.clear();
     this.isUpdateScheduled = false;
     this.scope = {};
     this.module = null;
@@ -309,32 +313,47 @@ export class DriftClientVM {
   public markDirty(varName: string): void {
     if (!this.module) return;
     this.pendingDirtyVars.add(varName);
+    this.invalidateDerived(varName);
     if (!this.isUpdateScheduled) {
       this.isUpdateScheduled = true;
       queueMicrotask(() => this.flushUpdates());
     }
   }
 
+  private invalidateDerived(varName: string, visited: Set<string> = new Set()): void {
+    if (visited.has(varName)) return;
+    visited.add(varName);
+
+    const derivedList = this.depToDerived.get(varName);
+    if (derivedList && derivedList.length > 0) {
+      for (const d of derivedList) {
+        const cache = this.derivedCache.get(d.name);
+        if (cache) {
+          cache.isDirty = true;
+        }
+        this.pendingDirtyVars.add(d.name);
+        this.invalidateDerived(d.name, visited);
+      }
+    }
+  }
+
   private flushUpdates(): void {
     this.isUpdateScheduled = false;
-    if (!this.module || this.pendingDirtyVars.size === 0) {
-      this.flushRecursionCount = 0;
-      return;
-    }
-    if (this.flushRecursionCount >= DriftClientVM.MAX_FLUSH_ITERATIONS) {
+    if (!this.module || this.pendingDirtyVars.size === 0) return;
+
+    let iterations = 0;
+    while (this.pendingDirtyVars.size > 0) {
+      if (iterations >= DriftClientVM.MAX_FLUSH_ITERATIONS) {
+        this.pendingDirtyVars.clear();
+        console.error(
+          `DriftClientVM: Maximum recursive update limit (${DriftClientVM.MAX_FLUSH_ITERATIONS}) exceeded. Possible infinite reactivity loop detected.`
+        );
+        break;
+      }
+      iterations++;
+      const dirty = new Set(this.pendingDirtyVars);
       this.pendingDirtyVars.clear();
-      this.flushRecursionCount = 0;
-      console.error(
-        `DriftClientVM: Maximum recursive update limit (${DriftClientVM.MAX_FLUSH_ITERATIONS}) exceeded. Possible infinite reactivity loop detected.`
-      );
-      return;
-    }
-    this.flushRecursionCount++;
-    const dirty = new Set(this.pendingDirtyVars);
-    this.pendingDirtyVars.clear();
-    this.triggerUpdates(dirty);
-    if (this.pendingDirtyVars.size === 0) {
-      this.flushRecursionCount = 0;
+      this.triggerUpdates(dirty);
     }
   }
 
@@ -346,7 +365,7 @@ export class DriftClientVM {
     const dirtyPropVars = new Set<string>();
 
     for (const key of Object.keys(newPropsObj)) {
-      if (key === '__drift_props__') continue;
+      if (key === '__drift_props__' || key === '__proto__' || key === 'constructor' || key === 'prototype' || key === '__drift_mark_dirty__') continue;
       const newVal = newPropsObj[key];
       const oldVal = oldProps[key];
       if (newVal !== oldVal) {
@@ -356,7 +375,7 @@ export class DriftClientVM {
     }
 
     for (const key of Object.keys(oldProps)) {
-      if (key === '__drift_props__') continue;
+      if (key === '__drift_props__' || key === '__proto__' || key === 'constructor' || key === 'prototype' || key === '__drift_mark_dirty__') continue;
       if (!Object.prototype.hasOwnProperty.call(newPropsObj, key)) {
         setScopeValue(childScope, key, undefined);
         dirtyPropVars.add(key);
@@ -1080,14 +1099,13 @@ export class DriftClientVM {
     );
     Object.defineProperty(scope, '__drift_mark_dirty__', {
       value: (name: string) => this.markDirty(name),
-      writable: true,
-      configurable: true,
+      writable: false,
+      configurable: false,
       enumerable: false,
     });
+
     this.scope = scope;
     this.module = module;
-    // Prefer the explicit declaredVars list emitted by the generator (contains ALL script-declared
-    // variables). Fall back to deriving from reactiveBindings for hand-crafted test modules.
     if (module.declaredVars && module.declaredVars.length > 0) {
       this.declaredVars = new Set(module.declaredVars);
     } else {
@@ -1095,6 +1113,41 @@ export class DriftClientVM {
         (module.reactiveBindings ?? []).map((b) => b.variable)
       );
     }
+
+    this.depToDerived.clear();
+    this.derivedCache.clear();
+
+    if (module.derived && module.derived.length > 0) {
+      for (const d of module.derived) {
+        for (const dep of d.deps) {
+          if (!this.depToDerived.has(dep)) {
+            this.depToDerived.set(dep, []);
+          }
+          this.depToDerived.get(dep)!.push(d);
+        }
+
+        const exprConst = module.constants[d.exprIdx];
+        const cacheEntry = {
+          val: undefined,
+          isDirty: true,
+          exprConst,
+        };
+        this.derivedCache.set(d.name, cacheEntry);
+
+        Object.defineProperty(scope, d.name, {
+          get: () => {
+            if (cacheEntry.isDirty) {
+              cacheEntry.val = evaluateExpression(cacheEntry.exprConst, scope, this.declaredVars);
+              cacheEntry.isDirty = false;
+            }
+            return cacheEntry.val;
+          },
+          enumerable: true,
+          configurable: true,
+        });
+      }
+    }
+
     this.registers.fill(undefined);
 
     pushActiveVM(this);

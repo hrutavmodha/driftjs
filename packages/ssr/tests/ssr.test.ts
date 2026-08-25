@@ -238,4 +238,25 @@ describe('DriftServerVM (SSR Engine)', () => {
     expect(html).toContain('style="background-color: #3b82f6; border-radius: 12px; padding: 20px; opacity: 0.9; z-index: 5"');
     expect(html).toContain('<span>SSR Content</span>');
   });
+
+  it('renders derive() computed values to string correctly in SSR', () => {
+    const src = `
+      <script>
+        let count = 4;
+        let double = derive(count * 2);
+        let status = derive(() => count > 0 ? 'Positive' : 'ZeroOrNegative');
+      </script>
+      <div class="result">
+        <span>{count}</span>
+        <span>{double}</span>
+        <span>{status}</span>
+      </div>
+    `;
+    const compiled = compile(src);
+    const html = renderToString(compiled);
+
+    expect(html).toContain('<span>4</span>');
+    expect(html).toContain('<span>8</span>');
+    expect(html).toContain('<span>Positive</span>');
+  });
 });

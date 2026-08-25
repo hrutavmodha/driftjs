@@ -25,7 +25,7 @@ export default defineConfig({
       name: 'DriftRuntime',
       fileName: (format: string) => `index-${format}.js`,
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: ['driftjs-shared'],
     },
   },

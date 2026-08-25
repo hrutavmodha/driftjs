@@ -88,7 +88,8 @@ async function resolveAsyncComponents(matched: RouteLocationNormalized['matched'
           const resolved = await comp();
           record.components[key] = resolved?.default || resolved;
         } catch (e) {
-          // Keep raw or log error
+          console.error(`[DriftRouter] Failed to resolve async route component for path "${record.path}":`, e);
+          throw e;
         }
       }
     }

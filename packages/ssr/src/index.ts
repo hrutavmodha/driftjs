@@ -80,6 +80,18 @@ export class DriftServerVM {
       Object.create(parentScope),
       module.scope
     );
+
+    if (module.derived && module.derived.length > 0) {
+      for (const d of module.derived) {
+        const exprConst = module.constants[d.exprIdx];
+        Object.defineProperty(this.scope, d.name, {
+          get: () => evaluateExpression(exprConst, this.scope, this.declaredVars),
+          enumerable: true,
+          configurable: true,
+        });
+      }
+    }
+
     this.declaredVars = new Set(module.declaredVars ?? []);
     this.registers.fill(null as any);
 
