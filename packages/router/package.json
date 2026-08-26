@@ -1,6 +1,6 @@
 {
   "name": "driftjs-router",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Client-side SPA router for DriftJS with history, hash, and memory drivers, dynamic route parameters, nested routes/outlets, scroll restoration, and navigation guards.",
   "keywords": [
     "driftjs",
