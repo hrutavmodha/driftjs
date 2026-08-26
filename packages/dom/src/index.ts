@@ -82,7 +82,7 @@ export class DriftClientVM {
   private delegatedEvents = new Set<string>();
   private static eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
   private cursor: HydrationCursor | null = null;
-  private childVMs = new WeakMap<Node, { vm: DriftClientVM; scope: Record<string, any>; propsSpec: any; nodes?: Node[] }>();
+  private childVMs = new WeakMap<Node, { vm: DriftClientVM; scope: Record<string, any>; propsSpec: any; nodes?: Node[]; childrenVM?: DriftClientVM | null }>();
   private mountedChildVMs = new Set<DriftClientVM>();
   private pendingDirtyVars = new Set<string>();
   private isUpdateScheduled = false;

@@ -11,7 +11,7 @@
     "snippets",
     "sfc"
   ],
-  "version": "0.0.9",
+  "version": "0.0.10",
   "type": "module",
   "publisher": "driftjs",
   "icon": "assets/icon.png",
