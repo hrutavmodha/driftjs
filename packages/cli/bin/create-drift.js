@@ -140,11 +140,8 @@ Examples:
   const s = p.spinner();
   s.start(`Scaffolding DriftJS app in ${pc.yellow(targetDir)}...`);
 
-  // Locate template directory (package relative or monorepo root)
-  let templateDir = path.resolve(__dirname, '../template');
-  if (!fs.existsSync(templateDir)) {
-    templateDir = path.resolve(__dirname, '../../../template');
-  }
+  // Locate template directory inside package
+  const templateDir = path.resolve(__dirname, '../template');
 
   try {
     scaffoldProject({

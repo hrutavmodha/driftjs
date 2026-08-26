@@ -133,23 +133,14 @@ driftjs/
 │       ├── src/
 │       │   ├── extension.ts # VSCode extension activation & LSP client
 │       │   └── server.ts    # Language server (diagnostics, completions, hover info)
+│       ├── assets/
+│       │   └── icon.png     # Extension icon
 │       ├── syntaxes/
 │       │   └── drift.tmLanguage.json # TextMate grammar for .drift syntax highlighting
 │       ├── snippets.json    # HTML & Drift directive snippets
 │       ├── language-configuration.json
 │       ├── package.json
 │       └── tsconfig.json
-│
-├── template/              # Root starter template for CSR & SSR apps
-│   ├── index.html
-│   ├── vite.config.ts
-│   ├── package.json
-│   ├── server.js          # SSR Express/Node entry
-│   └── src/
-│       ├── App.drift      # Main counter/reactive SFC
-│       ├── main.ts        # Client mount entry
-│       ├── style.css
-│       └── drift.d.ts
 │
 ├── playground/            # Local interactive playground for manual testing
 ├── docs/
@@ -159,7 +150,7 @@ driftjs/
 │   ├── RESULTS.md         # Benchmark & performance test results
 │   └── TODO.md            # Feature implementation roadmap ($derived, $effect, @bind, slots)
 │
-├── scripts/               # Workspace helper scripts (versioning, template sync)
+├── scripts/               # Workspace helper scripts (versioning)
 ├── package.json           # Root monorepo config (pnpm workspaces)
 ├── pnpm-workspace.yaml    # Workspace package configuration
 ├── tsconfig.json          # Root strict TypeScript config

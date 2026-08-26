@@ -36,11 +36,8 @@
     }
   },
   "scripts": {
-    "prebuild": "node ../../scripts/template/copy.js",
-    "build": "pnpm prebuild && vite build",
-    "test": "vitest run",
-    "postpack": "node ../../scripts/template/clean.js",
-    "postpublish": "node ../../scripts/template/clean.js"
+    "build": "vite build",
+    "test": "vitest run"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0",

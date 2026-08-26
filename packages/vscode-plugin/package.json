@@ -14,6 +14,7 @@
   "version": "0.0.8",
   "type": "module",
   "publisher": "driftjs",
+  "icon": "assets/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",

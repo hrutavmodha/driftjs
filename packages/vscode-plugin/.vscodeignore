@@ -1,0 +1,7 @@
+.vscode/**
+.vscode-test/**
+src/**
+tests/**
+tsconfig.json
+vite.config.ts
+*.vsix

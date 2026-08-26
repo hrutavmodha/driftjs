@@ -18,9 +18,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "publish": "pnpm -r publish --no-git-checks --access public",
-    "patch": "node scripts/version/patch.js",
-    "minor": "node scripts/version/minor.js",
-    "major": "node scripts/version/major.js"
+    "patch": "node scripts/patch.js",
+    "minor": "node scripts/minor.js",
+    "major": "node scripts/major.js"
   },
   "devDependencies": {
     "@vitest/browser": "4.1.10",

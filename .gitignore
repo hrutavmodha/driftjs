@@ -12,7 +12,6 @@ temp/
 *.vsix
 scratch/
 my-app/
-packages/cli/template/
 *.tgz
 *.env
 prompts/

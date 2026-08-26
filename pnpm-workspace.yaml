@@ -1,6 +1,5 @@
 packages:
   - 'packages/*'
-  - 'template'
   - 'playground'
 allowBuilds:
   '@vscode/vsce-sign': true

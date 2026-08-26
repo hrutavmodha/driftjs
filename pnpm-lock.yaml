@@ -233,28 +233,6 @@ importers:
         specifier: ^8.1.5
         version: 8.1.5(@types/node@26.1.1)
 
-  template:
-    dependencies:
-      driftjs-compiler:
-        specifier: workspace:*
-        version: link:../packages/compiler
-      driftjs-dom:
-        specifier: workspace:*
-        version: link:../packages/dom
-      driftjs-ssr:
-        specifier: workspace:*
-        version: link:../packages/ssr
-    devDependencies:
-      driftjs-vite-plugin:
-        specifier: workspace:*
-        version: link:../packages/vite-plugin
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vite:
-        specifier: ^8.1.5
-        version: 8.1.5(@types/node@26.1.1)
-
 packages:
 
   '@azu/format-text@1.0.2':
