@@ -45,8 +45,14 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish Packages
+      - name: Publish Packages to NPM
         run: pnpm publish -r --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish VS Code Extension to Marketplace
+        if: env.VSCE_PAT != ''
+        run: pnpm --filter drift-vscode exec vsce publish --no-dependencies -p "${VSCE_PAT}"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}

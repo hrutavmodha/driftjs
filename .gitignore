@@ -16,3 +16,4 @@ my-app/
 *.env
 prompts/
 __screenshots__/
+process-images/
