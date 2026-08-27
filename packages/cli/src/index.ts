@@ -77,7 +77,7 @@ export function scaffoldProject(options: ScaffoldOptions): void {
   }
 }
 
-export function sanitizeDependencies(deps?: Record<string, string>, targetVersion: string = '^0.0.10'): void {
+export function sanitizeDependencies(deps?: Record<string, string>, targetVersion: string = '^0.0.11'): void {
   if (!deps) return;
   const bareVersion = targetVersion.replace(/^[\^~]/, '');
   const defaultCaret = targetVersion.startsWith('^') ? targetVersion : `^${bareVersion}`;

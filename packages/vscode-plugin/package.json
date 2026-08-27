@@ -11,7 +11,7 @@
     "snippets",
     "sfc"
   ],
-  "version": "0.0.10",
+  "version": "0.0.11",
   "type": "module",
   "publisher": "driftjs",
   "icon": "assets/icon.png",
@@ -44,7 +44,11 @@
         "extensions": [
           ".drift"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./assets/icon.png",
+          "dark": "./assets/icon.png"
+        }
       }
     ],
     "grammars": [

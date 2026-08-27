@@ -17,3 +17,5 @@ my-app/
 prompts/
 __screenshots__/
 process-images/
+html/
+coverage/
