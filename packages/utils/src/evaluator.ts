@@ -21,12 +21,10 @@ export function executePrecompiledFn(node: any, scope: Record<string, any>, decl
   if (typeof node.__drift_fn__ === 'function') {
     return node.__drift_fn__(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue);
   }
-  if (!node._executableFn) {
-    node._executableFn = typeof node.__drift_fn__ === 'string'
-      ? new Function('return (' + node.__drift_fn__ + ')')()
-      : node.__drift_fn__;
+  if (typeof node._executableFn === 'function') {
+    return node._executableFn(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue);
   }
-  return node._executableFn(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue);
+  return undefined;
 }
 
 /**

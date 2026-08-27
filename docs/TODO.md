@@ -48,7 +48,38 @@ In Single File Components (`.drift`), derived reactive state is authored via `de
 
 ---
 
-## ⚡ Priority 2: Reactive Side-Effects & Watchers (`$effect` / `watch`)
+## 🌊 Priority 1 (Next Up): Streaming SSR (`renderToReadableStream` / `pipeToNodeStream`)
+
+### Overview
+Enable progressive HTML streaming for DriftJS server-side rendering, allowing initial shells to reach the browser immediately while asynchronous data/components resolve concurrently.
+
+### Architecture & Design
+1. **Web Streams & Node.js Stream Adapters (`driftjs-ssr`):**
+   - `renderToReadableStream(component, options)`: Returns a Web Standard `ReadableStream` for Edge runtimes (Cloudflare Workers, Deno, Bun).
+   - `renderToPipeableStream(component, options)`: Exposes Node.js stream integration (`pipe(res)`) with `onShellReady`, `onAllReady`, and `onError` lifecycle hooks.
+2. **Async Boundaries & Out-of-Order Streaming:**
+   - Stream high-priority layout and static HTML chunks immediately (TTFB optimization).
+   - Anchor asynchronous sub-trees with placeholder comment markers (`<!--drift-async:id-->`).
+   - Emit resolved asynchronous chunks inline as `<template id="drift-async:id">...</template>` followed by lightweight replacement script snippets that swap content into place before hydration.
+
+---
+
+## ⚡ Priority 2: Selective & Progressive Hydration
+
+### Overview
+Upgrade `driftjs-dom` hydration from a monolithic full-page scan to fine-grained, non-blocking selective hydration of independent component subtrees.
+
+### Architecture & Design
+1. **Partial / Island Hydration Triggers:**
+   - **`hydrateOnIdle`**: Hydrates interactive subtrees during browser idle periods (`requestIdleCallback`).
+   - **`hydrateWhenVisible`**: Defers subtree hydration until the component enters the viewport (`IntersectionObserver`).
+   - **`hydrateOnInteraction`**: Defers event listener attachment and VM instantiation until the user hovers, touches, or clicks the element.
+2. **TreeWalker Hydration Cursor Integration:**
+   - Uses existing `HydrationCursor` comment anchors (`<!--if-->`, `<!--for-->`, `<!--comp:name-->`) to claim DOM sub-trees on-demand without reconstructing or resetting state.
+
+---
+
+## 🔄 Priority 3: Reactive Side-Effects & Watchers (`$effect` / `watch`)
 
 ### Proposed Design
 Allow developers to execute asynchronous or synchronous side-effects whenever targeted dependencies change:
@@ -68,7 +99,7 @@ Allow developers to execute asynchronous or synchronous side-effects whenever ta
 
 ---
 
-## 🔀 Priority 3: Two-Way Form Binding (`@bind` / `bind:value`)
+## 🔀 Priority 4: Two-Way Form Binding (`@bind` / `bind:value`)
 
 ### Proposed Design
 Eliminate manual `value={val} oninput={(e) => val = e.target.value}` boilerplate with native compiler transformation:

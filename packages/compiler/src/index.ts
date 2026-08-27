@@ -15,6 +15,7 @@ import { DriftGenerator } from './generator.js';
  *
  * @param src - The template source string to compile.
  * @param debug - If true, logs intermediate AST and final compiled module.
+ * @param instantiateFns - If true, instantiates function strings into native functions (default: true).
  */
 export function compile(src: string, debug: boolean = false) {
     const lexer = new DriftLexer(src);

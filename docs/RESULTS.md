@@ -109,3 +109,40 @@ This document maintains official benchmark results for **DriftJS** against compe
 | **41. Uncompressed Size (kB)** | `11.3` | `37.3` | `64.4` | ✅ DriftJS (~1.73× smaller) |
 | **42. Compressed Size (kB)** | `2.5` | `8.1` | `23.3` | ✅ DriftJS (~2.88× smaller / 65% reduction) |
 | **43. First Paint (ms)** | `219.9` | `297.9` | `273.8` | ❌ Vue (~1.08× faster) |
+
+---
+
+## 🏆 Level 4: SolidJS (`v1.9.3`) Comparison
+
+*Status: **CHALLENGER STAGE** — Tested against SolidJS (`v1.9.3`) using `drift-v0.0.4-keyed` implementation.*
+
+### 1. CPU Benchmarks (Duration in ms)
+*Values reported as **Mean Duration** in milliseconds (with **Scripting Time** in parentheses).*
+
+| Metric / Benchmark | VanillaJS | DriftJS (`v0.0.4`) | SolidJS (`v1.9.3`) | Result |
+| :--- | :---: | :---: | :---: | :--- |
+| **01. Create 1,000 rows** | `187.9` *(19.3)* | `262.3` *(95.0)* | `188.9` *(27.2)* | ❌ Solid (~1.39× faster) |
+| **02. Replace 1,000 rows** | `206.6` *(32.0)* | `318.6` *(119.5)* | `238.0` *(49.9)* | ❌ Solid (~1.34× faster) |
+| **03. Update every 10th row (1k)** | `29.4` *(1.0)* | `74.9` *(39.2)* | `29.4` *(1.8)* | ❌ Solid (~2.55× faster) |
+| **04. Select row (1k)** | `10.9` *(0.8)* | `31.4` *(24.8)* | `10.2` *(1.8)* | ❌ Solid (~3.08× faster) |
+| **05. Swap rows (1k)** | `31.9` *(0.5)* | `54.4` *(24.2)* | `35.0` *(1.9)* | ❌ Solid (~1.55× faster) |
+| **06. Remove single row (1k)** | `62.8` *(1.2)* | `62.4` *(23.5)* | `48.3` *(1.4)* | ❌ Solid (~1.29× faster) |
+| **07. Create 10,000 rows** | `1,634.9` *(147.0)* | `2,387.3` *(794.1)* | `1,694.5` *(199.9)* | ❌ Solid (~1.41× faster) |
+| **08. Append 1,000 rows to 1k** | `200.3` *(15.4)* | `310.5` *(96.3)* | `201.6` *(24.8)* | ❌ Solid (~1.54× faster) |
+| **09. Clear 1,000 rows** | `19.7` *(15.2)* | `27.4` *(24.2)* | `26.7` *(22.1)* | ❌ Solid (~1.03× faster) |
+
+### 2. Memory Footprint (in MB)
+
+| Metric / Benchmark | VanillaJS | DriftJS (`v0.0.4`) | SolidJS (`v1.9.3`) | Result |
+| :--- | :---: | :---: | :---: | :--- |
+| **21. Ready Memory** | `0.57` | `1.23` | `0.58` | ❌ Solid (~2.12× less memory) |
+| **22. Run Memory (1k rows)** | `1.89` | `3.20` | `2.63` | ❌ Solid (~1.22× less memory) |
+| **25. Run-Clear Memory** | `0.62` | `1.70` | `0.75` | ❌ Solid (~2.27× less memory) |
+
+### 3. Implementation Size & Startup
+
+| Metric / Benchmark | VanillaJS | DriftJS (`v0.0.4`) | SolidJS (`v1.9.3`) | Result |
+| :--- | :---: | :---: | :---: | :--- |
+| **41. Uncompressed Size (kB)** | `11.3` | `164.1` | `11.5` | ❌ Solid (~14.27× smaller) |
+| **42. Compressed Size (kB)** | `2.5` | `38.2` | `4.5` | ❌ Solid (~8.49× smaller) |
+| **43. First Paint (ms)** | `257.6` | `663.3` | `301.6` | ❌ Solid (~2.20× faster) |
