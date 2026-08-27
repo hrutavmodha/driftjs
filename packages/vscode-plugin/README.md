@@ -13,7 +13,7 @@ Official Visual Studio Code extension providing language support, syntax highlig
 Search for **DriftJS Language Support** in the VS Code Extensions Marketplace (`Ctrl+Shift+X` or `Cmd+Shift+X`), or install via VSIX file:
 
 ```bash
-code --install-extension drift-vscode-0.0.4.vsix
+code --install-extension driftjs-vscode.vsix
 ```
 
 ## License

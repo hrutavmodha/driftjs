@@ -21,7 +21,7 @@ body:
         - "driftjs-shared (Scope Engine, Expression Evaluation, AST Execution)"
         - "driftjs-vite-plugin (Vite Plugin, AOT Build Optimizations, HMR)"
         - "create-drift (CLI Scaffolding Tool, Templates & Presets)"
-        - "drift-vscode (Language Server Protocol, Syntax Highlighting, Formatting, Tooling)"
+        - "driftjs-vscode (Language Server Protocol, Syntax Highlighting, Formatting, Tooling)"
         - "Instruction Set Architecture (ISA Opcodes & Bytecode Format)"
         - "Documentation, Benchmarks & Examples"
         - "Other / General Architecture"

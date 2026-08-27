@@ -21,7 +21,7 @@ body:
         - "driftjs-shared (Scope Chain, Expression Evaluator, Precompiled AST Execution)"
         - "driftjs-vite-plugin (Vite Plugin, AOT Transform, HMR, Module Serialization)"
         - "create-drift (CLI Scaffolder, Starter Templates, CSR/SSR Options)"
-        - "drift-vscode (Language Server Protocol, Syntax Highlighting, Diagnostics, Snippets)"
+        - "driftjs-vscode (Language Server Protocol, Syntax Highlighting, Diagnostics, Snippets)"
         - "Playground / Starter Template"
         - "Documentation / ISA Specification"
         - "Other / Workspace Infrastructure"

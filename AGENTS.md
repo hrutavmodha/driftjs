@@ -129,7 +129,7 @@ driftjs/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   └── vscode-plugin/     # drift-vscode — VSCode Extension & Language Server
+│   └── vscode-plugin/     # driftjs-vscode — VSCode Extension & Language Server
 │       ├── src/
 │       │   ├── extension.ts # VSCode extension activation & LSP client
 │       │   └── server.ts    # Language server (diagnostics, completions, hover info)
@@ -182,7 +182,7 @@ pnpm typecheck        # Type-check workspace across all packages (tsc --noEmit)
 ```
 
 **Build Topological Order:**
-`driftjs-shared` -> `driftjs-compiler` -> `driftjs-dom` & `driftjs-ssr` -> `driftjs-vite-plugin` -> `create-drift` -> `drift-vscode`.
+`driftjs-shared` -> `driftjs-compiler` -> `driftjs-dom` & `driftjs-ssr` -> `driftjs-vite-plugin` -> `create-drift` -> `driftjs-vscode`.
 
 ---
 
