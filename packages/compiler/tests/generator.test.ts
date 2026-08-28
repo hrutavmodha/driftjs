@@ -3,11 +3,11 @@ import { compile } from '../src/index.js';
 import { Opcode } from '../types/index.js';
 
 describe('DriftGenerator', () => {
-  it('generates fragment and return for empty templates', () => {
+  it('generates fragment for empty templates', () => {
     const module = compile('');
 
     expect(module.constants).toEqual([]);
-    expect(module.bytecode).toEqual([Opcode.CREATE_FRAGMENT, 0, Opcode.RETURN, 0]);
+    expect(module.bytecode).toEqual([Opcode.CREATE_FRAGMENT, 0]);
   });
 
   it('generates direct root element for single top-level element', () => {
@@ -21,9 +21,6 @@ describe('DriftGenerator', () => {
     expect(module.bytecode[0]).toBe(Opcode.CREATE_ELEMENT);
     expect(module.bytecode[1]).toBe(0); // rootReg = 0
     expect(module.bytecode[2]).toBe(tagIdx);
-
-    expect(module.bytecode[module.bytecode.length - 2]).toBe(Opcode.RETURN);
-    expect(module.bytecode[module.bytecode.length - 1]).toBe(0);
   });
 
   it('generates fragment container for multiple top-level nodes', () => {
@@ -475,7 +472,7 @@ describe('DriftGenerator', () => {
       expect(childrenSubMod).toBeDefined();
       expect(childrenSubMod.bytecode).toBeDefined();
       expect(childrenSubMod.reactiveBindings).toEqual([
-        { variable: 'count', positions: [{ pc: 11, opcode: Opcode.INTERPOLATE_TEXT }] },
+        { variable: 'count', positions: [11] },
       ]);
     });
   });

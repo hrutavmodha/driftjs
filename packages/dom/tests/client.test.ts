@@ -323,12 +323,12 @@ describe('DriftClientVM', () => {
     const module: CompiledModule = {
       bytecode: [
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_FRAGMENT, 1,
-        Opcode.CREATE_ELEMENT, 2, 1,
-        Opcode.INTERPOLATE_TEXT, 3, 2,
+        Opcode.CREATE_FRAGMENT, 0,
+        Opcode.CREATE_ELEMENT, 1, 1,
+        Opcode.INTERPOLATE_TEXT, 2, 2,
         Opcode.RETURN,
-        Opcode.APPEND_CHILD, 2, 3,
         Opcode.APPEND_CHILD, 1, 2,
+        Opcode.APPEND_CHILD, 0, 1,
       ],
       constants: [scriptBody, 'p', countExpr],
       reactiveBindings: [{ variable: 'count', positions: [7] }],
@@ -931,10 +931,10 @@ describe('DriftClientVM', () => {
     const childComponent = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.CREATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         {
@@ -952,7 +952,7 @@ describe('DriftClientVM', () => {
     const parentComponent = {
       bytecode: new Uint32Array([
         Opcode.MOUNT_COMPONENT, 0, 0, 1,
-        Opcode.RETURN, 0,
+        Opcode.RETURN,
       ]),
       constants: [
         'Header',
@@ -974,17 +974,17 @@ describe('DriftClientVM', () => {
   it('reactively updates child component props when parent state changes', () => {
     const childComponent = {
       bytecode: new Uint32Array([
-        Opcode.CREATE_ELEMENT, 1, 0,
-        Opcode.INTERPOLATE_TEXT, 2, 1,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.INTERPOLATE_TEXT, 1, 1,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         'span',
         { __drift_fn__: '(scope) => scope.count' },
       ],
       reactiveBindings: [
-        { variable: 'count', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 3 }] },
+        { variable: 'count', positions: [3] },
       ],
       declaredVars: ['count'],
       scope: {},
@@ -993,14 +993,14 @@ describe('DriftClientVM', () => {
     const parentComponent = {
       bytecode: new Uint32Array([
         Opcode.MOUNT_COMPONENT, 0, 0, 1,
-        Opcode.RETURN, 0,
+        Opcode.RETURN,
       ]),
       constants: [
         'CounterDisplay',
         { __drift_props__: true, count: { __drift_fn__: '(scope) => scope.parentCount' } },
       ],
       reactiveBindings: [
-        { variable: 'parentCount', positions: [{ opcode: Opcode.MOUNT_COMPONENT, pc: 0 }] },
+        { variable: 'parentCount', positions: [0] },
       ],
       declaredVars: ['CounterDisplay', 'parentCount'],
       scope: {
@@ -1024,10 +1024,10 @@ describe('DriftClientVM', () => {
   it('supports direct props.key expressions in child templates', () => {
     const childComponent = {
       bytecode: new Uint32Array([
-        Opcode.CREATE_ELEMENT, 1, 0,
-        Opcode.INTERPOLATE_TEXT, 2, 1,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.INTERPOLATE_TEXT, 1, 1,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         'p',
@@ -1040,7 +1040,7 @@ describe('DriftClientVM', () => {
     const parentComponent = {
       bytecode: new Uint32Array([
         Opcode.MOUNT_COMPONENT, 0, 0, 1,
-        Opcode.RETURN, 0,
+        Opcode.RETURN,
       ]),
       constants: [
         'Child',

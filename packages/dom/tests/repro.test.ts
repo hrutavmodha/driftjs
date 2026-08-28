@@ -598,7 +598,7 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
 
     // Update handleClick to null
     vm.scope.handleClick = null;
-    (vm as any).updateAt(3, comp, { scope: vm.scope });
+    vm.triggerUpdates(new Set(['handleClick']));
 
     node.click();
     expect(handler).toHaveBeenCalledTimes(1);

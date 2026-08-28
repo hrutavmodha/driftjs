@@ -1013,39 +1013,47 @@ export class DriftClientVM {
     const rootNode = nodes[0]!;
     regs.set(0, rootNode);
 
-    if (nodes.length > 1) {
-      let childIdx = 0;
-      for (let pc = 0; pc < bytecode.length; ) {
-        const opcode = bytecode[pc]!;
-        if (
-          opcode === Opcode.CREATE_ELEMENT ||
-          opcode === Opcode.CREATE_TEXT ||
-          opcode === Opcode.CREATE_COMMENT ||
-          opcode === Opcode.INTERPOLATE_TEXT
-        ) {
-          const reg = bytecode[pc + 1]!;
-          if (childIdx < nodes.length) {
-            regs.set(reg, nodes[childIdx]!);
-            childIdx++;
-          }
-          pc += 3;
-        } else if (opcode === Opcode.SET_ATTR) {
-          pc += 5;
-        } else if (opcode === Opcode.MOUNT_COMPONENT) {
-          pc += 4;
-        } else if (opcode === Opcode.APPEND_CHILD) {
-          pc += 3;
-        } else if (opcode === Opcode.CREATE_FRAGMENT || opcode === Opcode.EXEC_SCRIPT) {
-          pc += 2;
-        } else if (opcode === Opcode.REACTIVE_IF) {
-          pc += 6;
-        } else if (opcode === Opcode.REACTIVE_FOR) {
-          pc += 8;
-        } else if (opcode === Opcode.RETURN) {
-          pc += 1;
-        } else {
-          break;
+    const elements: Node[] = [];
+    for (const n of nodes) {
+      if (n.nodeType === 1) {
+        elements.push(n);
+        elements.push(...(n as Element).querySelectorAll('*'));
+      } else {
+        elements.push(n);
+      }
+    }
+    let elemIdx = 0;
+    for (let pc = 0; pc < bytecode.length; ) {
+      const opcode = bytecode[pc]!;
+      if (opcode === Opcode.CREATE_ELEMENT) {
+        const reg = bytecode[pc + 1]!;
+        if (elemIdx < elements.length) {
+          regs.set(reg, elements[elemIdx]!);
+          elemIdx++;
         }
+        pc += 3;
+      } else if (
+        opcode === Opcode.CREATE_TEXT ||
+        opcode === Opcode.CREATE_COMMENT ||
+        opcode === Opcode.INTERPOLATE_TEXT
+      ) {
+        pc += 3;
+      } else if (opcode === Opcode.SET_ATTR) {
+        pc += 5;
+      } else if (opcode === Opcode.MOUNT_COMPONENT) {
+        pc += 4;
+      } else if (opcode === Opcode.APPEND_CHILD) {
+        pc += 3;
+      } else if (opcode === Opcode.CREATE_FRAGMENT || opcode === Opcode.EXEC_SCRIPT) {
+        pc += 2;
+      } else if (opcode === Opcode.REACTIVE_IF) {
+        pc += 6;
+      } else if (opcode === Opcode.REACTIVE_FOR) {
+        pc += 8;
+      } else if (opcode === Opcode.RETURN) {
+        pc += 1;
+      } else {
+        break;
       }
     }
 

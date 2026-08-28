@@ -29,10 +29,10 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const childComponent: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         {
@@ -52,8 +52,8 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const parentComponent: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF, // Child
-        Opcode.RETURN, 1,
+        Opcode.MOUNT_COMPONENT, 0, 1, 0xFF, // Child
+        Opcode.RETURN,
       ]),
       constants: [
         {
@@ -83,10 +83,10 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const deepChild: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         {
@@ -118,8 +118,8 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const grandparent: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF, // MiddleParent
-        Opcode.RETURN, 1,
+        Opcode.MOUNT_COMPONENT, 0, 1, 0xFF, // MiddleParent
+        Opcode.RETURN,
       ]),
       constants: [
         {
@@ -148,10 +148,10 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const deepChild: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         {
@@ -170,8 +170,8 @@ describe('DriftJS Global Context Mechanism (Client VM)', () => {
     const overriddenSubtree: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.MOUNT_COMPONENT, 1, 1, 0xFF, // deepChild
-        Opcode.RETURN, 1,
+        Opcode.MOUNT_COMPONENT, 0, 1, 0xFF, // deepChild
+        Opcode.RETURN,
       ]),
       constants: [
         {

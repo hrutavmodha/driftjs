@@ -9,10 +9,10 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
     const mod = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         { __drift_fn__: '(scope) => { scope.status = "idle"; }' },
@@ -20,7 +20,7 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
         { __drift_fn__: '(scope) => scope.status' },
       ],
       reactiveBindings: [
-        { variable: 'status', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 5 }] },
+        { variable: 'status', positions: [5] },
       ],
       declaredVars: ['status'],
       scope: {},
@@ -56,10 +56,10 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
     const mod = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         { __drift_fn__: '(scope) => { scope.count = 0; }' },
@@ -67,7 +67,7 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
         { __drift_fn__: '(scope) => scope.count' },
       ],
       reactiveBindings: [
-        { variable: 'count', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 5 }] },
+        { variable: 'count', positions: [5] },
       ],
       declaredVars: ['count'],
       scope: {},
@@ -93,14 +93,14 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
 
     const mod = {
       bytecode: new Uint32Array([
-        Opcode.CREATE_ELEMENT, 1, 0,
-        Opcode.INTERPOLATE_TEXT, 2, 1,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.INTERPOLATE_TEXT, 1, 1,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: ['div', { __drift_fn__: '(scope) => scope.val' }],
       reactiveBindings: [
-        { variable: 'val', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 2 }] },
+        { variable: 'val', positions: [3] },
       ],
       declaredVars: ['val'],
       scope: {},
@@ -134,17 +134,17 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
   it('triggers reactivity on array mutating calls (e.g. push)', async () => {
     const mod = {
       bytecode: new Uint32Array([
-        Opcode.CREATE_ELEMENT, 1, 0,
-        Opcode.INTERPOLATE_TEXT, 2, 1,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 0,
+        Opcode.INTERPOLATE_TEXT, 1, 1,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         'div',
         { __drift_fn__: '(scope) => scope.items.length' },
       ],
       reactiveBindings: [
-        { variable: 'items', positions: [{ opcode: Opcode.INTERPOLATE_TEXT, pc: 3 }] },
+        { variable: 'items', positions: [3] },
       ],
       declaredVars: ['items'],
       scope: { items: [1, 2] },
@@ -182,9 +182,10 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
 
     expect(root.textContent).toBe('initial');
 
-    await vm.scope.fetchAsyncData();
-    await Promise.resolve();
+    const scope = (vm as any).scope;
+    await scope.fetchAsyncData();
 
+    await Promise.resolve();
     expect(root.textContent).toBe('loaded async');
   });
 });

@@ -33,7 +33,7 @@ describe('driftjs-shared Module', () => {
 
   it('evaluates precompiled functions and closures', () => {
     const scope = { user: { age: 25 }, threshold: 20 };
-    const expr = { __drift_fn__: '(scope) => scope.user.age > scope.threshold' };
+    const expr = { __drift_fn__: (scope: any) => scope.user.age > scope.threshold };
 
     expect(evaluateExpression(expr, scope)).toBe(true);
 
@@ -62,7 +62,7 @@ describe('driftjs-shared Module', () => {
 
   it('executes precompiled script thunks and updates scope', () => {
     const scope = { val: 10 };
-    const statements = { __drift_fn__: '(scope) => { scope.val = 42; }' };
+    const statements = { __drift_fn__: (scope: any) => { scope.val = 42; } };
 
     evaluateExpression(statements, scope);
     expect(scope.val).toBe(42);
@@ -91,7 +91,7 @@ describe('driftjs-shared Module', () => {
     const scope = { activeId: 101, title: 'Test' };
     const spec = {
       __drift_props__: true,
-      id: { __drift_fn__: '(scope) => scope.activeId' },
+      id: { __drift_fn__: (scope: any) => scope.activeId },
       staticProp: 'Hello',
     };
 

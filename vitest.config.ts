@@ -28,6 +28,7 @@ export default defineConfig({
           include: ['packages/ssr/tests/**/*.test.ts'],
           exclude: ['packages/ssr/dist'],
           environment: 'node',
+          setupFiles: ['./packages/ssr/tests/setup.ts'],
         },
       },
       {
@@ -52,6 +53,7 @@ export default defineConfig({
           name: 'dom',
           include: ['packages/dom/tests/**/*.test.ts'],
           exclude: ['packages/dom/dist'],
+          setupFiles: ['./packages/dom/tests/setup.ts'],
           browser: {
             enabled: true,
             provider: playwright(),
@@ -68,6 +70,7 @@ export default defineConfig({
           name: 'router',
           include: ['packages/router/tests/**/*.test.ts'],
           exclude: ['packages/router/dist'],
+          setupFiles: ['./packages/dom/tests/setup.ts'],
           browser: {
             enabled: true,
             provider: playwright(),

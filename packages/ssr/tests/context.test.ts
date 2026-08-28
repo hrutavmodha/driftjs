@@ -19,10 +19,10 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
     const childComponent: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         {
@@ -72,10 +72,10 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
     const component: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         {
@@ -101,10 +101,10 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
     const leaf: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         {
@@ -166,10 +166,10 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
     const badgeComponent: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         {
@@ -228,10 +228,10 @@ describe('DriftJS Global Context Mechanism (Server VM SSR)', () => {
     const itemComponent: CompiledModule = {
       bytecode: new Uint32Array([
         Opcode.EXEC_SCRIPT, 0,
-        Opcode.CREATE_ELEMENT, 1, 1,
-        Opcode.INTERPOLATE_TEXT, 2, 2,
-        Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
+        Opcode.CREATE_ELEMENT, 0, 1,
+        Opcode.INTERPOLATE_TEXT, 1, 2,
+        Opcode.RETURN,
+        Opcode.APPEND_CHILD, 0, 1,
       ]),
       constants: [
         {
