@@ -6,7 +6,7 @@ import type {
   VMExecutionOptions,
   ReactiveRegion,
 } from "../types/index.js";
-import { Opcode } from "../types/index.js";
+import { Opcode, VMMode } from "../types/index.js";
 import { reconcileKeyedList } from "./reconciler.js";
 import { HydrationCursor } from "./hydration.js";
 import {
@@ -63,9 +63,7 @@ function clearBetweenAnchors(startAnchor: Node, endAnchor: Node, vm?: DriftClien
 }
 
 /**
-
  * Register-based Virtual Machine for executing compiled DriftJS templates.
- * Clean, lightweight, and 100% CSP compliant.
  */
 export class DriftClientVM {
   private static readonly MAX_REGISTERS = 256;
@@ -75,10 +73,15 @@ export class DriftClientVM {
   private readonly registers: (Node | any)[] = new Array(DriftClientVM.MAX_REGISTERS);
   public scope: Record<string, any> = {};
   private module: CompiledModule | null = null;
+  private mode: VMMode = VMMode.MOUNT;
   private declaredVars: Set<string> = new Set();
+  private reactiveBindingsMap = new Map<string, readonly number[]>();
+  private updatedPcs = new Set<number>();
+  private regionCollectorStack: ReactiveRegion[][] = [];
   private doc: Document | null = null;
   private reactiveRegions = new Set<ReactiveRegion>();
   private reactiveRegionsIndex = new Map<string, Set<ReactiveRegion>>();
+  private nodeToRegions = new Map<Node, Set<ReactiveRegion>>();
   private delegatedEvents = new Set<string>();
   private static eventHandlersMap = new WeakMap<Node, Record<string, (e: Event) => void>>();
   private cursor: HydrationCursor | null = null;
@@ -189,6 +192,23 @@ export class DriftClientVM {
     }
   }
 
+  private addNodeRegion(node: Node, region: ReactiveRegion): void {
+    let set = this.nodeToRegions.get(node);
+    if (!set) {
+      set = new Set<ReactiveRegion>();
+      this.nodeToRegions.set(node, set);
+    }
+    set.add(region);
+  }
+
+  private removeNodeRegion(node: Node, region: ReactiveRegion): void {
+    const set = this.nodeToRegions.get(node);
+    if (set) {
+      set.delete(region);
+      if (set.size === 0) this.nodeToRegions.delete(node);
+    }
+  }
+
   public unmountSubtree(node: Node | null): void {
     if (!node) return;
     const entry = this.childVMs.get(node);
@@ -207,12 +227,9 @@ export class DriftClientVM {
       }
     }
 
-    for (const region of Array.from(this.reactiveRegions)) {
-      if (
-        (region.startAnchor && (region.startAnchor === node || (node.contains && node.contains(region.startAnchor)))) ||
-        (region.endAnchor && (region.endAnchor === node || (node.contains && node.contains(region.endAnchor)))) ||
-        (region.parentNode && (region.parentNode === node || (node.contains && node.contains(region.parentNode))))
-      ) {
+    const directRegions = this.nodeToRegions.get(node);
+    if (directRegions) {
+      for (const region of Array.from(directRegions)) {
         this.removeRegion(region);
       }
     }
@@ -238,6 +255,13 @@ export class DriftClientVM {
       }
       set.add(region);
     }
+    if (region.startAnchor) this.addNodeRegion(region.startAnchor, region);
+    if (region.endAnchor) this.addNodeRegion(region.endAnchor, region);
+    if (region.parentNode) this.addNodeRegion(region.parentNode, region);
+
+    if (this.regionCollectorStack.length > 0) {
+      this.regionCollectorStack[this.regionCollectorStack.length - 1]!.push(region);
+    }
   }
 
   public removeRegion(region: ReactiveRegion): void {
@@ -255,6 +279,10 @@ export class DriftClientVM {
         if (set.size === 0) this.reactiveRegionsIndex.delete(dep);
       }
     }
+
+    if (region.startAnchor) this.removeNodeRegion(region.startAnchor, region);
+    if (region.endAnchor) this.removeNodeRegion(region.endAnchor, region);
+    if (region.parentNode) this.removeNodeRegion(region.parentNode, region);
 
     this.reactiveRegions.delete(region);
   }
@@ -369,7 +397,7 @@ export class DriftClientVM {
       const newVal = newPropsObj[key];
       const oldVal = oldProps[key];
       if (newVal !== oldVal) {
-        setScopeValue(childScope, key, newVal);
+        childScope[key] = newVal;
         dirtyPropVars.add(key);
       }
     }
@@ -377,7 +405,7 @@ export class DriftClientVM {
     for (const key of Object.keys(oldProps)) {
       if (key === '__drift_props__' || key === '__proto__' || key === 'constructor' || key === 'prototype' || key === '__drift_mark_dirty__') continue;
       if (!Object.prototype.hasOwnProperty.call(newPropsObj, key)) {
-        setScopeValue(childScope, key, undefined);
+        childScope[key] = undefined;
         dirtyPropVars.add(key);
       }
     }
@@ -431,493 +459,535 @@ export class DriftClientVM {
     }
   }
 
-  private setRegister(index: number, value: any): void {
+  private setRegister(index: number, value: any, registers: (Node | any)[] = this.registers): void {
     this.checkRegister(index);
-    this.registers[index] = value;
+    registers[index] = value;
   }
 
-  private getRegister(index: number): any {
+  private getRegister(index: number, registers: (Node | any)[] = this.registers): any {
     this.checkRegister(index);
-    return this.registers[index];
+    return registers[index];
   }
 
   /**
-   * Runs the bytecode of a sub-module using fresh registers but the VM's shared scope,
-   * declaredVars, doc, and reactiveRegions. Used by REACTIVE_IF / REACTIVE_FOR handlers.
+   * Runs the bytecode of a sub-module using a dedicated register window without copying parent registers.
+   * Directly returns the created DOM fragment and the exact child reactive regions created during execution.
    */
   private runSubModule(
     rawSubMod: { bytecode: readonly number[] | Uint32Array; constants: readonly any[] },
     scope: Record<string, any>
-  ): DocumentFragment | null {
+  ): { fragment: DocumentFragment | null; createdRegions: ReactiveRegion[] } {
     const subMod = (resolveComponentModule(rawSubMod) || rawSubMod) as CompiledModule;
-    const savedRegisters = [...this.registers];
     const savedModule = this.module;
     const savedDeclaredVars = this.declaredVars;
 
-    this.registers.fill(undefined);
     this.module = subMod;
     if (subMod.declaredVars && subMod.declaredVars.length > 0) {
       this.declaredVars = new Set(subMod.declaredVars);
     }
 
-    const result = this.executeLoop(subMod.bytecode, subMod.constants, scope) as DocumentFragment | null;
+    const createdRegions: ReactiveRegion[] = [];
+    this.regionCollectorStack.push(createdRegions);
 
-    this.registers.fill(undefined);
-    for (let i = 0; i < savedRegisters.length; i++) this.registers[i] = savedRegisters[i];
+    const subRegisters = new Array(DriftClientVM.MAX_REGISTERS);
+    const fragment = this.executeFrom(0, subMod.bytecode, subMod.constants, scope, VMMode.MOUNT, subRegisters) as DocumentFragment | null;
+
+    this.regionCollectorStack.pop();
     this.module = savedModule;
     this.declaredVars = savedDeclaredVars;
-    return result;
+    return { fragment, createdRegions };
   }
 
   /**
-   * Core execution loop — shared between the top-level execute() and runSubModule().
+   * Core execution loop — shared between initial mount (MOUNT mode) and reactive slice execution (UPDATE mode).
    */
-  private executeLoop(
+  private executeFrom(
+    startPc: number,
     bytecode: readonly number[] | Uint32Array,
     constants: readonly any[],
-    scope: Record<string, any>
+    scope: Record<string, any>,
+    mode: VMMode,
+    registers: (Node | any)[] = this.registers
   ): Node | null {
     const doc = this.doc!;
-    let pc = 0;
+    const prevMode = this.mode;
+    this.mode = mode;
+    let pc = startPc;
 
-    while (pc < bytecode.length) {
-      const opcode = bytecode[pc];
+    try {
+      while (pc < bytecode.length) {
+        const opcode = bytecode[pc]!;
 
-      switch (opcode) {
-        case Opcode.RETURN: {
-          return this.getRegister(bytecode[pc + 1]!) as Node | null;
-        }
-
-        case Opcode.CREATE_ELEMENT: {
-          const dstReg = bytecode[pc + 1]!;
-          const tagConstIdx = bytecode[pc + 2]!;
-          const tag = String(constants[tagConstIdx]);
-          const elem = this.cursor ? this.cursor.claimElement(tag, doc) : doc.createElement(tag);
-          this.setRegister(dstReg, elem);
-          pc += 3;
-          break;
-        }
-
-        case Opcode.MOUNT_COMPONENT: {
-          const dstReg = bytecode[pc + 1]!;
-          const tagConstIdx = bytecode[pc + 2]!;
-          const propsSpecIdx = bytecode[pc + 3]!;
-          const tag = String(constants[tagConstIdx]);
-
-          const rawComp = (scope && tag in scope) ? scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
-          const compMod = resolveComponentModule(rawComp);
-          if (compMod) {
-            const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
-            const propsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
-
-            let childrenNode: Node | undefined = undefined;
-            let childrenVM: DriftClientVM | null = null;
-            if (propsSpec && propsSpec.__drift_children__ !== undefined) {
-              const childrenSubMod = constants[propsSpec.__drift_children__] ?? propsSpec.__drift_children__;
-              if (childrenSubMod) {
-                childrenVM = new DriftClientVM();
-                childrenVM.parentVM = this;
-                childrenNode = childrenVM.execute(childrenSubMod, { scope, document: doc }) as Node | undefined;
-              }
+        switch (opcode) {
+          case Opcode.RETURN: {
+            if (this.mode === VMMode.UPDATE) {
+              return null;
             }
+            pc += 1;
+            break;
+          }
 
-            const childVM = new DriftClientVM();
-            childVM.parentVM = this;
-            const childScope = Object.assign(Object.create(scope), { props: propsObj }, propsObj);
-            if (childrenNode !== undefined) {
-              childScope.children = childrenNode;
+          case Opcode.CREATE_ELEMENT: {
+            if (this.mode === VMMode.MOUNT) {
+              const dstReg = bytecode[pc + 1]!;
+              const tagConstIdx = bytecode[pc + 2]!;
+              const tag = String(constants[tagConstIdx]);
+              const elem = this.cursor ? this.cursor.claimElement(tag, doc) : doc.createElement(tag);
+              this.setRegister(dstReg, elem, registers);
             }
-            const compNode = childVM.execute(compMod, { scope: childScope, document: doc });
-            this.updateChildComponentProps(childVM.scope, childVM, propsObj);
-            if (compNode) {
-              const childEntry = { vm: childVM, scope: childVM.scope, propsSpec, nodes: [] as Node[], childrenVM };
-              this.childVMs.set(compNode, childEntry);
-              childEntry.nodes.push(compNode);
-              if (compNode.nodeType === 11) {
-                for (let i = 0; i < compNode.childNodes.length; i++) {
-                  const childNode = compNode.childNodes[i]!;
-                  this.childVMs.set(childNode, childEntry);
-                  childEntry.nodes.push(childNode);
+            pc += 3;
+            break;
+          }
+
+          case Opcode.MOUNT_COMPONENT: {
+            const dstReg = bytecode[pc + 1]!;
+            const tagConstIdx = bytecode[pc + 2]!;
+            const propsSpecIdx = bytecode[pc + 3]!;
+
+            if (this.mode === VMMode.MOUNT) {
+              const tag = String(constants[tagConstIdx]);
+              const rawComp = (scope && tag in scope) ? scope[tag] : (typeof globalThis !== 'undefined' && (globalThis as any)[tag]);
+              const compMod = resolveComponentModule(rawComp);
+              if (compMod) {
+                const propsSpec = propsSpecIdx !== 0xFF ? constants[propsSpecIdx] : null;
+                const propsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
+
+                let childrenNode: Node | undefined = undefined;
+                let childrenVM: DriftClientVM | null = null;
+                if (propsSpec && propsSpec.__drift_children__ !== undefined) {
+                  const childrenSubMod = constants[propsSpec.__drift_children__] ?? propsSpec.__drift_children__;
+                  if (childrenSubMod) {
+                    childrenVM = new DriftClientVM();
+                    childrenVM.parentVM = this;
+                    childrenNode = childrenVM.execute(childrenSubMod, { scope, document: doc }) as Node | undefined;
+                  }
+                }
+
+                const childVM = new DriftClientVM();
+                childVM.parentVM = this;
+                const childScope = Object.assign(Object.create(scope), { props: propsObj }, propsObj);
+                if (childrenNode !== undefined) {
+                  childScope.children = childrenNode;
+                }
+                const compNode = childVM.execute(compMod, { scope: childScope, document: doc });
+                if (compNode) {
+                  const childEntry = { vm: childVM, scope: childVM.scope, propsSpec, nodes: [] as Node[], childrenVM };
+                  this.childVMs.set(compNode, childEntry);
+                  childEntry.nodes.push(compNode);
+                  if (compNode.nodeType === 11) {
+                    for (let i = 0; i < compNode.childNodes.length; i++) {
+                      const childNode = compNode.childNodes[i]!;
+                      this.childVMs.set(childNode, childEntry);
+                      childEntry.nodes.push(childNode);
+                    }
+                  }
+                  this.mountedChildVMs.add(childVM);
+                  if (childrenVM) this.mountedChildVMs.add(childrenVM);
+                  this.setRegister(dstReg, compNode, registers);
                 }
               }
-              this.mountedChildVMs.add(childVM);
-              if (childrenVM) this.mountedChildVMs.add(childrenVM);
-              this.setRegister(dstReg, compNode);
-            }
-          }
-          pc += 4;
-          break;
-        }
-
-        case Opcode.CREATE_TEXT: {
-          const dstReg = bytecode[pc + 1]!;
-          const text = constants[bytecode[pc + 2]!];
-          const val = evaluateExpression(text, scope, this.declaredVars);
-          const textNode = this.cursor ? this.cursor.claimText(doc) : doc.createTextNode(val != null ? String(val) : '');
-          this.setRegister(dstReg, textNode);
-          pc += 3;
-          break;
-        }
-
-        case Opcode.CREATE_COMMENT: {
-          const dstReg = bytecode[pc + 1]!;
-          const comment = String(constants[bytecode[pc + 2]!] ?? '');
-          const commentNode = this.cursor ? this.cursor.claimComment(comment, doc) : doc.createComment(comment);
-          this.setRegister(dstReg, commentNode);
-          pc += 3;
-          break;
-        }
-
-        case Opcode.CREATE_FRAGMENT: {
-          const dstReg = bytecode[pc + 1]!;
-          this.setRegister(dstReg, doc.createDocumentFragment());
-          pc += 2;
-          break;
-        }
-
-        case Opcode.APPEND_CHILD: {
-          const parent = this.getRegister(bytecode[pc + 1]!);
-          const child = this.getRegister(bytecode[pc + 2]!);
-          if (parent && child && typeof parent.appendChild === 'function') {
-            if (!this.cursor || (child.parentNode !== parent && parent.nodeType !== 11)) {
-              parent.appendChild(child);
-            }
-          }
-          pc += 3;
-          break;
-        }
-
-        case Opcode.SET_ATTR: {
-          const elem = this.getRegister(bytecode[pc + 1]!);
-          const attrName = String(constants[bytecode[pc + 2]!]);
-          const rawVal = constants[bytecode[pc + 3]!];
-          const isDynamic = bytecode[pc + 4]!;
-          const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
-          this.applyDOMAttribute(elem, attrName, val, scope);
-          pc += 5;
-          break;
-        }
-
-        case Opcode.INTERPOLATE_TEXT: {
-          const dstReg = bytecode[pc + 1]!;
-          const expr = constants[bytecode[pc + 2]!];
-          const val = evaluateExpression(expr, scope, this.declaredVars);
-          if (val && typeof val === 'object' && ('nodeType' in val)) {
-            this.setRegister(dstReg, val);
-          } else {
-            const textNode = this.cursor ? this.cursor.claimText(doc) : doc.createTextNode(val != null ? String(val) : '');
-            textNode.nodeValue = val != null ? String(val) : '';
-            this.setRegister(dstReg, textNode);
-          }
-          pc += 3;
-          break;
-        }
-
-
-
-        case Opcode.EXEC_SCRIPT: {
-          const scriptBody = constants[bytecode[pc + 1]!];
-          // scriptBody is either a single AST statement or an array of statements.
-          if (Array.isArray(scriptBody)) {
-            for (const stmt of scriptBody) {
-              evaluateExpression(stmt, scope, this.declaredVars);
-            }
-          } else if (scriptBody) {
-            evaluateExpression(scriptBody, scope, this.declaredVars);
-          }
-          pc += 2;
-          break;
-        }
-
-        case Opcode.REACTIVE_IF: {
-          const parentReg  = bytecode[pc + 1]!;
-          const condIdx    = bytecode[pc + 2]!;
-          const consIdx    = bytecode[pc + 3]!;
-          const altIdx     = bytecode[pc + 4]!;
-          const depsIdx    = bytecode[pc + 5]!;
-
-          const parentElem = this.getRegister(parentReg);
-          const condExpr   = constants[condIdx];
-          const consMod    = constants[consIdx];
-          const altMod     = altIdx !== 0xFF ? constants[altIdx] : null;
-          const depsRaw    = constants[depsIdx];
-          const deps       = new Set<string>(Array.isArray(depsRaw) ? depsRaw : []);
-
-          const startAnchor = this.cursor ? this.cursor.claimComment('if', doc) : doc.createComment('if');
-          if (!startAnchor.parentNode || startAnchor.parentNode !== parentElem) {
-            parentElem.appendChild(startAnchor);
-          }
-
-          let actualEndAnchor: Comment = !this.cursor ? doc.createComment('/if') : (null as any);
-          if (actualEndAnchor) {
-            parentElem.appendChild(actualEndAnchor);
-          }
-
-          const vm = this;
-          // Track child regions registered by sub-module renders so we can remove
-          // stale ones before each re-render (prevents parentNode-null crashes).
-          let childRegions: ReactiveRegion[] = [];
-          let ifRegion: ReactiveRegion | null = null;
-
-          const renderIf = () => {
-            for (const r of childRegions) {
-              vm.removeRegion(r);
-            }
-            childRegions = [];
-            if (actualEndAnchor && startAnchor.parentNode) {
-              clearBetweenAnchors(startAnchor, actualEndAnchor, vm);
-            }
-            const before = vm.reactiveRegions.size;
-            const cond = evaluateExpression(condExpr, scope, vm.declaredVars);
-            const subMod = cond ? consMod : altMod;
-            if (subMod) {
-              const frag = vm.runSubModule(subMod, scope);
-              if (frag) {
-                if (actualEndAnchor && actualEndAnchor.parentNode) {
-                  actualEndAnchor.parentNode.insertBefore(frag, actualEndAnchor);
-                } else {
-                  parentElem.appendChild(frag);
+            } else {
+              const compNode = this.getRegister(dstReg, registers);
+              const childEntry = compNode ? this.childVMs.get(compNode) : null;
+              if (childEntry) {
+                if (childEntry.propsSpec) {
+                  const { vm: childVM, scope: childScope, propsSpec } = childEntry;
+                  const newPropsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
+                  this.updateChildComponentProps(childVM.scope, childVM, newPropsObj);
+                }
+                if (childEntry.childrenVM) {
+                  childEntry.childrenVM.triggerUpdates(new Set(this.declaredVars));
                 }
               }
             }
-            childRegions = Array.from(vm.reactiveRegions).slice(before);
-            if (ifRegion) {
-              ifRegion.childRegions = childRegions;
-            }
-          };
-          renderIf();
+            pc += 4;
+            break;
+          }
 
-          if (this.cursor) {
-            actualEndAnchor = this.cursor.claimComment('/if', doc);
+          case Opcode.CREATE_TEXT: {
+            if (this.mode === VMMode.MOUNT) {
+              const dstReg = bytecode[pc + 1]!;
+              const text = constants[bytecode[pc + 2]!];
+              const val = evaluateExpression(text, scope, this.declaredVars);
+              const textNode = this.cursor ? this.cursor.claimText(doc) : doc.createTextNode(val != null ? String(val) : '');
+              this.setRegister(dstReg, textNode, registers);
+            }
+            pc += 3;
+            break;
+          }
+
+          case Opcode.CREATE_COMMENT: {
+            if (this.mode === VMMode.MOUNT) {
+              const dstReg = bytecode[pc + 1]!;
+              const comment = String(constants[bytecode[pc + 2]!] ?? '');
+              const commentNode = this.cursor ? this.cursor.claimComment(comment, doc) : doc.createComment(comment);
+              this.setRegister(dstReg, commentNode, registers);
+            }
+            pc += 3;
+            break;
+          }
+
+          case Opcode.CREATE_FRAGMENT: {
+            if (this.mode === VMMode.MOUNT) {
+              const dstReg = bytecode[pc + 1]!;
+              this.setRegister(dstReg, doc.createDocumentFragment(), registers);
+            }
+            pc += 2;
+            break;
+          }
+
+          case Opcode.APPEND_CHILD: {
+            if (this.mode === VMMode.MOUNT) {
+              const parent = this.getRegister(bytecode[pc + 1]!, registers);
+              const child = this.getRegister(bytecode[pc + 2]!, registers);
+              if (parent && child && typeof parent.appendChild === 'function') {
+                if (!this.cursor || (child.parentNode !== parent && parent.nodeType !== 11)) {
+                  parent.appendChild(child);
+                }
+              }
+            }
+            pc += 3;
+            break;
+          }
+
+          case Opcode.SET_ATTR: {
+            const elem = this.getRegister(bytecode[pc + 1]!, registers);
+            const attrName = String(constants[bytecode[pc + 2]!]);
+            const rawVal = constants[bytecode[pc + 3]!];
+            const isDynamic = bytecode[pc + 4]!;
+
+            if (this.mode === VMMode.MOUNT || isDynamic === 1) {
+              const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
+              this.applyDOMAttribute(elem, attrName, val, scope);
+            }
+            pc += 5;
+            break;
+          }
+
+          case Opcode.INTERPOLATE_TEXT: {
+            const dstReg = bytecode[pc + 1]!;
+            const expr = constants[bytecode[pc + 2]!];
+            const val = evaluateExpression(expr, scope, this.declaredVars);
+
+            if (this.mode === VMMode.MOUNT) {
+              if (val && typeof val === 'object' && ('nodeType' in val)) {
+                this.setRegister(dstReg, val, registers);
+              } else {
+                const textNode = this.cursor ? this.cursor.claimText(doc) : doc.createTextNode(val != null ? String(val) : '');
+                textNode.nodeValue = val != null ? String(val) : '';
+                this.setRegister(dstReg, textNode, registers);
+              }
+            } else {
+              const existingNode = this.getRegister(dstReg, registers);
+              if (existingNode && existingNode.nodeType === 3) {
+                existingNode.nodeValue = val != null ? String(val) : '';
+              }
+            }
+            pc += 3;
+            break;
+          }
+
+          case Opcode.EXEC_SCRIPT: {
+            if (this.mode === VMMode.MOUNT) {
+              const scriptBody = constants[bytecode[pc + 1]!];
+              if (Array.isArray(scriptBody)) {
+                for (const stmt of scriptBody) {
+                  evaluateExpression(stmt, scope, this.declaredVars);
+                }
+              } else if (scriptBody) {
+                evaluateExpression(scriptBody, scope, this.declaredVars);
+              }
+            }
+            pc += 2;
+            break;
+          }
+
+          case Opcode.REACTIVE_IF: {
+            const parentReg  = bytecode[pc + 1]!;
+            const condIdx    = bytecode[pc + 2]!;
+            const consIdx    = bytecode[pc + 3]!;
+            const altIdx     = bytecode[pc + 4]!;
+            const depsIdx    = bytecode[pc + 5]!;
+
+            const parentElem = this.getRegister(parentReg, registers);
+            const condExpr   = constants[condIdx];
+            const consMod    = constants[consIdx];
+            const altMod     = altIdx !== 0xFF ? constants[altIdx] : null;
+            const depsRaw    = constants[depsIdx];
+            const deps       = new Set<string>(Array.isArray(depsRaw) ? depsRaw : []);
+
+            const startAnchor = this.cursor ? this.cursor.claimComment('if', doc) : doc.createComment('if');
+            if (!startAnchor.parentNode || startAnchor.parentNode !== parentElem) {
+              parentElem.appendChild(startAnchor);
+            }
+
+            let actualEndAnchor: Comment = !this.cursor ? doc.createComment('/if') : (null as any);
+            if (actualEndAnchor) {
+              parentElem.appendChild(actualEndAnchor);
+            }
+
+            const vm = this;
+            let childRegions: ReactiveRegion[] = [];
+            let ifRegion: ReactiveRegion | null = null;
+
+            const renderIf = () => {
+              for (const r of childRegions) {
+                vm.removeRegion(r);
+              }
+              childRegions = [];
+              if (actualEndAnchor && startAnchor.parentNode) {
+                clearBetweenAnchors(startAnchor, actualEndAnchor, vm);
+              }
+              const cond = evaluateExpression(condExpr, scope, vm.declaredVars);
+              const subMod = cond ? consMod : altMod;
+              if (subMod) {
+                const { fragment, createdRegions } = vm.runSubModule(subMod, scope);
+                childRegions = createdRegions;
+                if (fragment) {
+                  if (actualEndAnchor && actualEndAnchor.parentNode) {
+                    actualEndAnchor.parentNode.insertBefore(fragment, actualEndAnchor);
+                  } else {
+                    parentElem.appendChild(fragment);
+                  }
+                }
+              }
+              if (ifRegion) {
+                ifRegion.childRegions = childRegions;
+              }
+            };
+            renderIf();
+
+            if (this.cursor) {
+              actualEndAnchor = this.cursor.claimComment('/if', doc);
+              if (!actualEndAnchor.parentNode || actualEndAnchor.parentNode !== parentElem) {
+                parentElem.appendChild(actualEndAnchor);
+              }
+            }
+
+            ifRegion = {
+              deps,
+              reRender: () => {
+                renderIf();
+              },
+              childRegions,
+              parentNode: parentElem,
+              startAnchor,
+              endAnchor: actualEndAnchor,
+            };
+            this.registerRegion(ifRegion);
+
+            pc += 6;
+            break;
+          }
+
+          case Opcode.REACTIVE_FOR: {
+            const parentReg   = bytecode[pc + 1]!;
+            const iterIdx     = bytecode[pc + 2]!;
+            const itemNameIdx = bytecode[pc + 3]!;
+            const idxNameIdx  = bytecode[pc + 4]!;
+            const keyIdx      = bytecode[pc + 5]!;
+            const bodyIdx     = bytecode[pc + 6]!;
+            const depsIdx     = bytecode[pc + 7]!;
+
+            const parentElem  = this.getRegister(parentReg, registers);
+            const iterExpr    = constants[iterIdx];
+            const itemName    = constants[itemNameIdx] as string;
+            const indexName   = idxNameIdx !== 0xFF ? constants[idxNameIdx] as string : null;
+            const keyExpr     = keyIdx !== 0xFF ? constants[keyIdx] : null;
+            const bodyMod     = constants[bodyIdx];
+            const depsRaw     = constants[depsIdx];
+            const deps        = new Set<string>(Array.isArray(depsRaw) ? depsRaw : []);
+            const forCacheRef: { cache: ItemRecord[] } = { cache: [] };
+
+            const startAnchor = this.cursor ? this.cursor.claimComment('for', doc) : doc.createComment('for');
+            if (!startAnchor.parentNode || startAnchor.parentNode !== parentElem) {
+              parentElem.appendChild(startAnchor);
+            }
+
+            let actualEndAnchor: Comment = !this.cursor ? doc.createComment('/for') : (null as any);
+            if (actualEndAnchor) {
+              parentElem.appendChild(actualEndAnchor);
+            }
+
+            const vm = this;
+            const removeItem = (record: ItemRecord) => {
+              if (record.childRegions && record.childRegions.length > 0) {
+                for (const r of record.childRegions) {
+                  vm.removeRegion(r);
+                }
+                record.childRegions = [];
+              }
+              if (record.nodes) {
+                for (const node of record.nodes) {
+                  vm.unmountSubtree(node);
+                }
+              }
+            };
+
+            const renderFor = () => {
+              const rawIter = evaluateExpression(iterExpr, scope, vm.declaredVars);
+              const items = resolveIterable(rawIter);
+
+              reconcileKeyedList(
+                (actualEndAnchor && actualEndAnchor.parentNode) || parentElem,
+                actualEndAnchor,
+                forCacheRef,
+                items,
+                (itemVal, indexVal) => {
+                  if (keyExpr) {
+                    const itemScope = Object.create(scope);
+                    populateItemScope(itemScope, itemName, itemVal, indexName, indexVal);
+                    return evaluateExpression(keyExpr, itemScope, vm.declaredVars);
+                  }
+                  return indexVal;
+                },
+                (itemVal, indexVal, refNode) => {
+                  const childScope = Object.create(scope);
+                  populateItemScope(childScope, itemName, itemVal, indexName, indexVal);
+
+                  const { fragment: frag, createdRegions: childRegions } = vm.runSubModule(bodyMod, childScope);
+                  const nodes: Node[] = frag
+                    ? frag.nodeType === 11
+                      ? Array.from(frag.childNodes)
+                      : [frag]
+                    : [];
+
+                  if (frag) {
+                    if (refNode && refNode.parentNode) {
+                      refNode.parentNode.insertBefore(frag, refNode);
+                    } else {
+                      parentElem.appendChild(frag);
+                    }
+                  }
+
+                  const itemKey = keyExpr
+                    ? evaluateExpression(keyExpr, childScope, vm.declaredVars)
+                    : indexVal;
+
+                  return {
+                    key: itemKey,
+                    nodes,
+                    childRegions,
+                    itemVal,
+                    indexVal,
+                  };
+                },
+                (record, itemVal, indexVal) => {
+                  const isObject = (val: any) => val && typeof val === 'object' && val !== null;
+                  const itemsEqual = (a: any, b: any) => {
+                    if (a === b) return true;
+                    if (!isObject(a) || !isObject(b)) return false;
+                    const keysA = Object.keys(a);
+                    const keysB = Object.keys(b);
+                    if (keysA.length !== keysB.length) return false;
+                    for (const k of keysA) {
+                      if (a[k] !== b[k]) return false;
+                    }
+                    return true;
+                  };
+
+                  const childScope = Object.create(scope);
+                  populateItemScope(childScope, itemName, itemVal, indexName, indexVal);
+
+                  if (itemsEqual(record.itemVal, itemVal) && (!indexName || record.indexVal === indexVal)) {
+                    record.indexVal = indexVal;
+                    if (record.nodes.length > 0) {
+                      vm.patchItemAttributes(bodyMod, childScope, record.nodes);
+                    }
+                    return;
+                  }
+
+                  record.itemVal = itemVal;
+                  record.indexVal = indexVal;
+
+                  if (record.childRegions) {
+                    for (const r of record.childRegions) {
+                      vm.removeRegion(r);
+                    }
+                  }
+
+                  const { fragment: frag, createdRegions } = vm.runSubModule(bodyMod, childScope);
+                  record.childRegions = createdRegions;
+
+                  if (frag && record.nodes.length > 0) {
+                    const rootNode = record.nodes[0];
+                    if (
+                      frag.childNodes.length === 1 &&
+                      frag.childNodes[0]?.nodeName === rootNode?.nodeName &&
+                      rootNode &&
+                      typeof (rootNode as any).setAttribute === 'function'
+                    ) {
+                      const newElem = frag.childNodes[0] as Element;
+                      const elem = rootNode as Element;
+                      const newHandlers = DriftClientVM.eventHandlersMap.get(newElem);
+                      if (newHandlers) {
+                        DriftClientVM.eventHandlersMap.set(elem, newHandlers);
+                      } else {
+                        DriftClientVM.eventHandlersMap.delete(elem);
+                      }
+                      for (const attr of Array.from(elem.attributes)) {
+                        elem.removeAttribute(attr.name);
+                      }
+                      for (const attr of Array.from(newElem.attributes)) {
+                        elem.setAttribute(attr.name, attr.value);
+                      }
+                      while (elem.firstChild) {
+                        vm.unmountSubtree(elem.firstChild);
+                        elem.removeChild(elem.firstChild);
+                      }
+                      while (newElem.firstChild) {
+                        elem.appendChild(newElem.firstChild);
+                      }
+                    } else if (rootNode?.parentNode) {
+                      const parent = rootNode.parentNode;
+                      const newNodes = frag.nodeType === 11 ? Array.from(frag.childNodes) : [frag];
+                      parent.insertBefore(frag, rootNode);
+                      for (const oldNode of record.nodes) {
+                        if (oldNode.parentNode === parent) {
+                          vm.unmountSubtree(oldNode);
+                          parent.removeChild(oldNode);
+                        }
+                      }
+                      record.nodes = newNodes;
+                    }
+                  }
+                },
+                removeItem
+              );
+            };
+            renderFor();
+
+            if (this.cursor) {
+              actualEndAnchor = this.cursor.claimComment('/for', doc);
+            }
             if (!actualEndAnchor.parentNode || actualEndAnchor.parentNode !== parentElem) {
               parentElem.appendChild(actualEndAnchor);
             }
+
+            const forRegion: ReactiveRegion = {
+              deps,
+              reRender: () => {
+                renderFor();
+              },
+              parentNode: parentElem,
+              startAnchor,
+              endAnchor: actualEndAnchor,
+            };
+            this.registerRegion(forRegion);
+
+            pc += 8;
+            break;
           }
 
-          ifRegion = {
-            deps,
-            reRender: () => {
-              renderIf();
-            },
-            childRegions,
-            parentNode: parentElem,
-            startAnchor,
-            endAnchor: actualEndAnchor,
-          };
-          this.registerRegion(ifRegion);
-
-          pc += 6;
-          break;
+          default:
+            throw new Error(`Unknown Opcode ${opcode} at PC ${pc}`);
         }
-
-        case Opcode.REACTIVE_FOR: {
-          const parentReg   = bytecode[pc + 1]!;
-          const iterIdx     = bytecode[pc + 2]!;
-          const itemNameIdx = bytecode[pc + 3]!;
-          const idxNameIdx  = bytecode[pc + 4]!;
-          const keyIdx      = bytecode[pc + 5]!;
-          const bodyIdx     = bytecode[pc + 6]!;
-          const depsIdx     = bytecode[pc + 7]!;
-
-          const parentElem  = this.getRegister(parentReg);
-          const iterExpr    = constants[iterIdx];
-          const itemName    = constants[itemNameIdx] as string;
-          const indexName   = idxNameIdx !== 0xFF ? constants[idxNameIdx] as string : null;
-          const keyExpr     = keyIdx !== 0xFF ? constants[keyIdx] : null;
-          const bodyMod     = constants[bodyIdx];
-          const depsRaw     = constants[depsIdx];
-          const deps        = new Set<string>(Array.isArray(depsRaw) ? depsRaw : []);
-          const forCacheRef: { cache: ItemRecord[] } = { cache: [] };
-
-          const startAnchor = this.cursor ? this.cursor.claimComment('for', doc) : doc.createComment('for');
-          if (!startAnchor.parentNode || startAnchor.parentNode !== parentElem) {
-            parentElem.appendChild(startAnchor);
-          }
-
-          let actualEndAnchor: Comment = !this.cursor ? doc.createComment('/for') : (null as any);
-          if (actualEndAnchor) {
-            parentElem.appendChild(actualEndAnchor);
-          }
-
-          const vm = this;
-          const removeItem = (record: ItemRecord) => {
-            if (record.childRegions && record.childRegions.length > 0) {
-              for (const r of record.childRegions) {
-                vm.removeRegion(r);
-              }
-              record.childRegions = [];
-            }
-            if (record.nodes) {
-              for (const node of record.nodes) {
-                vm.unmountSubtree(node);
-              }
-            }
-          };
-
-          const renderFor = () => {
-            const rawIter = evaluateExpression(iterExpr, scope, vm.declaredVars);
-            const items = resolveIterable(rawIter);
-
-            reconcileKeyedList(
-              (actualEndAnchor && actualEndAnchor.parentNode) || parentElem,
-              actualEndAnchor,
-              forCacheRef,
-              items,
-              (itemVal, indexVal) => {
-                if (keyExpr) {
-                  const itemScope = Object.create(scope);
-                  populateItemScope(itemScope, itemName, itemVal, indexName, indexVal);
-                  return evaluateExpression(keyExpr, itemScope, vm.declaredVars);
-                }
-                return indexVal;
-              },
-              (itemVal, indexVal, refNode) => {
-                const childScope = Object.create(scope);
-                populateItemScope(childScope, itemName, itemVal, indexName, indexVal);
-
-                const before = vm.reactiveRegions.size;
-                const frag = vm.runSubModule(bodyMod, childScope);
-                const nodes: Node[] = frag
-                  ? frag.nodeType === 11
-                    ? Array.from(frag.childNodes)
-                    : [frag]
-                  : [];
-                const childRegions = Array.from(vm.reactiveRegions).slice(before);
-
-                if (frag) {
-                  if (refNode && refNode.parentNode) {
-                    refNode.parentNode.insertBefore(frag, refNode);
-                  } else {
-                    parentElem.appendChild(frag);
-                  }
-                }
-
-                const itemKey = keyExpr
-                  ? evaluateExpression(keyExpr, childScope, vm.declaredVars)
-                  : indexVal;
-
-                return {
-                  key: itemKey,
-                  nodes,
-                  childRegions,
-                  itemVal,
-                  indexVal,
-                };
-              },
-              (record, itemVal, indexVal) => {
-                const isObject = (val: any) => val && typeof val === 'object' && val !== null;
-                const itemsEqual = (a: any, b: any) => {
-                  if (a === b) return true;
-                  if (!isObject(a) || !isObject(b)) return false;
-                  const keysA = Object.keys(a);
-                  const keysB = Object.keys(b);
-                  if (keysA.length !== keysB.length) return false;
-                  for (const k of keysA) {
-                    if (a[k] !== b[k]) return false;
-                  }
-                  return true;
-                };
-
-                const childScope = Object.create(scope);
-                populateItemScope(childScope, itemName, itemVal, indexName, indexVal);
-
-                if (itemsEqual(record.itemVal, itemVal) && (!indexName || record.indexVal === indexVal)) {
-                  record.indexVal = indexVal;
-                  if (record.nodes.length > 0) {
-                    vm.patchItemAttributes(bodyMod, childScope, record.nodes);
-                  }
-                  return;
-                }
-
-                record.itemVal = itemVal;
-                record.indexVal = indexVal;
-
-                if (record.childRegions) {
-                  for (const r of record.childRegions) {
-                    vm.removeRegion(r);
-                  }
-                }
-
-                const before = vm.reactiveRegions.size;
-                const frag = vm.runSubModule(bodyMod, childScope);
-                record.childRegions = Array.from(vm.reactiveRegions).slice(before);
-
-                if (frag && record.nodes.length > 0) {
-                  const rootNode = record.nodes[0];
-                  if (
-                    frag.childNodes.length === 1 &&
-                    frag.childNodes[0]?.nodeName === rootNode?.nodeName &&
-                    rootNode &&
-                    typeof (rootNode as any).setAttribute === 'function'
-                  ) {
-                    const newElem = frag.childNodes[0] as Element;
-                    const elem = rootNode as Element;
-                    const newHandlers = DriftClientVM.eventHandlersMap.get(newElem);
-                    if (newHandlers) {
-                      DriftClientVM.eventHandlersMap.set(elem, newHandlers);
-                    } else {
-                      DriftClientVM.eventHandlersMap.delete(elem);
-                    }
-                    for (const attr of Array.from(elem.attributes)) {
-                      elem.removeAttribute(attr.name);
-                    }
-                    for (const attr of Array.from(newElem.attributes)) {
-                      elem.setAttribute(attr.name, attr.value);
-                    }
-                    while (elem.firstChild) {
-                      vm.unmountSubtree(elem.firstChild);
-                      elem.removeChild(elem.firstChild);
-                    }
-                    while (newElem.firstChild) {
-                      elem.appendChild(newElem.firstChild);
-                    }
-                  } else if (rootNode?.parentNode) {
-                    const parent = rootNode.parentNode;
-                    const newNodes = frag.nodeType === 11 ? Array.from(frag.childNodes) : [frag];
-                    parent.insertBefore(frag, rootNode);
-                    for (const oldNode of record.nodes) {
-                      if (oldNode.parentNode === parent) {
-                        vm.unmountSubtree(oldNode);
-                        parent.removeChild(oldNode);
-                      }
-                    }
-                    record.nodes = newNodes;
-                  }
-                }
-              },
-              removeItem
-            );
-          };
-          renderFor();
-
-          if (this.cursor) {
-            actualEndAnchor = this.cursor.claimComment('/for', doc);
-          }
-          if (!actualEndAnchor.parentNode || actualEndAnchor.parentNode !== parentElem) {
-            parentElem.appendChild(actualEndAnchor);
-          }
-
-          const forRegion: ReactiveRegion = {
-            deps,
-            reRender: () => {
-              renderFor();
-            },
-            parentNode: parentElem,
-            startAnchor,
-            endAnchor: actualEndAnchor,
-          };
-          this.registerRegion(forRegion);
-
-          pc += 8;
-          break;
-        }
-
-        default:
-          throw new Error(`Unknown Opcode ${opcode} at PC ${pc}`);
       }
-    }
 
-    return null;
+      return this.mode === VMMode.MOUNT ? (this.getRegister(0, registers) as Node | null) : null;
+    } finally {
+      this.mode = prevMode;
+    }
   }
 
   /**
@@ -939,147 +1009,75 @@ export class DriftClientVM {
     const bytecode = bodyMod.bytecode;
     const constants = bodyMod.constants;
 
-    // Step 1: Scan bytecode to discover root register, APPEND_CHILD relationships, and map registers to DOM nodes.
-    let rootReg = 0;
-    const childrenOf = new Map<number, number[]>();
-
-    for (let pc = 0; pc < bytecode.length; ) {
-      const opcode = bytecode[pc]!;
-      switch (opcode) {
-        case Opcode.RETURN:
-          rootReg = bytecode[pc + 1] ?? 0;
-          pc += 2;
-          break;
-        case Opcode.CREATE_ELEMENT:
-        case Opcode.CREATE_TEXT:
-        case Opcode.CREATE_COMMENT:
-        case Opcode.INTERPOLATE_TEXT:
-          pc += 3;
-          break;
-        case Opcode.MOUNT_COMPONENT:
-          pc += 4;
-          break;
-        case Opcode.APPEND_CHILD: {
-          const parentReg = bytecode[pc + 1]!;
-          const childReg = bytecode[pc + 2]!;
-          if (!childrenOf.has(parentReg)) {
-            childrenOf.set(parentReg, []);
-          }
-          childrenOf.get(parentReg)!.push(childReg);
-          pc += 3;
-          break;
-        }
-        case Opcode.SET_ATTR:
-          pc += 5;
-          break;
-        case Opcode.CREATE_FRAGMENT:
-        case Opcode.EXEC_SCRIPT:
-          pc += 2;
-          break;
-        case Opcode.REACTIVE_IF:
-          pc += 6;
-          break;
-        case Opcode.REACTIVE_FOR:
-          pc += 8;
-          break;
-        default:
-          pc = bytecode.length;
-          break;
-      }
-    }
-
-    // Step 2: Map each register to its corresponding DOM node in the subtree
     const regs = new Map<number, Node>();
-
-    const getDirectChildNodes = (parentNode: Node): Node[] => {
-      const result: Node[] = [];
-      const children = parentNode.childNodes;
-      let ifDepth = 0;
-      let forDepth = 0;
-      for (let i = 0; i < children.length; i++) {
-        const child = children[i]!;
-        if (child.nodeType === 8) {
-          const text = (child as Comment).data.trim();
-          if (text === 'if') {
-            ifDepth++;
-            continue;
-          } else if (text === '/if') {
-            if (ifDepth > 0) ifDepth--;
-            continue;
-          } else if (text === 'for') {
-            forDepth++;
-            continue;
-          } else if (text === '/for') {
-            if (forDepth > 0) forDepth--;
-            continue;
-          }
-        }
-        if (ifDepth === 0 && forDepth === 0) {
-          result.push(child);
-        }
-      }
-      return result;
-    };
-
-    const mapChildren = (parentReg: number, parentNode: Node) => {
-      const childRegs = childrenOf.get(parentReg);
-      if (!childRegs) return;
-      const childNodes = getDirectChildNodes(parentNode);
-      for (let i = 0; i < childRegs.length && i < childNodes.length; i++) {
-        const cReg = childRegs[i]!;
-        const cNode = childNodes[i]!;
-        regs.set(cReg, cNode);
-        mapChildren(cReg, cNode);
-      }
-    };
+    const rootNode = nodes[0]!;
+    regs.set(0, rootNode);
 
     if (nodes.length > 1) {
-      const topChildRegs = childrenOf.get(rootReg) || [];
-      for (let i = 0; i < topChildRegs.length && i < nodes.length; i++) {
-        const cReg = topChildRegs[i]!;
-        const cNode = nodes[i]!;
-        regs.set(cReg, cNode);
-        mapChildren(cReg, cNode);
+      let childIdx = 0;
+      for (let pc = 0; pc < bytecode.length; ) {
+        const opcode = bytecode[pc]!;
+        if (
+          opcode === Opcode.CREATE_ELEMENT ||
+          opcode === Opcode.CREATE_TEXT ||
+          opcode === Opcode.CREATE_COMMENT ||
+          opcode === Opcode.INTERPOLATE_TEXT
+        ) {
+          const reg = bytecode[pc + 1]!;
+          if (childIdx < nodes.length) {
+            regs.set(reg, nodes[childIdx]!);
+            childIdx++;
+          }
+          pc += 3;
+        } else if (opcode === Opcode.SET_ATTR) {
+          pc += 5;
+        } else if (opcode === Opcode.MOUNT_COMPONENT) {
+          pc += 4;
+        } else if (opcode === Opcode.APPEND_CHILD) {
+          pc += 3;
+        } else if (opcode === Opcode.CREATE_FRAGMENT || opcode === Opcode.EXEC_SCRIPT) {
+          pc += 2;
+        } else if (opcode === Opcode.REACTIVE_IF) {
+          pc += 6;
+        } else if (opcode === Opcode.REACTIVE_FOR) {
+          pc += 8;
+        } else if (opcode === Opcode.RETURN) {
+          pc += 1;
+        } else {
+          break;
+        }
       }
-    } else {
-      const rootNode = nodes[0]!;
-      regs.set(rootReg, rootNode);
-      mapChildren(rootReg, rootNode);
     }
 
-
-    // Step 3: Iterate over SET_ATTR opcodes and patch attributes on the targeted DOM element
     for (let pc = 0; pc < bytecode.length; ) {
       const opcode = bytecode[pc]!;
       switch (opcode) {
-        case Opcode.RETURN:
-          return;
-        case Opcode.CREATE_ELEMENT:
-          pc += 3;
-          break;
-        case Opcode.MOUNT_COMPONENT:
-          pc += 4;
-          break;
-        case Opcode.CREATE_TEXT:
-        case Opcode.CREATE_COMMENT:
-        case Opcode.APPEND_CHILD:
-        case Opcode.INTERPOLATE_TEXT:
-          pc += 3;
-          break;
         case Opcode.SET_ATTR: {
           const targetReg = bytecode[pc + 1]!;
           const attrName = String(constants[bytecode[pc + 2]!]);
           const rawVal = constants[bytecode[pc + 3]!];
           const isDynamic = bytecode[pc + 4]!;
 
-          const targetNode = regs.get(targetReg) ?? (targetReg === rootReg && nodes.length === 1 ? nodes[0] : null);
-          if (targetNode && isDynamic === 1) {
-            const val = evaluateExpression(rawVal, childScope, this.declaredVars);
-            this.applyDOMAttribute(targetNode, attrName, val, childScope);
+          if (isDynamic === 1) {
+            const targetNode = regs.get(targetReg) ?? (targetReg === 0 ? rootNode : null);
+            if (targetNode) {
+              const val = evaluateExpression(rawVal, childScope, this.declaredVars);
+              this.applyDOMAttribute(targetNode, attrName, val, childScope);
+            }
           }
           pc += 5;
           break;
         }
+        case Opcode.CREATE_ELEMENT:
+        case Opcode.CREATE_TEXT:
+        case Opcode.CREATE_COMMENT:
+        case Opcode.INTERPOLATE_TEXT:
+        case Opcode.APPEND_CHILD:
+          pc += 3;
+          break;
+        case Opcode.MOUNT_COMPONENT:
+          pc += 4;
+          break;
         case Opcode.CREATE_FRAGMENT:
         case Opcode.EXEC_SCRIPT:
           pc += 2;
@@ -1090,8 +1088,12 @@ export class DriftClientVM {
         case Opcode.REACTIVE_FOR:
           pc += 8;
           break;
+        case Opcode.RETURN:
+          pc += 1;
+          break;
         default:
-          return;
+          pc = bytecode.length;
+          break;
       }
     }
   }
@@ -1105,6 +1107,8 @@ export class DriftClientVM {
 
     this.doc = doc;
     this.reactiveRegions.clear();
+    this.reactiveRegionsIndex.clear();
+    this.nodeToRegions.clear();
 
     if (options.hydrate && options.container) {
       this.cursor = new HydrationCursor(options.container, doc);
@@ -1126,12 +1130,13 @@ export class DriftClientVM {
 
     this.scope = scope;
     this.module = module;
-    if (module.declaredVars && module.declaredVars.length > 0) {
-      this.declaredVars = new Set(module.declaredVars);
-    } else {
-      this.declaredVars = new Set(
-        (module.reactiveBindings ?? []).map((b) => b.variable)
-      );
+    this.declaredVars = new Set(module.declaredVars ?? []);
+
+    this.reactiveBindingsMap.clear();
+    if (module.reactiveBindings) {
+      for (const b of module.reactiveBindings) {
+        this.reactiveBindingsMap.set(b.variable, b.positions);
+      }
     }
 
     this.depToDerived.clear();
@@ -1172,58 +1177,11 @@ export class DriftClientVM {
 
     pushActiveVM(this);
     try {
-      const result = this.executeLoop(module.bytecode, module.constants, scope);
+      const result = this.executeFrom(0, module.bytecode, module.constants, scope, VMMode.MOUNT);
       this.cursor = null;
       return result;
     } finally {
       popActiveVM();
-    }
-  }
-
-  /**
-   * Directly updates a single instruction at `pc` using persistent registers.
-   */
-  public updateAt(pc: number, module: CompiledModule, options: VMExecutionOptions = {}): void {
-    const scope: Record<string, any> = options.scope ?? this.scope;
-    const { bytecode, constants } = module;
-    const opcode = bytecode[pc];
-
-    switch (opcode) {
-      case Opcode.INTERPOLATE_TEXT: {
-        const dstReg = bytecode[pc + 1]!;
-        const expr = constants[bytecode[pc + 2]!];
-        const val = evaluateExpression(expr, scope, this.declaredVars);
-        const existingNode = this.getRegister(dstReg);
-        if (existingNode && existingNode.nodeType === 3) {
-          existingNode.nodeValue = val != null ? String(val) : '';
-        }
-        break;
-      }
-      case Opcode.SET_ATTR: {
-        const elem = this.getRegister(bytecode[pc + 1]!);
-        const attrName = String(constants[bytecode[pc + 2]!]);
-        const rawVal = constants[bytecode[pc + 3]!];
-        const isDynamic = bytecode[pc + 4]!;
-        const val = isDynamic === 1 ? evaluateExpression(rawVal, scope, this.declaredVars) : rawVal;
-        this.applyDOMAttribute(elem, attrName, val, scope);
-        break;
-      }
-      case Opcode.MOUNT_COMPONENT: {
-        const dstReg = bytecode[pc + 1]!;
-        const compNode = this.getRegister(dstReg);
-        const childEntry = compNode ? this.childVMs.get(compNode) : null;
-        if (childEntry) {
-          if (childEntry.propsSpec) {
-            const { vm: childVM, scope: childScope, propsSpec } = childEntry;
-            const newPropsObj = evaluatePropsSpec(propsSpec, scope, this.declaredVars);
-            this.updateChildComponentProps(childScope, childVM, newPropsObj);
-          }
-          if (childEntry.childrenVM) {
-            childEntry.childrenVM.triggerUpdates(new Set(this.declaredVars));
-          }
-        }
-        break;
-      }
     }
   }
 
@@ -1234,21 +1192,16 @@ export class DriftClientVM {
   public triggerUpdates(changedVars: Set<string>): void {
     if (changedVars.size === 0) return;
 
-    // 1. Patch INTERPOLATE_TEXT / SET_ATTR / MOUNT_COMPONENT in-place (existing logic)
-    if (this.module?.reactiveBindings) {
-      const updatedPcs = new Set<number>();
-      for (const binding of this.module.reactiveBindings) {
-        if (!changedVars.has(binding.variable)) continue;
+    if (this.reactiveBindingsMap.size > 0 && this.module) {
+      this.updatedPcs.clear();
+      for (const varName of changedVars) {
+        const positions = this.reactiveBindingsMap.get(varName);
+        if (!positions) continue;
 
-        for (const pos of binding.positions) {
-          if (
-            !updatedPcs.has(pos.pc) &&
-            (pos.opcode === Opcode.INTERPOLATE_TEXT ||
-             pos.opcode === Opcode.SET_ATTR ||
-             pos.opcode === Opcode.MOUNT_COMPONENT)
-          ) {
-            updatedPcs.add(pos.pc);
-            this.updateAt(pos.pc, this.module, { scope: this.scope });
+        for (const pc of positions) {
+          if (!this.updatedPcs.has(pc)) {
+            this.updatedPcs.add(pc);
+            this.executeFrom(pc, this.module.bytecode, this.module.constants, this.scope, VMMode.UPDATE);
           }
         }
       }

@@ -284,24 +284,26 @@ describe('DriftClientVM', () => {
     expect(container.firstElementChild?.textContent).toBe('Mounted Component');
   });
 
-  it('updates reactive nodes in-place via updateAt(pc, module, scope)', () => {
+  it('updates reactive nodes in-place via triggerUpdates', () => {
     const vmInstance = new DriftClientVM();
     const module: CompiledModule = {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0,
         Opcode.INTERPOLATE_TEXT, 1, 1,
+        Opcode.RETURN,
         Opcode.APPEND_CHILD, 0, 1,
-        Opcode.RETURN, 0,
       ],
       constants: ['p', { __drift_fn__: '(scope) => scope.count' }],
+      reactiveBindings: [{ variable: 'count', positions: [3] }],
+      declaredVars: ['count'],
     };
 
     const initialScope = { count: 0 };
     const p = vmInstance.execute(module, { document: doc, scope: initialScope }) as HTMLParagraphElement;
     expect(p.textContent).toBe('0');
 
-    const updatedScope = { count: 1 };
-    vmInstance.updateAt(3, module, { document: doc, scope: updatedScope });
+    (vmInstance as any).scope.count = 1;
+    vmInstance.triggerUpdates(new Set(['count']));
     expect(p.textContent).toBe('1');
   });
 
@@ -324,12 +326,12 @@ describe('DriftClientVM', () => {
         Opcode.CREATE_FRAGMENT, 1,
         Opcode.CREATE_ELEMENT, 2, 1,
         Opcode.INTERPOLATE_TEXT, 3, 2,
+        Opcode.RETURN,
         Opcode.APPEND_CHILD, 2, 3,
         Opcode.APPEND_CHILD, 1, 2,
-        Opcode.RETURN, 1,
       ],
       constants: [scriptBody, 'p', countExpr],
-      reactiveBindings: [{ variable: 'count', positions: [{ pc: 7, opcode: Opcode.INTERPOLATE_TEXT }] }],
+      reactiveBindings: [{ variable: 'count', positions: [7] }],
     };
 
     const frag = vmInstance.execute(module, { document: doc }) as DocumentFragment;

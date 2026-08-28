@@ -106,8 +106,8 @@ export class DriftServerVM {
 
         switch (opcode) {
           case Opcode.RETURN: {
-            const reg = bytecode[pc + 1]!;
-            return this.getRegister(reg);
+            pc += 1;
+            break;
           }
 
           case Opcode.CREATE_ELEMENT: {
@@ -333,7 +333,7 @@ export class DriftServerVM {
       }
     }
 
-    return null;
+    return this.getRegister(0);
   } finally {
     popActiveVM();
   }

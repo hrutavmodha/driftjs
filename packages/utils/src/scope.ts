@@ -12,10 +12,13 @@ export function setScopeValue<T = any>(targetScope: Record<string, any>, name: s
 
   let curr: any = targetScope;
   let setOn: any = null;
-  const dirtyFns: Set<(name: string) => void> = new Set();
+  const dirtyFns: ((name: string) => void)[] = [];
 
-  // 1. Traverse targetScope's prototype chain to find which scope object owns `name`
+  // Single upward pass: find owner and collect dirty functions simultaneously
   while (curr && curr !== Object.prototype) {
+    if (typeof curr.__drift_mark_dirty__ === 'function') {
+      dirtyFns.push(curr.__drift_mark_dirty__);
+    }
     if (Object.prototype.hasOwnProperty.call(curr, name)) {
       curr[name] = val;
       setOn = curr;
@@ -24,29 +27,15 @@ export function setScopeValue<T = any>(targetScope: Record<string, any>, name: s
     curr = Object.getPrototypeOf(curr);
   }
 
-  // 2. If `name` was not found on any prototype in the chain, declare it as an own property on targetScope
   if (!setOn) {
     targetScope[name] = val;
-    setOn = targetScope;
   }
 
-  // 3. Collect dirty notification functions from targetScope up to setOn
-  let scan: any = targetScope;
-  while (scan && scan !== Object.prototype) {
-    if (typeof scan.__drift_mark_dirty__ === 'function') {
-      dirtyFns.add(scan.__drift_mark_dirty__);
-    }
-    if (scan === setOn) {
-      break;
-    }
-    scan = Object.getPrototypeOf(scan);
-  }
-
-  // 4. Trigger dirty marking on all affected scope VMs (skip internal __drift_ variables)
+  // Trigger dirty marking on all affected scope VMs (skip internal __drift_ variables)
   if (!name.startsWith('__drift_')) {
-    for (const fn of dirtyFns) {
+    for (let i = 0; i < dirtyFns.length; i++) {
       try {
-        fn(name);
+        dirtyFns[i]!(name);
       } catch (err) {
         console.error(`[DriftJS] Error notifying dirty update for "${name}":`, err);
       }
@@ -55,8 +44,6 @@ export function setScopeValue<T = any>(targetScope: Record<string, any>, name: s
 
   return val;
 }
-
-
 
 /**
  * Safely checks if a property exists on scope or any of its parent scopes,
@@ -75,16 +62,26 @@ export function inScopeChain(scope: any, name: string): boolean {
 }
 
 /**
- * Safely gets a variable value from the scope chain, or falls back to globalThis.
+ * Safely gets a variable value from the scope chain, or falls back to globalThis in a single traversal.
  */
 export function getScopeValue(scope: any, name: string): any {
-  if (scope && inScopeChain(scope, name)) {
-    return scope[name];
+  if (name === '__proto__' || name === 'constructor' || name === 'prototype' || name === '__drift_mark_dirty__') {
+    return undefined;
   }
-  if (typeof globalThis !== 'undefined' && globalThis) {
-    if (name === '__proto__' || name === 'constructor' || name === 'prototype' || name === '__drift_mark_dirty__') {
-      return undefined;
+
+  // Single pass on scope chain
+  if (scope && typeof scope === 'object') {
+    let curr: any = scope;
+    while (curr && curr !== Object.prototype) {
+      if (Object.prototype.hasOwnProperty.call(curr, name)) {
+        return curr[name];
+      }
+      curr = Object.getPrototypeOf(curr);
     }
+  }
+
+  // Fallback: single pass on globalThis
+  if (typeof globalThis !== 'undefined' && globalThis) {
     let curr: any = globalThis;
     while (curr && curr !== Object.prototype) {
       if (Object.prototype.hasOwnProperty.call(curr, name)) {
@@ -93,6 +90,7 @@ export function getScopeValue(scope: any, name: string): any {
       curr = Object.getPrototypeOf(curr);
     }
   }
+
   return undefined;
 }
 

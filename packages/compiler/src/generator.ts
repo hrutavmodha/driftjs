@@ -32,7 +32,7 @@ export class DriftGenerator {
   private nextRegisterId = 0;
   private declaredVars: Set<string> = new Set();
   private imports: ImportSpec[] = [];
-  private bindingPositions: Map<string, { pc: number; opcode: Opcode }[]> = new Map();
+  private bindingPositions: Map<string, number[]> = new Map();
   private derivedBindings: DerivedBinding[] = [];
   private pendingDerived: { name: string; arg: any }[] = [];
 
@@ -60,7 +60,6 @@ export class DriftGenerator {
     if (this.ast.body.length === 0) {
       const rootReg = this.allocRegister();
       this.emit(Opcode.CREATE_FRAGMENT, rootReg);
-      this.emit(Opcode.RETURN, rootReg);
       return {
         bytecode: this.bytecode,
         constants: this.constants,
@@ -74,14 +73,12 @@ export class DriftGenerator {
     if (this.ast.body.length === 1 && this.ast.body[0]?.type === ASTNodeType.Element) {
       const rootReg = this.allocRegister();
       this.compileElement(this.ast.body[0] as ElementNode, rootReg);
-      this.emit(Opcode.RETURN, rootReg);
     } else {
       const rootReg = this.allocRegister();
       this.emit(Opcode.CREATE_FRAGMENT, rootReg);
       for (const child of this.ast.body) {
         this.compileNode(child, rootReg);
       }
-      this.emit(Opcode.RETURN, rootReg);
     }
 
     return {
@@ -221,10 +218,11 @@ export class DriftGenerator {
       const propsSpecIdx = hasPropsOrChildren ? this.addConstant(propsSpec) : 0xFF;
       const pc = this.bytecode.length;
       this.emit(Opcode.MOUNT_COMPONENT, targetReg, tagConstIdx, propsSpecIdx);
+      this.emit(Opcode.RETURN);
 
       for (const attr of node.attributes) {
         if (attr.type === ASTNodeType.Attribute && attr.value !== null && typeof attr.value !== 'string' && attr.value.type === ASTNodeType.Interpolation) {
-          this.recordBindingPositions(attr.value.expression, pc, Opcode.MOUNT_COMPONENT);
+          this.recordBindingPositions(attr.value.expression, pc);
         }
       }
       if (childrenSubMod) {
@@ -233,7 +231,7 @@ export class DriftGenerator {
             if (!this.bindingPositions.has(binding.variable)) {
               this.bindingPositions.set(binding.variable, []);
             }
-            this.bindingPositions.get(binding.variable)!.push({ pc, opcode: Opcode.MOUNT_COMPONENT });
+            this.bindingPositions.get(binding.variable)!.push(pc);
           }
         }
       }
@@ -269,7 +267,8 @@ export class DriftGenerator {
       const exprIdx = this.addConstant(attr.value.expression);
       const pc = this.bytecode.length;
       this.emit(Opcode.SET_ATTR, elemReg, nameIdx, exprIdx, 1);
-      this.recordBindingPositions(attr.value.expression, pc, Opcode.SET_ATTR);
+      this.emit(Opcode.RETURN);
+      this.recordBindingPositions(attr.value.expression, pc);
     }
   }
 
@@ -285,8 +284,9 @@ export class DriftGenerator {
     const exprConstIdx = this.addConstant(node.expression);
     const pc = this.bytecode.length;
     this.emit(Opcode.INTERPOLATE_TEXT, textReg, exprConstIdx);
+    this.emit(Opcode.RETURN);
     this.emit(Opcode.APPEND_CHILD, parentReg, textReg);
-    this.recordBindingPositions(node.expression, pc, Opcode.INTERPOLATE_TEXT);
+    this.recordBindingPositions(node.expression, pc);
   }
 
   private compileCommentNode(node: CommentNode, parentReg: number): void {
@@ -321,7 +321,6 @@ export class DriftGenerator {
     for (const node of nodes) {
       this.compileNode(node, rootReg);
     }
-    this.emit(Opcode.RETURN, rootReg);
 
     const result = {
       bytecode: this.bytecode,
@@ -347,7 +346,10 @@ export class DriftGenerator {
     subMod: { reactiveBindings: ReactiveBinding[] },
     extraExpr?: any
   ): string[] {
-    const deps = new Set<string>(subMod.reactiveBindings.map((b) => b.variable));
+    const deps = new Set<string>();
+    for (let i = 0; i < subMod.reactiveBindings.length; i++) {
+      deps.add(subMod.reactiveBindings[i]!.variable);
+    }
     if (extraExpr) {
       for (const name of this.extractIdentifiers(extraExpr)) {
         if (this.declaredVars.has(name)) deps.add(name);
@@ -545,7 +547,7 @@ export class DriftGenerator {
     return ids;
   }
 
-  private recordBindingPositions(expr: any, pc: number, opcode: Opcode): void {
+  private recordBindingPositions(expr: any, pc: number): void {
     if (this.declaredVars.size === 0) return;
     const ids = this.extractIdentifiers(expr);
     for (const name of ids) {
@@ -553,7 +555,7 @@ export class DriftGenerator {
         if (!this.bindingPositions.has(name)) {
           this.bindingPositions.set(name, []);
         }
-        this.bindingPositions.get(name)!.push({ pc, opcode });
+        this.bindingPositions.get(name)!.push(pc);
       }
     }
   }

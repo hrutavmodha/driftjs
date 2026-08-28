@@ -7,6 +7,7 @@ This document tracks upcoming core architectural features, reactivity primitives
 ## ✅ Completed: Derived & Computed State (`derive()`)
 
 ### Overview
+
 In Single File Components (`.drift`), derived reactive state is authored via `derive(expr)` or `derive(() => { ... })`:
 
 ```drift
@@ -34,6 +35,7 @@ In Single File Components (`.drift`), derived reactive state is authored via `de
 ```
 
 ### Compiler & VM Implementation
+
 1. **Compiler AST Analysis & Codegen (`driftjs-compiler`):**
    - Detects `derive(...)` calls in `<script>` variable declarations.
    - Statically extracts variable dependencies (e.g. `count`) from expression AST.
@@ -51,9 +53,11 @@ In Single File Components (`.drift`), derived reactive state is authored via `de
 ## 🌊 Priority 1 (Next Up): Streaming SSR (`renderToReadableStream` / `pipeToNodeStream`)
 
 ### Overview
+
 Enable progressive HTML streaming for DriftJS server-side rendering, allowing initial shells to reach the browser immediately while asynchronous data/components resolve concurrently.
 
 ### Architecture & Design
+
 1. **Web Streams & Node.js Stream Adapters (`driftjs-ssr`):**
    - `renderToReadableStream(component, options)`: Returns a Web Standard `ReadableStream` for Edge runtimes (Cloudflare Workers, Deno, Bun).
    - `renderToPipeableStream(component, options)`: Exposes Node.js stream integration (`pipe(res)`) with `onShellReady`, `onAllReady`, and `onError` lifecycle hooks.
@@ -67,9 +71,11 @@ Enable progressive HTML streaming for DriftJS server-side rendering, allowing in
 ## ⚡ Priority 2: Selective & Progressive Hydration
 
 ### Overview
+
 Upgrade `driftjs-dom` hydration from a monolithic full-page scan to fine-grained, non-blocking selective hydration of independent component subtrees.
 
 ### Architecture & Design
+
 1. **Partial / Island Hydration Triggers:**
    - **`hydrateOnIdle`**: Hydrates interactive subtrees during browser idle periods (`requestIdleCallback`).
    - **`hydrateWhenVisible`**: Defers subtree hydration until the component enters the viewport (`IntersectionObserver`).
@@ -82,6 +88,7 @@ Upgrade `driftjs-dom` hydration from a monolithic full-page scan to fine-grained
 ## 🔄 Priority 3: Reactive Side-Effects & Watchers (`$effect` / `watch`)
 
 ### Proposed Design
+
 Allow developers to execute asynchronous or synchronous side-effects whenever targeted dependencies change:
 
 ```drift
@@ -102,6 +109,7 @@ Allow developers to execute asynchronous or synchronous side-effects whenever ta
 ## 🔀 Priority 4: Two-Way Form Binding (`@bind` / `bind:value`)
 
 ### Proposed Design
+
 Eliminate manual `value={val} oninput={(e) => val = e.target.value}` boilerplate with native compiler transformation:
 
 ```drift
@@ -111,6 +119,7 @@ Eliminate manual `value={val} oninput={(e) => val = e.target.value}` boilerplate
 ```
 
 ### Compiler Implementation
+
 - Automatically expands `@bind value={x}` into:
   - `SET_ATTR` for `value` bound to `x`.
   - Global delegated `input` / `change` event handler dispatching `setScopeValue(scope, 'x', event.target.value)`.
@@ -122,6 +131,7 @@ Eliminate manual `value={val} oninput={(e) => val = e.target.value}` boilerplate
 ## ✅ Completed: Custom Component Children (`{children}`)
 
 ### Overview
+
 In DriftJS, custom components can receive child elements/nodes, mounted in the component template via `{children}` and accessible as the independent `children` variable in `<script>`:
 
 ```drift
@@ -148,6 +158,7 @@ In DriftJS, custom components can receive child elements/nodes, mounted in the c
 ```
 
 ### Key Architectural Characteristics
+
 - **Separation of Props and Children:** `props` strictly contains explicit attributes (e.g. `props.title`). `children` is an independent first-class scope entity.
 - **Compiler Sub-Module Generation:** Children passed between `<CustomComponent>...</CustomComponent>` are compiled into an isolated sub-module and passed via `propsSpec.__drift_children__`.
 - **Client & SSR Parity:** Evaluates in parent's reactive scope and mounts seamlessly via `INTERPOLATE_TEXT` in both DOM (`DriftClientVM`) and Server (`DriftServerVM`).
@@ -157,6 +168,7 @@ In DriftJS, custom components can receive child elements/nodes, mounted in the c
 ## 📌 Priority 5: DOM Element References (`ref`)
 
 ### Proposed Design
+
 Directly bind mounted DOM elements or component instances to `<script>` variables:
 
 ```drift
@@ -178,6 +190,7 @@ Directly bind mounted DOM elements or component instances to `<script>` variable
 ## 🎨 Priority 6: Component Scoped CSS (`<style scoped>`)
 
 ### Proposed Design
+
 Post-process `<style scoped>` blocks in `driftjs-compiler` / `driftjs-vite-plugin` by appending unique component hashes (e.g. `[data-drift-v-ab12cd]`) to CSS selectors and template elements to prevent global style leakage.
 
 ---
@@ -185,6 +198,7 @@ Post-process `<style scoped>` blocks in `driftjs-compiler` / `driftjs-vite-plugi
 ## ⏱️ Priority 7: `nextTick()` / `tick()` Microtask Helper
 
 ### Proposed Design
+
 Expose a promise-based helper to wait for scheduled VM batch DOM updates to flush:
 
 ```ts

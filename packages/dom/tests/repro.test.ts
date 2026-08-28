@@ -577,7 +577,7 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
       bytecode: [
         Opcode.CREATE_ELEMENT, 0, 0, // button
         Opcode.SET_ATTR, 0, 1, 2, 1, // onclick = eval(handleClick)
-        Opcode.RETURN, 0,
+        Opcode.RETURN,
       ],
       constants: [
         'button',
@@ -585,7 +585,7 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
         { __drift_fn__: '(scope) => scope.handleClick' },
       ],
       reactiveBindings: [
-        { variable: 'handleClick', positions: [{ opcode: Opcode.SET_ATTR, pc: 3 }] },
+        { variable: 'handleClick', positions: [3] },
       ],
       declaredVars: ['handleClick'],
     };

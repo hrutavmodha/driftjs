@@ -26,7 +26,7 @@ export enum Opcode {
  */
 export interface ReactiveBinding {
   readonly variable: string;
-  readonly positions: readonly { readonly pc: number; readonly opcode: Opcode }[];
+  readonly positions: readonly number[];
 }
 
 export interface ImportSpec {

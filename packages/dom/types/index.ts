@@ -1,5 +1,10 @@
 export * from '../../compiler/types/opcodes.js';
 
+export enum VMMode {
+  MOUNT = 0,
+  UPDATE = 1,
+}
+
 export interface VMExecutionOptions {
   readonly scope?: Record<string, any>;
   readonly document?: Document;
