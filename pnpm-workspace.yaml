@@ -1,6 +1,10 @@
 packages:
   - 'packages/*'
   - 'playground'
+  - 'benchmarks'
+  - 'benchmarks/runner'
+  - 'benchmarks/frameworks/*'
 allowBuilds:
   '@vscode/vsce-sign': true
   keytar: true
+  esbuild: true

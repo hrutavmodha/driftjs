@@ -1,0 +1,16 @@
+{
+  "name": "driftjs-benchmark-runner",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "bench": "tsx src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "playwright": "^1.62.1",
+    "tsx": "^4.19.3",
+    "typescript": "^7.0.2"
+  }
+}

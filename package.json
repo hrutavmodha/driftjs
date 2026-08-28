@@ -16,6 +16,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "vitest run",
+    "bench": "pnpm --filter driftjs-benchmark-runner start",
     "typecheck": "tsc --noEmit",
     "publish": "pnpm -r publish --no-git-checks --access public",
     "patch": "node scripts/patch.js",

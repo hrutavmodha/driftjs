@@ -1,0 +1,288 @@
+import type { BenchmarkReport, BenchmarkSummaryTable, FrameworkDef } from './types.js';
+import { formatValue } from './stats.js';
+import { writeFileSync, mkdirSync } from 'fs';
+import { resolve, dirname } from 'path';
+
+function renderTableHTML(table: BenchmarkSummaryTable, frameworks: FrameworkDef[]): string {
+  if (!table.rows || table.rows.length === 0) return '';
+
+  const headerCells = [
+    `<th class="text-left font-semibold py-3 px-4 text-slate-700">Metric / Benchmark</th>`,
+    `<th class="text-left font-semibold py-3 px-4 text-slate-700">Unit</th>`,
+    ...frameworks.map(f => `<th class="text-right font-semibold py-3 px-4 text-slate-700">${f.name}</th>`)
+  ].join('\n            ');
+
+  const bodyRows = table.rows.map(row => {
+    const baselineVal = row.values['vanilla'];
+    const valCells = frameworks.map(f => {
+      const val = row.values[f.id];
+      const formatted = formatValue(val, row.unit);
+      let factorBadge = '';
+      if (baselineVal && val && f.id !== 'vanilla') {
+        const factor = val / baselineVal;
+        const factorStr = factor.toFixed(2) + 'x';
+        factorBadge = `<span class="factor">(${factorStr})</span>`;
+      }
+      return `<td class="num">${formatted} ${factorBadge}</td>`;
+    }).join('\n            ');
+
+    return `
+          <tr>
+            <td class="name">
+              <strong>${row.name}</strong>
+              <div class="desc">${row.description}</div>
+            </td>
+            <td class="unit">${row.unit}</td>
+            ${valCells}
+          </tr>`;
+  }).join('\n');
+
+  return `
+    <section class="section-card">
+      <div class="section-header">
+        <h2>${table.title}</h2>
+        <span class="badge">Arithmetic Mean (${table.rows.length} Benchmarks)</span>
+      </div>
+      <div class="table-container">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              ${headerCells}
+            </tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+export function generateHTMLReport(report: BenchmarkReport, frameworks: FrameworkDef[]): string {
+  const tablesHTML = report.tables.map(t => renderTableHTML(t, frameworks)).join('\n');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DriftJS Framework Benchmark Results</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.5;
+      padding: 2.5rem 1.5rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+    }
+
+    header h1 {
+      font-size: 1.875rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.025em;
+    }
+
+    header p {
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      font-size: 0.95rem;
+    }
+
+    .meta-bar {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .meta-item strong {
+      color: var(--text);
+    }
+
+    .section-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      overflow: hidden;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      background: #fdfdfe;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-header h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      background: #eff6ff;
+      color: var(--primary);
+      border-radius: 9999px;
+      border: 1px solid #dbeafe;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table.bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    table.bench-table th {
+      padding: 0.85rem 1.25rem;
+      background: #f8fafc;
+      font-weight: 600;
+      color: #334155;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    table.bench-table td {
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    table.bench-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.bench-table tbody tr:nth-child(even) {
+      background-color: #fafbfc;
+    }
+
+    table.bench-table tbody tr:hover {
+      background-color: #f1f5f9;
+    }
+
+    td.name {
+      width: 38%;
+    }
+
+    td.name strong {
+      display: block;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    td.name .desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.15rem;
+    }
+
+    td.unit {
+      width: 8%;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    td.num {
+      text-align: right;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #1e293b;
+    }
+
+    .factor {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-left: 0.35rem;
+      font-weight: normal;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>DriftJS Framework Benchmark Report</h1>
+      <p>Benchmark suite clone modeled after <code>js-framework-benchmark</code> measuring CPU durations, memory footprint, and startup metrics.</p>
+      <div class="meta-bar">
+        <span class="meta-item">Timestamp: <strong>${report.timestamp}</strong></span>
+        <span class="meta-item">Runs per Benchmark: <strong>${report.runs}</strong></span>
+        <span class="meta-item">Aggregation: <strong>Arithmetic Mean</strong></span>
+      </div>
+    </header>
+
+    <main>
+      ${tablesHTML}
+    </main>
+
+    <footer>
+      <p>Generated by DriftJS Benchmark Suite &bull; All durations reported as arithmetic mean across ${report.runs} runs.</p>
+    </footer>
+  </div>
+</body>
+</html>`;
+}
+
+export function saveReport(report: BenchmarkReport, frameworks: FrameworkDef[], outputDir: string): { htmlPath: string; jsonPath: string } {
+  mkdirSync(outputDir, { recursive: true });
+
+  const htmlContent = generateHTMLReport(report, frameworks);
+  const htmlPath = resolve(outputDir, 'index.html');
+  writeFileSync(htmlPath, htmlContent, 'utf-8');
+
+  const jsonPath = resolve(outputDir, 'results.json');
+  writeFileSync(jsonPath, JSON.stringify(report, null, 2), 'utf-8');
+
+  return { htmlPath, jsonPath };
+}

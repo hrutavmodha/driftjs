@@ -1,0 +1,119 @@
+<script>
+  let data = $state([]);
+  let selected = $state(0);
+  let nextId = 1;
+
+  const adjectives = ["pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint", "clean", "elegant", "easy", "angry", "crazy", "helpful", "mushy", "odd", "unsightly", "adorable", "important", "inexpensive", "cheap", "expensive", "fancy"];
+  const colours = ["red", "yellow", "blue", "green", "pink", "brown", "purple", "brown", "white", "black", "orange"];
+  const nouns = ["table", "chair", "house", "bbq", "desk", "car", "pony", "cup", "fish", "elephant", "aquarium", "guitar", "boat", "plane"];
+
+  function _random(max) {
+    return Math.round(Math.random() * 1000) % max;
+  }
+
+  function buildData(count) {
+    const res = new Array(count);
+    for (let i = 0; i < count; i++) {
+      res[i] = {
+        id: nextId++,
+        label: adjectives[_random(adjectives.length)] + " " + colours[_random(colours.length)] + " " + nouns[_random(nouns.length)]
+      };
+    }
+    return res;
+  }
+
+  function run() {
+    data = buildData(1000);
+    selected = 0;
+  }
+
+  function runLots() {
+    data = buildData(10000);
+    selected = 0;
+  }
+
+  function add() {
+    data = data.concat(buildData(1000));
+  }
+
+  function update() {
+    for (let i = 0; i < data.length; i += 10) {
+      data[i].label += ' !!!';
+    }
+  }
+
+  function clear() {
+    data = [];
+    selected = 0;
+  }
+
+  function swapRows() {
+    if (data.length > 998) {
+      const temp = data[1];
+      data[1] = data[998];
+      data[998] = temp;
+    }
+  }
+
+  function select(id) {
+    selected = id;
+  }
+
+  function remove(id) {
+    const idx = data.findIndex(d => d.id === id);
+    if (idx !== -1) {
+      data.splice(idx, 1);
+    }
+  }
+</script>
+
+<div class="container">
+  <div class="jumbotron">
+    <div class="row">
+      <div class="col-md-6">
+        <h1>Svelte 5 (keyed)</h1>
+      </div>
+      <div class="col-md-6">
+        <div class="row">
+          <div class="col-sm-6 smallpad">
+            <button type="button" class="btn btn-primary btn-block" id="run" onclick={run}>Create 1,000 rows</button>
+          </div>
+          <div class="col-sm-6 smallpad">
+            <button type="button" class="btn btn-primary btn-block" id="runlots" onclick={runLots}>Create 10,000 rows</button>
+          </div>
+          <div class="col-sm-6 smallpad">
+            <button type="button" class="btn btn-primary btn-block" id="add" onclick={add}>Append 1,000 rows</button>
+          </div>
+          <div class="col-sm-6 smallpad">
+            <button type="button" class="btn btn-primary btn-block" id="update" onclick={update}>Update every 10th row</button>
+          </div>
+          <div class="col-sm-6 smallpad">
+            <button type="button" class="btn btn-primary btn-block" id="clear" onclick={clear}>Clear</button>
+          </div>
+          <div class="col-sm-6 smallpad">
+            <button type="button" class="btn btn-primary btn-block" id="swaprows" onclick={swapRows}>Swap Rows</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <table class="table table-hover table-striped test-data">
+    <tbody id="tbody">
+      {#each data as item (item.id)}
+        <tr class={selected === item.id ? 'danger' : ''}>
+          <td class="col-md-1">{item.id}</td>
+          <td class="col-md-4">
+            <a class="lbl" onclick={() => select(item.id)}>{item.label}</a>
+          </td>
+          <td class="col-md-1">
+            <a class="remove" onclick={() => remove(item.id)}>
+              <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>
+            </a>
+          </td>
+          <td class="col-md-6"></td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+  <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>
+</div>

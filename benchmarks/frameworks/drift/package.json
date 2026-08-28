@@ -1,0 +1,21 @@
+{
+  "name": "benchmark-drift",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "driftjs-dom": "workspace:*",
+    "driftjs-shared": "workspace:*"
+  },
+  "devDependencies": {
+    "driftjs-compiler": "workspace:*",
+    "driftjs-vite-plugin": "workspace:*",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5"
+  }
+}

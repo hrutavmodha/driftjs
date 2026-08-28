@@ -1,0 +1,10 @@
+{
+  "name": "driftjs-benchmarks-root",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "pnpm --filter driftjs-benchmark-runner start",
+    "build": "pnpm -r --filter \"./frameworks/**\" build"
+  }
+}
