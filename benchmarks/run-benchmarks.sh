@@ -86,7 +86,18 @@ CURRENT_GOV="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/
 echo "   • Active CPU Governor: ${CURRENT_GOV}"
 echo ""
 
-# Run the benchmarks
-echo "⚡ Starting Benchmark Suite with CPU in performance mode..."
+# 3. Build framework bundles for size and startup measurements
+echo "📦 Building benchmark framework packages..."
 cd "${ROOT_DIR}"
+pnpm -r --filter "./benchmarks/frameworks/**" build
+
+# 4. Run the benchmarks
+echo ""
+echo "⚡ Starting Benchmark Suite with CPU in performance mode..."
 pnpm --filter driftjs-benchmark-runner start "$@"
+
+# 5. Start the TS + Vite results dashboard app
+echo ""
+echo "📊 Launching DriftJS Benchmark Results Dashboard..."
+pnpm --filter driftjs-benchmark-app dev -- --open
+

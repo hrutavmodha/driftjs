@@ -12,6 +12,7 @@ import type {
   CompiledModule,
   ReactiveBinding,
   DerivedBinding,
+  EffectBinding,
   ImportSpec,
 } from '../types/index.js';
 import {
@@ -35,6 +36,8 @@ export class DriftGenerator {
   private bindingPositions: Map<string, number[]> = new Map();
   private derivedBindings: DerivedBinding[] = [];
   private pendingDerived: { name: string; arg: any }[] = [];
+  private effectBindings: EffectBinding[] = [];
+  private pendingEffects: { arg: any }[] = [];
 
   constructor(ast: ProgramNode) {
     this.ast = ast;
@@ -53,9 +56,12 @@ export class DriftGenerator {
     this.bindingPositions = new Map();
     this.derivedBindings = [];
     this.pendingDerived = [];
+    this.effectBindings = [];
+    this.pendingEffects = [];
 
     this.collectDeclaredVars(this.ast.body);
     this.processDerivedBindings();
+    this.processEffectBindings();
 
     if (this.ast.body.length === 0) {
       const rootReg = this.allocRegister();
@@ -66,6 +72,7 @@ export class DriftGenerator {
         reactiveBindings: this.buildReactiveBindings(),
         declaredVars: [...this.declaredVars],
         derived: this.derivedBindings,
+        effects: this.effectBindings,
         imports: this.imports,
       };
     }
@@ -87,6 +94,7 @@ export class DriftGenerator {
       reactiveBindings: this.buildReactiveBindings(),
       declaredVars: [...this.declaredVars],
       derived: this.derivedBindings,
+      effects: this.effectBindings,
       imports: this.imports,
     };
   }
@@ -135,6 +143,14 @@ export class DriftGenerator {
   private filterScriptStatement(stmt: any): any {
     if (!stmt || typeof stmt !== 'object') return stmt;
     if (stmt.type === 'ImportDeclaration') return null;
+    if (
+      stmt.type === 'ExpressionStatement' &&
+      stmt.expression?.type === 'CallExpression' &&
+      stmt.expression.callee?.type === 'Identifier' &&
+      stmt.expression.callee.name === 'effect'
+    ) {
+      return null;
+    }
     if (stmt.type === 'VariableDeclaration') {
       const nonDerivedDecls = stmt.declarations.filter((decl: any) => {
         return !(
@@ -457,6 +473,15 @@ export class DriftGenerator {
           this.pendingDerived.push({ name: decl.id.name, arg: decl.init.arguments[0] });
         }
       }
+    } else if (
+      node.type === 'ExpressionStatement' &&
+      node.expression?.type === 'CallExpression' &&
+      node.expression.callee?.type === 'Identifier' &&
+      node.expression.callee.name === 'effect' &&
+      Array.isArray(node.expression.arguments) &&
+      node.expression.arguments.length > 0
+    ) {
+      this.pendingEffects.push({ arg: node.expression.arguments[0] });
     } else if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id?.type === 'Identifier') {
       this.declaredVars.add(node.id.name);
     } else if (node.type === 'ImportDeclaration' && Array.isArray(node.specifiers)) {
@@ -512,6 +537,43 @@ export class DriftGenerator {
 
       const exprIdx = this.addConstant(fnVal);
       this.derivedBindings.push({ name, deps, exprIdx });
+    }
+  }
+
+  private processEffectBindings(): void {
+    for (const item of this.pendingEffects) {
+      const { arg } = item;
+      let exprAST = arg;
+      let isFunctionBlock = false;
+      const isAsync = Boolean(arg?.async);
+
+      if (arg.type === 'ArrowFunctionExpression' || arg.type === 'FunctionExpression') {
+        if (arg.body?.type === 'BlockStatement') {
+          isFunctionBlock = true;
+          exprAST = arg.body;
+        } else {
+          exprAST = arg.body;
+        }
+      }
+
+      const ids = this.extractIdentifiers(exprAST);
+      const deps = [...ids].filter((id) => this.declaredVars.has(id));
+
+      const codeStr = astToJS(exprAST);
+      const asyncPrefix = isAsync ? 'async ' : '';
+      let fnVal: any;
+      if (isFunctionBlock) {
+        fnVal = {
+          __drift_fn__: `${asyncPrefix}(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => ${codeStr}`
+        };
+      } else {
+        fnVal = {
+          __drift_fn__: `${asyncPrefix}(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => (${codeStr})`
+        };
+      }
+
+      const exprIdx = this.addConstant(fnVal);
+      this.effectBindings.push({ deps, exprIdx });
     }
   }
 

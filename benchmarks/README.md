@@ -73,7 +73,7 @@ benchmarks/
 
 ### 3. Startup & Size Benchmarks
 
-- **41. Uncompressed Size (`kB`)** — Total uncompressed JavaScript asset size on disk (1 run, 0 warmup).
+- **41. Uncompressed Size (`kB`)** — Total uncompressed JavaScript asset size on & Acknowledgementdisk (1 run, 0 warmup).
 - **42. Compressed Size (`kB`)** — Gzip-compressed JavaScript transfer size (1 run, 0 warmup).
 - **43. First Paint (`ms`)** — Time to First Contentful Paint / Initial Paint (3 runs, 1 warmup).
 

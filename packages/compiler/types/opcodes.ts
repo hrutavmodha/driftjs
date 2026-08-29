@@ -48,6 +48,14 @@ export interface DerivedBinding {
 }
 
 /**
+ * Describes a reactive side-effect and its state dependencies.
+ */
+export interface EffectBinding {
+  readonly deps: readonly string[];
+  readonly exprIdx: number;
+}
+
+/**
  * Output module emitted by DriftGenerator.
  */
 export interface CompiledModule {
@@ -58,6 +66,8 @@ export interface CompiledModule {
   readonly declaredVars?: readonly string[];
   /** Derived/computed state variables declared with derive(...) */
   readonly derived?: readonly DerivedBinding[];
+  /** Reactive side-effects declared with effect(...) */
+  readonly effects?: readonly EffectBinding[];
   /** Import statements declared in the component's <script> block. */
   readonly imports?: readonly ImportSpec[];
   /** Component scope containing imported components or scope bindings. */

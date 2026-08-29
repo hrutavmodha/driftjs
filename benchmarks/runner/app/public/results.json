@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-08-29T04:52:21.185Z",
-  "runs": 3,
+  "timestamp": "2026-08-29T07:32:06.307Z",
+  "runs": 5,
   "tables": [
     {
       "category": "cpu",
@@ -22,20 +22,20 @@
           "description": "Creates 1,000 table rows upon clicking #run.",
           "unit": "ms",
           "values": {
-            "vanilla": 183,
-            "drift": 197.33,
-            "react": 586,
-            "vue": 306.67,
-            "solid": 175.67,
-            "svelte": 194.33
+            "vanilla": 200.87,
+            "drift": 250,
+            "react": 733.07,
+            "vue": 237.33,
+            "solid": 205.4,
+            "svelte": 262.67
           },
           "factors": {
             "vanilla": 1,
-            "drift": 1.08,
-            "react": 3.2,
-            "vue": 1.68,
-            "solid": 0.96,
-            "svelte": 1.06
+            "drift": 1.24,
+            "react": 3.65,
+            "vue": 1.18,
+            "solid": 1.02,
+            "svelte": 1.31
           }
         },
         {
@@ -44,20 +44,20 @@
           "description": "Replaces all 1,000 rows with 1,000 new rows.",
           "unit": "ms",
           "values": {
-            "vanilla": 270,
-            "drift": 212,
-            "react": 845.67,
-            "vue": 327.67,
-            "solid": 193.67,
-            "svelte": 261.33
+            "vanilla": 238.4,
+            "drift": 296.4,
+            "react": 755.67,
+            "vue": 280.27,
+            "solid": 235.87,
+            "svelte": 324.27
           },
           "factors": {
             "vanilla": 1,
-            "drift": 0.79,
-            "react": 3.13,
-            "vue": 1.21,
-            "solid": 0.72,
-            "svelte": 0.97
+            "drift": 1.24,
+            "react": 3.17,
+            "vue": 1.18,
+            "solid": 0.99,
+            "svelte": 1.36
           }
         },
         {
@@ -66,20 +66,20 @@
           "description": "Updates every 10th row in a table of 1,000 rows.",
           "unit": "ms",
           "values": {
-            "vanilla": 145.33,
-            "drift": 115.67,
-            "react": 259,
-            "vue": 137,
-            "solid": 65,
-            "svelte": 89.67
+            "vanilla": 101.27,
+            "drift": 147.27,
+            "react": 219.67,
+            "vue": 129.53,
+            "solid": 103.4,
+            "svelte": 105.13
           },
           "factors": {
             "vanilla": 1,
-            "drift": 0.8,
-            "react": 1.78,
-            "vue": 0.94,
-            "solid": 0.45,
-            "svelte": 0.62
+            "drift": 1.45,
+            "react": 2.17,
+            "vue": 1.28,
+            "solid": 1.02,
+            "svelte": 1.04
           }
         },
         {
@@ -88,20 +88,20 @@
           "description": "Selects the 2nd row in a table of 1,000 rows.",
           "unit": "ms",
           "values": {
-            "vanilla": 10.33,
-            "drift": 29.67,
-            "react": 46,
-            "vue": 29,
-            "solid": 17,
-            "svelte": 14.67
+            "vanilla": 16.64,
+            "drift": 35.96,
+            "react": 63.16,
+            "vue": 32.72,
+            "solid": 18.44,
+            "svelte": 21.8
           },
           "factors": {
             "vanilla": 1,
-            "drift": 2.87,
-            "react": 4.45,
-            "vue": 2.81,
-            "solid": 1.65,
-            "svelte": 1.42
+            "drift": 2.16,
+            "react": 3.8,
+            "vue": 1.97,
+            "solid": 1.11,
+            "svelte": 1.31
           }
         },
         {
@@ -110,20 +110,20 @@
           "description": "Swaps row 2 and row 999 in a table of 1,000 rows.",
           "unit": "ms",
           "values": {
-            "vanilla": 64.67,
-            "drift": 77,
-            "react": 201.33,
-            "vue": 74.33,
-            "solid": 64,
-            "svelte": 57.67
+            "vanilla": 88.33,
+            "drift": 107.2,
+            "react": 280.93,
+            "vue": 101.87,
+            "solid": 74.93,
+            "svelte": 84.33
           },
           "factors": {
             "vanilla": 1,
-            "drift": 1.19,
-            "react": 3.11,
+            "drift": 1.21,
+            "react": 3.18,
             "vue": 1.15,
-            "solid": 0.99,
-            "svelte": 0.89
+            "solid": 0.85,
+            "svelte": 0.95
           }
         },
         {
@@ -132,20 +132,20 @@
           "description": "Removes the 2nd row from a table of 1,000 rows.",
           "unit": "ms",
           "values": {
-            "vanilla": 34,
-            "drift": 52.33,
-            "react": 76.67,
-            "vue": 56.67,
-            "solid": 32.33,
-            "svelte": 51.33
+            "vanilla": 53.8,
+            "drift": 71.87,
+            "react": 95.2,
+            "vue": 68.6,
+            "solid": 46.2,
+            "svelte": 69.87
           },
           "factors": {
             "vanilla": 1,
-            "drift": 1.54,
-            "react": 2.26,
-            "vue": 1.67,
-            "solid": 0.95,
-            "svelte": 1.51
+            "drift": 1.34,
+            "react": 1.77,
+            "vue": 1.28,
+            "solid": 0.86,
+            "svelte": 1.3
           }
         },
         {
@@ -154,20 +154,20 @@
           "description": "Creates 10,000 rows on an empty table.",
           "unit": "ms",
           "values": {
-            "vanilla": 1030.67,
-            "drift": 1239,
-            "react": 3490.33,
-            "vue": 1284.33,
-            "solid": 1038,
-            "svelte": 1961.33
+            "vanilla": 1271.67,
+            "drift": 1660.2,
+            "react": 3793.33,
+            "vue": 1638.6,
+            "solid": 1359,
+            "svelte": 2367.47
           },
           "factors": {
             "vanilla": 1,
-            "drift": 1.2,
-            "react": 3.39,
-            "vue": 1.25,
-            "solid": 1.01,
-            "svelte": 1.9
+            "drift": 1.31,
+            "react": 2.98,
+            "vue": 1.29,
+            "solid": 1.07,
+            "svelte": 1.86
           }
         },
         {
@@ -176,20 +176,20 @@
           "description": "Appends 1,000 rows to a table with 1,000 rows (total 2k rows).",
           "unit": "ms",
           "values": {
-            "vanilla": 161.33,
-            "drift": 217.33,
-            "react": 670.67,
-            "vue": 243.67,
-            "solid": 190.33,
-            "svelte": 421.33
+            "vanilla": 216.4,
+            "drift": 297.93,
+            "react": 771.87,
+            "vue": 286.93,
+            "solid": 234.6,
+            "svelte": 372.13
           },
           "factors": {
             "vanilla": 1,
-            "drift": 1.35,
-            "react": 4.16,
-            "vue": 1.51,
-            "solid": 1.18,
-            "svelte": 2.61
+            "drift": 1.38,
+            "react": 3.57,
+            "vue": 1.33,
+            "solid": 1.08,
+            "svelte": 1.72
           }
         },
         {
@@ -198,20 +198,20 @@
           "description": "Clears all 1,000 rows from the table.",
           "unit": "ms",
           "values": {
-            "vanilla": 68.33,
-            "drift": 66,
-            "react": 95,
-            "vue": 110.67,
-            "solid": 62.67,
-            "svelte": 70.33
+            "vanilla": 66.2,
+            "drift": 81.33,
+            "react": 112.73,
+            "vue": 80.13,
+            "solid": 73,
+            "svelte": 70.07
           },
           "factors": {
             "vanilla": 1,
-            "drift": 0.97,
-            "react": 1.39,
-            "vue": 1.62,
-            "solid": 0.92,
-            "svelte": 1.03
+            "drift": 1.23,
+            "react": 1.7,
+            "vue": 1.21,
+            "solid": 1.1,
+            "svelte": 1.06
           }
         }
       ]
@@ -282,15 +282,15 @@
           "values": {
             "vanilla": 2.3,
             "drift": 3.37,
-            "react": 10.55,
+            "react": 10.54,
             "vue": 5.03,
             "solid": 3.15,
-            "svelte": 5.22
+            "svelte": 5.23
           },
           "factors": {
             "vanilla": 1,
             "drift": 1.47,
-            "react": 4.59,
+            "react": 4.58,
             "vue": 2.19,
             "solid": 1.37,
             "svelte": 2.27
@@ -362,20 +362,20 @@
           "description": "Time in ms to First Contentful Paint / Initial Paint.",
           "unit": "ms",
           "values": {
-            "vanilla": 66.67,
-            "drift": 76,
-            "react": 88,
-            "vue": 86.67,
-            "solid": 77.33,
-            "svelte": 97.33
+            "vanilla": 64,
+            "drift": 93.33,
+            "react": 94.67,
+            "vue": 84,
+            "solid": 92,
+            "svelte": 77.33
           },
           "factors": {
             "vanilla": 1,
-            "drift": 1.14,
-            "react": 1.32,
-            "vue": 1.3,
-            "solid": 1.16,
-            "svelte": 1.46
+            "drift": 1.46,
+            "react": 1.48,
+            "vue": 1.31,
+            "solid": 1.44,
+            "svelte": 1.21
           }
         }
       ]
@@ -390,11 +390,23 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        193,
-        181,
-        175
+        208,
+        207,
+        207,
+        191,
+        217,
+        190,
+        220,
+        183,
+        195,
+        198,
+        218,
+        184,
+        179,
+        198,
+        218
       ],
-      "mean": 183
+      "mean": 200.87
     },
     {
       "benchmarkId": "02_replace1k",
@@ -404,11 +416,23 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        283,
-        255,
-        272
+        211,
+        240,
+        281,
+        224,
+        214,
+        219,
+        214,
+        246,
+        236,
+        237,
+        234,
+        267,
+        235,
+        230,
+        288
       ],
-      "mean": 270
+      "mean": 238.4
     },
     {
       "benchmarkId": "03_update10th1k",
@@ -418,11 +442,23 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        135,
-        148,
-        153
+        105,
+        108,
+        108,
+        110,
+        89,
+        109,
+        72,
+        92,
+        100,
+        92,
+        109,
+        110,
+        104,
+        97,
+        114
       ],
-      "mean": 145.33
+      "mean": 101.27
     },
     {
       "benchmarkId": "04_select1k",
@@ -432,11 +468,33 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        10,
-        10,
-        11
+        14,
+        16,
+        15,
+        19,
+        17,
+        15,
+        14,
+        16,
+        15,
+        15,
+        18,
+        13,
+        16,
+        23,
+        13,
+        18,
+        13,
+        15,
+        27,
+        13,
+        20,
+        15,
+        14,
+        27,
+        15
       ],
-      "mean": 10.33
+      "mean": 16.64
     },
     {
       "benchmarkId": "05_swap1k",
@@ -446,11 +504,23 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        78,
-        57,
-        59
+        102,
+        89,
+        85,
+        82,
+        83,
+        130,
+        79,
+        67,
+        144,
+        85,
+        80,
+        80,
+        65,
+        81,
+        73
       ],
-      "mean": 64.67
+      "mean": 88.33
     },
     {
       "benchmarkId": "06_remove1k",
@@ -460,11 +530,23 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        42,
-        30,
-        30
+        52,
+        44,
+        41,
+        40,
+        54,
+        49,
+        65,
+        93,
+        41,
+        87,
+        47,
+        50,
+        50,
+        44,
+        50
       ],
-      "mean": 34
+      "mean": 53.8
     },
     {
       "benchmarkId": "07_create10k",
@@ -474,11 +556,23 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        990,
-        990,
-        1112
+        1294,
+        1225,
+        1197,
+        1287,
+        1270,
+        1455,
+        1283,
+        1307,
+        1213,
+        1270,
+        1221,
+        1272,
+        1280,
+        1258,
+        1243
       ],
-      "mean": 1030.67
+      "mean": 1271.67
     },
     {
       "benchmarkId": "08_append1k",
@@ -488,11 +582,23 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        181,
-        170,
-        133
+        211,
+        233,
+        233,
+        195,
+        237,
+        215,
+        212,
+        210,
+        199,
+        221,
+        212,
+        233,
+        197,
+        218,
+        220
       ],
-      "mean": 161.33
+      "mean": 216.4
     },
     {
       "benchmarkId": "09_clear1k",
@@ -502,11 +608,23 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        87,
+        69,
+        76,
+        62,
+        68,
+        66,
+        61,
+        71,
+        67,
+        66,
+        58,
         59,
-        59
+        63,
+        61,
+        73,
+        73
       ],
-      "mean": 68.33
+      "mean": 66.2
     },
     {
       "benchmarkId": "21_readyMemory",
@@ -516,8 +634,6 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        1.21,
-        1.21,
         1.21
       ],
       "mean": 1.21
@@ -530,8 +646,6 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        2.43,
-        2.43,
         2.43
       ],
       "mean": 2.43
@@ -544,8 +658,6 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        2.3,
-        2.3,
         2.3
       ],
       "mean": 2.3
@@ -558,8 +670,6 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        3.5,
-        3.5,
         3.5
       ],
       "mean": 3.5
@@ -572,8 +682,6 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        1.4,
-        1.4,
         1.4
       ],
       "mean": 1.4
@@ -586,11 +694,11 @@
       "frameworkId": "vanilla",
       "frameworkName": "VanillaJS",
       "values": [
-        52,
-        92,
-        56
+        68,
+        60,
+        64
       ],
-      "mean": 66.67
+      "mean": 64
     },
     {
       "benchmarkId": "01_run1k",
@@ -600,11 +708,23 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        217,
-        196,
-        179
+        267,
+        274,
+        241,
+        237,
+        254,
+        239,
+        233,
+        248,
+        233,
+        240,
+        269,
+        236,
+        279,
+        257,
+        243
       ],
-      "mean": 197.33
+      "mean": 250
     },
     {
       "benchmarkId": "02_replace1k",
@@ -614,11 +734,23 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        176,
-        237,
-        223
+        282,
+        265,
+        273,
+        371,
+        284,
+        294,
+        279,
+        295,
+        291,
+        333,
+        285,
+        273,
+        309,
+        304,
+        308
       ],
-      "mean": 212
+      "mean": 296.4
     },
     {
       "benchmarkId": "03_update10th1k",
@@ -628,11 +760,23 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        109,
-        110,
-        128
+        136,
+        177,
+        154,
+        129,
+        127,
+        154,
+        136,
+        144,
+        137,
+        173,
+        150,
+        165,
+        148,
+        137,
+        142
       ],
-      "mean": 115.67
+      "mean": 147.27
     },
     {
       "benchmarkId": "04_select1k",
@@ -642,11 +786,33 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        28,
         35,
-        26
+        37,
+        38,
+        35,
+        34,
+        34,
+        39,
+        33,
+        39,
+        37,
+        43,
+        36,
+        36,
+        38,
+        36,
+        38,
+        33,
+        36,
+        36,
+        36,
+        33,
+        34,
+        38,
+        34,
+        31
       ],
-      "mean": 29.67
+      "mean": 35.96
     },
     {
       "benchmarkId": "05_swap1k",
@@ -656,11 +822,23 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        81,
-        84,
-        66
+        98,
+        95,
+        112,
+        113,
+        110,
+        95,
+        95,
+        106,
+        91,
+        177,
+        94,
+        118,
+        99,
+        115,
+        90
       ],
-      "mean": 77
+      "mean": 107.2
     },
     {
       "benchmarkId": "06_remove1k",
@@ -670,11 +848,23 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        49,
-        52,
-        56
+        67,
+        72,
+        82,
+        72,
+        82,
+        73,
+        69,
+        71,
+        68,
+        61,
+        83,
+        63,
+        69,
+        72,
+        74
       ],
-      "mean": 52.33
+      "mean": 71.87
     },
     {
       "benchmarkId": "07_create10k",
@@ -684,11 +874,23 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        1214,
-        1255,
-        1248
+        1797,
+        1538,
+        1709,
+        1758,
+        1718,
+        1746,
+        1800,
+        1575,
+        1526,
+        1653,
+        1473,
+        2088,
+        1507,
+        1450,
+        1565
       ],
-      "mean": 1239
+      "mean": 1660.2
     },
     {
       "benchmarkId": "08_append1k",
@@ -698,11 +900,23 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        223,
-        215,
-        214
+        287,
+        299,
+        267,
+        327,
+        272,
+        275,
+        348,
+        311,
+        296,
+        302,
+        287,
+        318,
+        280,
+        323,
+        277
       ],
-      "mean": 217.33
+      "mean": 297.93
     },
     {
       "benchmarkId": "09_clear1k",
@@ -712,11 +926,23 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        68,
-        70,
-        60
+        92,
+        81,
+        73,
+        76,
+        89,
+        81,
+        73,
+        86,
+        88,
+        72,
+        78,
+        76,
+        89,
+        86,
+        80
       ],
-      "mean": 66
+      "mean": 81.33
     },
     {
       "benchmarkId": "21_readyMemory",
@@ -726,8 +952,6 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        1.97,
-        1.97,
         1.97
       ],
       "mean": 1.97
@@ -740,8 +964,6 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        3.69,
-        3.69,
         3.69
       ],
       "mean": 3.69
@@ -754,8 +976,6 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        3.37,
-        3.37,
         3.37
       ],
       "mean": 3.37
@@ -768,8 +988,6 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        38.4,
-        38.4,
         38.4
       ],
       "mean": 38.4
@@ -782,8 +1000,6 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        11.2,
-        11.2,
         11.2
       ],
       "mean": 11.2
@@ -796,11 +1012,11 @@
       "frameworkId": "drift",
       "frameworkName": "DriftJS",
       "values": [
-        68,
-        80,
-        80
+        84,
+        84,
+        112
       ],
-      "mean": 76
+      "mean": 93.33
     },
     {
       "benchmarkId": "01_run1k",
@@ -810,11 +1026,23 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        556,
-        588,
-        614
+        927,
+        756,
+        696,
+        692,
+        676,
+        728,
+        729,
+        758,
+        741,
+        713,
+        661,
+        743,
+        663,
+        758,
+        755
       ],
-      "mean": 586
+      "mean": 733.07
     },
     {
       "benchmarkId": "02_replace1k",
@@ -824,11 +1052,23 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        829,
-        897,
-        811
+        792,
+        763,
+        780,
+        779,
+        695,
+        761,
+        709,
+        766,
+        761,
+        771,
+        772,
+        732,
+        764,
+        773,
+        717
       ],
-      "mean": 845.67
+      "mean": 755.67
     },
     {
       "benchmarkId": "03_update10th1k",
@@ -838,11 +1078,23 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        391,
-        198,
-        188
+        170,
+        179,
+        234,
+        234,
+        241,
+        229,
+        223,
+        209,
+        233,
+        205,
+        224,
+        245,
+        203,
+        237,
+        229
       ],
-      "mean": 259
+      "mean": 219.67
     },
     {
       "benchmarkId": "04_select1k",
@@ -852,11 +1104,33 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        48,
-        45,
-        45
+        65,
+        62,
+        62,
+        63,
+        66,
+        62,
+        62,
+        64,
+        61,
+        60,
+        66,
+        69,
+        64,
+        64,
+        66,
+        64,
+        59,
+        62,
+        62,
+        62,
+        63,
+        65,
+        63,
+        61,
+        62
       ],
-      "mean": 46
+      "mean": 63.16
     },
     {
       "benchmarkId": "05_swap1k",
@@ -866,11 +1140,23 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        193,
-        197,
-        214
+        253,
+        298,
+        278,
+        284,
+        289,
+        253,
+        271,
+        275,
+        257,
+        278,
+        312,
+        288,
+        276,
+        307,
+        295
       ],
-      "mean": 201.33
+      "mean": 280.93
     },
     {
       "benchmarkId": "06_remove1k",
@@ -880,11 +1166,23 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        73,
-        63,
-        94
+        97,
+        93,
+        93,
+        104,
+        93,
+        86,
+        100,
+        93,
+        97,
+        88,
+        96,
+        100,
+        99,
+        92,
+        97
       ],
-      "mean": 76.67
+      "mean": 95.2
     },
     {
       "benchmarkId": "07_create10k",
@@ -894,11 +1192,23 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        3705,
-        3506,
-        3260
+        4146,
+        3912,
+        3677,
+        3889,
+        3647,
+        3818,
+        3930,
+        3724,
+        3763,
+        3761,
+        3721,
+        3712,
+        3652,
+        3687,
+        3861
       ],
-      "mean": 3490.33
+      "mean": 3793.33
     },
     {
       "benchmarkId": "08_append1k",
@@ -908,11 +1218,23 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        679,
-        698,
-        635
+        886,
+        779,
+        833,
+        745,
+        759,
+        774,
+        774,
+        742,
+        737,
+        752,
+        781,
+        751,
+        727,
+        757,
+        781
       ],
-      "mean": 670.67
+      "mean": 771.87
     },
     {
       "benchmarkId": "09_clear1k",
@@ -922,11 +1244,23 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        80,
+        108,
+        112,
+        120,
+        112,
+        110,
+        100,
+        114,
+        114,
+        121,
+        112,
+        104,
+        119,
         102,
-        103
+        121,
+        122
       ],
-      "mean": 95
+      "mean": 112.73
     },
     {
       "benchmarkId": "21_readyMemory",
@@ -936,8 +1270,6 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        7.36,
-        7.36,
         7.36
       ],
       "mean": 7.36
@@ -950,8 +1282,6 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        18.16,
-        18.16,
         18.16
       ],
       "mean": 18.16
@@ -964,11 +1294,9 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        10.54,
-        10.55,
-        10.57
+        10.54
       ],
-      "mean": 10.55
+      "mean": 10.54
     },
     {
       "benchmarkId": "41_uncompressedSize",
@@ -978,8 +1306,6 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        191.3,
-        191.3,
         191.3
       ],
       "mean": 191.3
@@ -992,8 +1318,6 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        60.1,
-        60.1,
         60.1
       ],
       "mean": 60.1
@@ -1006,11 +1330,11 @@
       "frameworkId": "react",
       "frameworkName": "React 19",
       "values": [
-        116,
-        72,
-        76
+        100,
+        88,
+        96
       ],
-      "mean": 88
+      "mean": 94.67
     },
     {
       "benchmarkId": "01_run1k",
@@ -1020,11 +1344,23 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        262,
-        283,
-        375
+        232,
+        251,
+        247,
+        238,
+        237,
+        239,
+        221,
+        237,
+        225,
+        272,
+        223,
+        284,
+        213,
+        212,
+        229
       ],
-      "mean": 306.67
+      "mean": 237.33
     },
     {
       "benchmarkId": "02_replace1k",
@@ -1034,11 +1370,23 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        340,
-        318,
-        325
+        281,
+        276,
+        339,
+        330,
+        277,
+        262,
+        285,
+        257,
+        246,
+        262,
+        288,
+        239,
+        348,
+        242,
+        272
       ],
-      "mean": 327.67
+      "mean": 280.27
     },
     {
       "benchmarkId": "03_update10th1k",
@@ -1048,11 +1396,23 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        124,
-        166,
-        121
+        151,
+        134,
+        117,
+        139,
+        141,
+        139,
+        119,
+        127,
+        153,
+        129,
+        96,
+        103,
+        127,
+        129,
+        139
       ],
-      "mean": 137
+      "mean": 129.53
     },
     {
       "benchmarkId": "04_select1k",
@@ -1062,11 +1422,33 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        42,
-        21,
-        24
+        36,
+        33,
+        30,
+        33,
+        30,
+        30,
+        30,
+        31,
+        33,
+        37,
+        34,
+        33,
+        32,
+        34,
+        39,
+        33,
+        32,
+        33,
+        32,
+        33,
+        30,
+        33,
+        33,
+        32,
+        32
       ],
-      "mean": 29
+      "mean": 32.72
     },
     {
       "benchmarkId": "05_swap1k",
@@ -1076,11 +1458,23 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        70,
-        70,
-        83
+        123,
+        90,
+        87,
+        93,
+        89,
+        99,
+        85,
+        104,
+        104,
+        131,
+        123,
+        102,
+        107,
+        97,
+        94
       ],
-      "mean": 74.33
+      "mean": 101.87
     },
     {
       "benchmarkId": "06_remove1k",
@@ -1090,11 +1484,23 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        49,
-        76,
-        45
+        67,
+        83,
+        73,
+        72,
+        73,
+        63,
+        75,
+        65,
+        82,
+        72,
+        62,
+        60,
+        64,
+        60,
+        58
       ],
-      "mean": 56.67
+      "mean": 68.6
     },
     {
       "benchmarkId": "07_create10k",
@@ -1104,11 +1510,23 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        1234,
-        1274,
-        1345
+        1547,
+        1687,
+        1745,
+        1916,
+        1504,
+        1794,
+        1616,
+        1751,
+        1730,
+        1569,
+        1467,
+        1481,
+        1633,
+        1483,
+        1656
       ],
-      "mean": 1284.33
+      "mean": 1638.6
     },
     {
       "benchmarkId": "08_append1k",
@@ -1118,11 +1536,23 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        300,
-        233,
-        198
+        263,
+        276,
+        244,
+        284,
+        374,
+        305,
+        301,
+        286,
+        299,
+        284,
+        271,
+        283,
+        290,
+        302,
+        242
       ],
-      "mean": 243.67
+      "mean": 286.93
     },
     {
       "benchmarkId": "09_clear1k",
@@ -1132,11 +1562,23 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        181,
-        84,
-        67
+        77,
+        85,
+        78,
+        72,
+        72,
+        80,
+        80,
+        81,
+        72,
+        77,
+        82,
+        78,
+        79,
+        96,
+        93
       ],
-      "mean": 110.67
+      "mean": 80.13
     },
     {
       "benchmarkId": "21_readyMemory",
@@ -1146,8 +1588,6 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        3.69,
-        3.69,
         3.69
       ],
       "mean": 3.69
@@ -1160,8 +1600,6 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        6.65,
-        6.65,
         6.65
       ],
       "mean": 6.65
@@ -1174,8 +1612,6 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        5.03,
-        5.03,
         5.03
       ],
       "mean": 5.03
@@ -1188,8 +1624,6 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        64.6,
-        64.6,
         64.6
       ],
       "mean": 64.6
@@ -1202,8 +1636,6 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        25.6,
-        25.6,
         25.6
       ],
       "mean": 25.6
@@ -1216,11 +1648,11 @@
       "frameworkId": "vue",
       "frameworkName": "Vue 3.5",
       "values": [
-        136,
-        64,
-        60
+        84,
+        92,
+        76
       ],
-      "mean": 86.67
+      "mean": 84
     },
     {
       "benchmarkId": "01_run1k",
@@ -1230,11 +1662,23 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        164,
-        190,
-        173
+        225,
+        225,
+        227,
+        209,
+        182,
+        213,
+        211,
+        198,
+        211,
+        204,
+        228,
+        188,
+        180,
+        189,
+        191
       ],
-      "mean": 175.67
+      "mean": 205.4
     },
     {
       "benchmarkId": "02_replace1k",
@@ -1244,11 +1688,23 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        224,
-        185,
-        172
+        256,
+        271,
+        282,
+        282,
+        232,
+        225,
+        218,
+        258,
+        217,
+        217,
+        206,
+        219,
+        218,
+        216,
+        221
       ],
-      "mean": 193.67
+      "mean": 235.87
     },
     {
       "benchmarkId": "03_update10th1k",
@@ -1258,11 +1714,23 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        76,
-        58,
-        61
+        134,
+        101,
+        82,
+        138,
+        106,
+        97,
+        107,
+        94,
+        113,
+        117,
+        77,
+        85,
+        113,
+        95,
+        92
       ],
-      "mean": 65
+      "mean": 103.4
     },
     {
       "benchmarkId": "04_select1k",
@@ -1272,11 +1740,33 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        22,
-        12,
-        17
+        19,
+        18,
+        18,
+        17,
+        18,
+        19,
+        19,
+        18,
+        18,
+        17,
+        19,
+        20,
+        19,
+        18,
+        18,
+        18,
+        17,
+        18,
+        20,
+        19,
+        18,
+        18,
+        18,
+        20,
+        20
       ],
-      "mean": 17
+      "mean": 18.44
     },
     {
       "benchmarkId": "05_swap1k",
@@ -1286,11 +1776,23 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        56,
-        75,
-        61
+        84,
+        80,
+        65,
+        81,
+        66,
+        64,
+        82,
+        81,
+        68,
+        65,
+        77,
+        76,
+        85,
+        82,
+        68
       ],
-      "mean": 64
+      "mean": 74.93
     },
     {
       "benchmarkId": "06_remove1k",
@@ -1300,11 +1802,23 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        35,
-        32,
-        30
+        53,
+        40,
+        46,
+        45,
+        43,
+        49,
+        40,
+        48,
+        39,
+        42,
+        56,
+        54,
+        47,
+        42,
+        49
       ],
-      "mean": 32.33
+      "mean": 46.2
     },
     {
       "benchmarkId": "07_create10k",
@@ -1314,11 +1828,23 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        1058,
-        1047,
-        1009
+        1333,
+        1275,
+        1248,
+        1386,
+        1361,
+        1490,
+        1611,
+        1602,
+        1520,
+        1409,
+        1202,
+        1280,
+        1238,
+        1216,
+        1214
       ],
-      "mean": 1038
+      "mean": 1359
     },
     {
       "benchmarkId": "08_append1k",
@@ -1328,11 +1854,23 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        172,
-        185,
+        229,
+        270,
+        217,
+        247,
+        210,
+        208,
+        208,
+        226,
+        220,
+        228,
+        251,
+        269,
+        251,
+        271,
         214
       ],
-      "mean": 190.33
+      "mean": 234.6
     },
     {
       "benchmarkId": "09_clear1k",
@@ -1342,11 +1880,23 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        59,
+        76,
+        73,
+        76,
         67,
-        62
+        72,
+        64,
+        67,
+        74,
+        85,
+        71,
+        63,
+        72,
+        76,
+        76,
+        83
       ],
-      "mean": 62.67
+      "mean": 73
     },
     {
       "benchmarkId": "21_readyMemory",
@@ -1356,8 +1906,6 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        1.93,
-        1.93,
         1.93
       ],
       "mean": 1.93
@@ -1370,8 +1918,6 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        4.15,
-        4.15,
         4.15
       ],
       "mean": 4.15
@@ -1384,8 +1930,6 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        3.15,
-        3.15,
         3.15
       ],
       "mean": 3.15
@@ -1398,8 +1942,6 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        16.1,
-        16.1,
         16.1
       ],
       "mean": 16.1
@@ -1412,8 +1954,6 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        6.4,
-        6.4,
         6.4
       ],
       "mean": 6.4
@@ -1426,11 +1966,11 @@
       "frameworkId": "solid",
       "frameworkName": "SolidJS 1.9",
       "values": [
-        96,
-        64,
-        72
+        104,
+        92,
+        80
       ],
-      "mean": 77.33
+      "mean": 92
     },
     {
       "benchmarkId": "01_run1k",
@@ -1440,11 +1980,23 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        197,
-        207,
-        179
+        313,
+        259,
+        247,
+        258,
+        259,
+        262,
+        248,
+        254,
+        274,
+        252,
+        273,
+        254,
+        247,
+        266,
+        274
       ],
-      "mean": 194.33
+      "mean": 262.67
     },
     {
       "benchmarkId": "02_replace1k",
@@ -1454,11 +2006,23 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        252,
-        238,
-        294
+        294,
+        291,
+        284,
+        302,
+        302,
+        278,
+        280,
+        397,
+        379,
+        398,
+        378,
+        350,
+        273,
+        378,
+        280
       ],
-      "mean": 261.33
+      "mean": 324.27
     },
     {
       "benchmarkId": "03_update10th1k",
@@ -1468,11 +2032,23 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        81,
-        74,
-        114
+        100,
+        96,
+        105,
+        100,
+        106,
+        98,
+        104,
+        103,
+        116,
+        108,
+        104,
+        110,
+        120,
+        100,
+        107
       ],
-      "mean": 89.67
+      "mean": 105.13
     },
     {
       "benchmarkId": "04_select1k",
@@ -1482,11 +2058,33 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        15,
-        15,
-        14
+        23,
+        23,
+        21,
+        23,
+        25,
+        22,
+        20,
+        21,
+        21,
+        20,
+        21,
+        21,
+        22,
+        21,
+        21,
+        21,
+        23,
+        26,
+        21,
+        21,
+        23,
+        21,
+        21,
+        24,
+        19
       ],
-      "mean": 14.67
+      "mean": 21.8
     },
     {
       "benchmarkId": "05_swap1k",
@@ -1496,11 +2094,23 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        63,
-        48,
-        62
+        80,
+        105,
+        88,
+        103,
+        75,
+        73,
+        83,
+        79,
+        73,
+        78,
+        97,
+        79,
+        79,
+        83,
+        90
       ],
-      "mean": 57.67
+      "mean": 84.33
     },
     {
       "benchmarkId": "06_remove1k",
@@ -1510,11 +2120,23 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        55,
-        49,
-        50
+        68,
+        61,
+        68,
+        69,
+        78,
+        64,
+        81,
+        77,
+        62,
+        70,
+        69,
+        78,
+        77,
+        61,
+        65
       ],
-      "mean": 51.33
+      "mean": 69.87
     },
     {
       "benchmarkId": "07_create10k",
@@ -1524,11 +2146,23 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        1766,
-        1747,
-        2371
+        2307,
+        2456,
+        2483,
+        2706,
+        2422,
+        2241,
+        2374,
+        2146,
+        2135,
+        2277,
+        2350,
+        2420,
+        2252,
+        2559,
+        2384
       ],
-      "mean": 1961.33
+      "mean": 2367.47
     },
     {
       "benchmarkId": "08_append1k",
@@ -1538,11 +2172,23 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        425,
-        419,
-        420
+        379,
+        348,
+        446,
+        343,
+        332,
+        379,
+        331,
+        455,
+        333,
+        353,
+        414,
+        370,
+        432,
+        340,
+        327
       ],
-      "mean": 421.33
+      "mean": 372.13
     },
     {
       "benchmarkId": "09_clear1k",
@@ -1552,11 +2198,23 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        91,
-        59,
-        61
+        65,
+        79,
+        69,
+        71,
+        68,
+        66,
+        65,
+        77,
+        76,
+        73,
+        70,
+        62,
+        78,
+        67,
+        65
       ],
-      "mean": 70.33
+      "mean": 70.07
     },
     {
       "benchmarkId": "21_readyMemory",
@@ -1566,8 +2224,6 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        3.78,
-        3.78,
         3.78
       ],
       "mean": 3.78
@@ -1580,8 +2236,6 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        7.66,
-        7.66,
         7.66
       ],
       "mean": 7.66
@@ -1594,11 +2248,9 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        5.22,
-        5.23,
-        5.22
+        5.23
       ],
-      "mean": 5.22
+      "mean": 5.23
     },
     {
       "benchmarkId": "41_uncompressedSize",
@@ -1608,8 +2260,6 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        43.2,
-        43.2,
         43.2
       ],
       "mean": 43.2
@@ -1622,8 +2272,6 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        16.8,
-        16.8,
         16.8
       ],
       "mean": 16.8
@@ -1636,11 +2284,11 @@
       "frameworkId": "svelte",
       "frameworkName": "Svelte 5",
       "values": [
-        104,
-        88,
-        100
+        76,
+        76,
+        80
       ],
-      "mean": 97.33
+      "mean": 77.33
     }
   ]
 }

@@ -476,5 +476,113 @@ describe('DriftGenerator', () => {
       ]);
     });
   });
+
+  describe('effect() Reactive Side-Effects Compilation', () => {
+    it('extracts effect(() => { ... }) bindings, dependencies, and creates constants', () => {
+      const src = `
+        <script>
+          let count = 0;
+          let user = "Alice";
+
+          effect(() => {
+            console.log(count, user);
+          });
+        </script>
+        <div>{count}</div>
+      `;
+      const module = compile(src);
+      expect(module.declaredVars).toContain('count');
+      expect(module.declaredVars).toContain('user');
+
+      expect(module.effects).toBeDefined();
+      expect(module.effects?.length).toBe(1);
+
+      const effect0 = module.effects![0]!;
+      expect(effect0.deps).toContain('count');
+      expect(effect0.deps).toContain('user');
+      expect(effect0.exprIdx).toBeDefined();
+
+      const fnConst = module.constants[effect0.exprIdx];
+      expect(fnConst).toBeDefined();
+      expect(fnConst.__drift_fn__).toContain('.log');
+      expect(fnConst.__drift_fn__).toContain('"console"');
+    });
+
+    it('extracts effect(() => { ... }) with derived dependencies', () => {
+      const src = `
+        <script>
+          let count = 1;
+          let double = derive(count * 2);
+
+          effect(() => {
+            console.log('Double changed:', double);
+          });
+        </script>
+        <div>{double}</div>
+      `;
+      const module = compile(src);
+      expect(module.effects).toBeDefined();
+      expect(module.effects?.length).toBe(1);
+      expect(module.effects![0]!.deps).toEqual(['double']);
+    });
+
+    it('handles mount-only effect with no state dependencies', () => {
+      const src = `
+        <script>
+          effect(() => {
+            console.log('Mounted component');
+          });
+        </script>
+        <div>Static Content</div>
+      `;
+      const module = compile(src);
+      expect(module.effects).toBeDefined();
+      expect(module.effects?.length).toBe(1);
+      expect(module.effects![0]!.deps).toEqual([]);
+    });
+
+    it('compiles async effect(async () => { ... }) correctly', () => {
+      const src = `
+        <script>
+          let userId = 42;
+          let data = null;
+
+          effect(async () => {
+            const res = await fetch('/api/' + userId);
+            data = await res.json();
+          });
+        </script>
+        <div>{userId}</div>
+      `;
+      const module = compile(src);
+      expect(module.effects).toBeDefined();
+      expect(module.effects?.length).toBe(1);
+      expect(module.effects![0]!.deps).toEqual(['userId']);
+
+      const fnConst = module.constants[module.effects![0]!.exprIdx];
+      expect(fnConst.__drift_fn__).toContain('async');
+      expect(fnConst.__drift_fn__).toContain('await');
+    });
+
+    it('filters effect statements from EXEC_SCRIPT constants', () => {
+      const src = `
+        <script>
+          let title = "Hello";
+          effect(() => {
+            console.log(title);
+          });
+        </script>
+        <h1>{title}</h1>
+      `;
+      const module = compile(src);
+      const execScriptIdx = Array.from(module.bytecode).indexOf(Opcode.EXEC_SCRIPT);
+      expect(execScriptIdx).not.toBe(-1);
+      const scriptBodyConstIdx = module.bytecode[execScriptIdx + 1]!;
+      const scriptConst = module.constants[scriptBodyConstIdx];
+      expect(scriptConst).toBeDefined();
+      expect(scriptConst.__drift_fn__).toContain('"title"');
+      expect(scriptConst.__drift_fn__).not.toContain('.log');
+    });
+  });
 });
 
