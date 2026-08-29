@@ -60,7 +60,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'cpu',
     description: 'Creates 1,000 table rows upon clicking #run.',
     unit: 'ms',
-    warmupRuns: 2,
+    warmupRuns: 0,
+    runs: 15,
     run: async (page, cdpSession) => {
       await page.click('#clear').catch(() => {});
       await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 0, { timeout: 5000 }).catch(() => {});
@@ -79,7 +80,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'cpu',
     description: 'Replaces all 1,000 rows with 1,000 new rows.',
     unit: 'ms',
-    warmupRuns: 2,
+    warmupRuns: 5,
+    runs: 15,
     run: async (page, cdpSession) => {
       await ensure1kRows(page);
       await forceGC(cdpSession);
@@ -97,7 +99,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'cpu',
     description: 'Updates every 10th row in a table of 1,000 rows.',
     unit: 'ms',
-    warmupRuns: 2,
+    warmupRuns: 5,
+    runs: 15,
     run: async (page, cdpSession) => {
       await ensure1kRows(page);
       await forceGC(cdpSession);
@@ -118,7 +121,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'cpu',
     description: 'Selects the 2nd row in a table of 1,000 rows.',
     unit: 'ms',
-    warmupRuns: 2,
+    warmupRuns: 5,
+    runs: 25,
     run: async (page, cdpSession) => {
       await ensure1kRows(page);
       await forceGC(cdpSession);
@@ -142,7 +146,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'cpu',
     description: 'Swaps row 2 and row 999 in a table of 1,000 rows.',
     unit: 'ms',
-    warmupRuns: 2,
+    warmupRuns: 5,
+    runs: 15,
     run: async (page, cdpSession) => {
       await ensure1kRows(page);
       const initialRow2Text = await page.locator('#tbody tr:nth-child(2) td:nth-child(2)').innerText();
@@ -150,7 +155,7 @@ export const BENCHMARKS: BenchmarkDef[] = [
 
       const start = Date.now();
       await page.click('#swaprows');
-      await page.waitForFunction((initial) => {
+      await page.waitForFunction((initial: any) => {
         const current = document.querySelector('#tbody tr:nth-child(2) td:nth-child(2)')?.textContent || '';
         return current !== initial;
       }, initialRow2Text, { timeout: 10000 });
@@ -164,7 +169,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'cpu',
     description: 'Removes the 2nd row from a table of 1,000 rows.',
     unit: 'ms',
-    warmupRuns: 2,
+    warmupRuns: 5,
+    runs: 15,
     run: async (page, cdpSession) => {
       await ensure1kRows(page);
       await forceGC(cdpSession);
@@ -185,7 +191,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'cpu',
     description: 'Creates 10,000 rows on an empty table.',
     unit: 'ms',
-    warmupRuns: 1,
+    warmupRuns: 0,
+    runs: 15,
     run: async (page, cdpSession) => {
       await page.click('#clear').catch(() => {});
       await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 0, { timeout: 5000 }).catch(() => {});
@@ -204,7 +211,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'cpu',
     description: 'Appends 1,000 rows to a table with 1,000 rows (total 2k rows).',
     unit: 'ms',
-    warmupRuns: 2,
+    warmupRuns: 0,
+    runs: 15,
     run: async (page, cdpSession) => {
       await ensure1kRows(page);
       await forceGC(cdpSession);
@@ -222,7 +230,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'cpu',
     description: 'Clears all 1,000 rows from the table.',
     unit: 'ms',
-    warmupRuns: 2,
+    warmupRuns: 0,
+    runs: 15,
     run: async (page, cdpSession) => {
       await ensure1kRows(page);
       await forceGC(cdpSession);
@@ -242,6 +251,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'memory',
     description: 'JS Heap memory usage immediately after loading the page.',
     unit: 'MB',
+    warmupRuns: 0,
+    runs: 1,
     run: async (page, cdpSession) => {
       await forceGC(cdpSession);
       const heapBytes = await page.evaluate(() => (performance as any).memory?.usedJSHeapSize ?? 0);
@@ -254,6 +265,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'memory',
     description: 'JS Heap memory usage after rendering 1,000 rows.',
     unit: 'MB',
+    warmupRuns: 0,
+    runs: 1,
     run: async (page, cdpSession) => {
       await ensure1kRows(page);
       await forceGC(cdpSession);
@@ -267,6 +280,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'memory',
     description: 'JS Heap memory usage after creating and clearing 1k rows 5 times.',
     unit: 'MB',
+    warmupRuns: 0,
+    runs: 1,
     run: async (page, cdpSession) => {
       for (let i = 0; i < 5; i++) {
         await page.click('#run');
@@ -287,6 +302,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'startup',
     description: 'Total uncompressed JS bundle size on disk.',
     unit: 'kB',
+    warmupRuns: 0,
+    runs: 1,
     run: async (page, cdpSession, config, framework) => {
       const { uncompressedBytes } = getFrameworkBundleSizes(framework);
       return Math.round((uncompressedBytes / 1024) * 10) / 10;
@@ -298,6 +315,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'startup',
     description: 'Total gzipped JS bundle size.',
     unit: 'kB',
+    warmupRuns: 0,
+    runs: 1,
     run: async (page, cdpSession, config, framework) => {
       const { compressedBytes } = getFrameworkBundleSizes(framework);
       return Math.round((compressedBytes / 1024) * 10) / 10;
@@ -309,6 +328,8 @@ export const BENCHMARKS: BenchmarkDef[] = [
     category: 'startup',
     description: 'Time in ms to First Contentful Paint / Initial Paint.',
     unit: 'ms',
+    warmupRuns: 1,
+    runs: 3,
     run: async (page) => {
       const paintTime = await page.evaluate(() => {
         const entries = performance.getEntriesByType('paint');

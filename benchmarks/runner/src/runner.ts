@@ -75,21 +75,23 @@ export async function runBenchmarks(options: RunOptions): Promise<BenchmarkRepor
 
       try {
         // Warmup runs
-        const warmupCount = options.warmup || benchmark.warmupRuns || 1;
+        const warmupCount = benchmark.warmupRuns ?? options.warmup ?? 1;
         for (let w = 0; w < warmupCount; w++) {
           await page.goto(frameworkUrl, { waitUntil: 'networkidle' });
           await benchmark.run(page, cdpSession, options, framework);
         }
 
         // Measurement runs
-        for (let r = 0; r < options.runs; r++) {
+        const runCount = benchmark.runs ?? options.runs ?? 5;
+        for (let r = 0; r < runCount; r++) {
           await page.goto(frameworkUrl, { waitUntil: 'networkidle' });
           const val = await benchmark.run(page, cdpSession, options, framework);
           measuredValues.push(val);
         }
 
         const mean = computeMean(measuredValues);
-        console.log(`Mean: ${mean} ${benchmark.unit} (runs: [${measuredValues.join(', ')}])`);
+        const runsInfo = measuredValues.length === 1 ? `1 run` : `runs: [${measuredValues.join(', ')}]`;
+        console.log(`Mean: ${mean} ${benchmark.unit} (${runsInfo})`);
 
         rawResults.push({
           benchmarkId: benchmark.id,

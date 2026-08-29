@@ -8,6 +8,7 @@ export interface BenchmarkDef {
   unit: string;
   run: (page: any, cdpSession: any, config: RunOptions, framework?: FrameworkDef) => Promise<number>;
   warmupRuns?: number;
+  runs?: number;
 }
 
 export interface FrameworkDef {
