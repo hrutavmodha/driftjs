@@ -21,7 +21,9 @@ benchmarks/
 ├── common/                  # Shared styling and layout assets
 │   └── main.css
 ├── frameworks/              # Implementations of the standard benchmark table
+│   ├── angular/             # Angular 22 implementation
 │   ├── drift/               # DriftJS Single File Component implementation
+│   ├── ember/               # Ember 7.2 implementation
 │   ├── react/               # React 19 implementation
 │   ├── solid/               # SolidJS 1.9 implementation
 │   ├── svelte/              # Svelte 5 implementation

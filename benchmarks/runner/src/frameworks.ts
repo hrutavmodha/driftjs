@@ -48,4 +48,10 @@ export const FRAMEWORKS: FrameworkDef[] = [
     dir: resolve(benchmarksRoot, 'frameworks/angular'),
     port: 5207,
   },
+  {
+    id: 'ember',
+    name: 'Ember 7.2',
+    dir: resolve(benchmarksRoot, 'frameworks/ember'),
+    port: 5208,
+  },
 ];
