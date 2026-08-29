@@ -293,4 +293,107 @@ describe('DriftJS @for Directive Integration Suite', () => {
 
     document.body.removeChild(container);
   });
+
+  it('preserves row DOM element and TextNode identity during in-place item updates via persistent register frames', () => {
+    const src = `
+      <script>
+        let items = [
+          { id: 1, text: 'Item 1' },
+          { id: 2, text: 'Item 2' }
+        ];
+        function updateFirstItem() {
+          items = [
+            { id: 1, text: 'Item 1 - Modified' },
+            { id: 2, text: 'Item 2' }
+          ];
+        }
+      </script>
+      <div>
+        <button id="update-btn" onclick={updateFirstItem}>Update</button>
+        <ul>
+          @for item in items key item.id {
+            <li id={"item-" + item.id}><span class="label">{item.text}</span></li>
+          }
+        </ul>
+      </div>
+    `;
+
+    const mod = compile(src);
+    const vm = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = vm.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    const li1Before = container.querySelector('#item-1')!;
+    const span1Before = li1Before.querySelector('.label')!;
+    const textNode1Before = span1Before.firstChild!;
+
+    expect(textNode1Before.nodeValue).toBe('Item 1');
+
+    (container.querySelector('#update-btn') as HTMLButtonElement).click();
+
+    const li1After = container.querySelector('#item-1')!;
+    const span1After = li1After.querySelector('.label')!;
+    const textNode1After = span1After.firstChild!;
+
+    expect(textNode1After.nodeValue).toBe('Item 1 - Modified');
+    // Verify exact DOM node and TextNode reference identity — zero reconstruction!
+    expect(li1After).toBe(li1Before);
+    expect(span1After).toBe(span1Before);
+    expect(textNode1After).toBe(textNode1Before);
+
+    document.body.removeChild(container);
+  });
+
+  it('fast-patches row dynamic attributes and classes in O(1) via pinned row registers', () => {
+    const src = `
+      <script>
+        let items = [
+          { id: 1, name: 'User 1' },
+          { id: 2, name: 'User 2' },
+          { id: 3, name: 'User 3' }
+        ];
+        let selectedId = 1;
+        function selectUser3() {
+          selectedId = 3;
+        }
+      </script>
+      <div>
+        <button id="select-btn" onclick={selectUser3}>Select 3</button>
+        <ul>
+          @for item in items key item.id {
+            <li id={"user-" + item.id} class={item.id === selectedId ? 'active' : ''}>{item.name}</li>
+          }
+        </ul>
+      </div>
+    `;
+
+    const mod = compile(src);
+    const vm = new DriftClientVM();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = vm.execute(mod, { document });
+    if (root) container.appendChild(root);
+
+    const initialRows = Array.from(container.querySelectorAll('li'));
+    expect(initialRows).toHaveLength(3);
+    expect(initialRows[0]?.getAttribute('class')).toBe('active');
+    expect(initialRows[2]?.getAttribute('class')).toBe('');
+
+    (container.querySelector('#select-btn') as HTMLButtonElement).click();
+
+    const updatedRows = Array.from(container.querySelectorAll('li'));
+    expect(updatedRows[0]?.getAttribute('class')).toBe('');
+    expect(updatedRows[2]?.getAttribute('class')).toBe('active');
+
+    // All row elements maintain strict DOM reference identity
+    for (let i = 0; i < 3; i++) {
+      expect(updatedRows[i]).toBe(initialRows[i]);
+    }
+
+    document.body.removeChild(container);
+  });
 });
+
+

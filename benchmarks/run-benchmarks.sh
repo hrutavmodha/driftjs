@@ -30,10 +30,10 @@ cleanup() {
   fi
 
   if [ -n "${ORIG_GOVERNOR}" ]; then
-    if command -v cpupower >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    if command -v cpupower >/dev/null 2>&1; then
       sudo cpupower frequency-set -g "${ORIG_GOVERNOR}" >/dev/null 2>&1 || true
       echo "   • Restored CPU governor: ${ORIG_GOVERNOR}"
-    elif sudo -n true 2>/dev/null; then
+    else
       for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
         if [ -f "$gov" ]; then
           echo "${ORIG_GOVERNOR}" | sudo tee "$gov" >/dev/null 2>&1 || true
@@ -47,43 +47,42 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-echo "🚀 Preparing CPU for benchmarking..."
+echo "🚀 Preparing CPU for benchmarking in PERFORMANCE mode..."
 
-# 1. Attempt to set power profile to performance or balanced
+# 1. Attempt to set power profile to performance only (no balanced fallback)
 if command -v powerprofilesctl >/dev/null 2>&1; then
   if powerprofilesctl set performance 2>/dev/null; then
     echo "   • Power profile set to: performance"
-  elif powerprofilesctl set balanced 2>/dev/null; then
-    echo "   • Power profile set to: balanced"
   fi
 fi
 
-# 2. Attempt to set CPU governor to performance
+# 2. Set CPU governor to performance (prompting sudo if needed)
 SET_GOV_SUCCESS=false
-if command -v cpupower >/dev/null 2>&1; then
-  if cpupower frequency-set -g performance >/dev/null 2>&1; then
-    SET_GOV_SUCCESS=true
-  elif sudo -n cpupower frequency-set -g performance >/dev/null 2>&1; then
-    SET_GOV_SUCCESS=true
-  fi
-fi
 
-if [ "$SET_GOV_SUCCESS" = false ]; then
-  if [ -w /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]; then
+CURRENT_GOV="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo 'unknown')"
+if [ "${CURRENT_GOV}" != "performance" ]; then
+  echo "   • Current CPU Governor is '${CURRENT_GOV}'. Requesting sudo to set 'performance' mode..."
+  if command -v cpupower >/dev/null 2>&1; then
+    if sudo cpupower frequency-set -g performance >/dev/null 2>&1; then
+      SET_GOV_SUCCESS=true
+    fi
+  fi
+
+  if [ "$SET_GOV_SUCCESS" = false ]; then
     for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-      [ -f "$gov" ] && echo performance > "$gov" 2>/dev/null || true
+      if [ -f "$gov" ]; then
+        echo performance | sudo tee "$gov" >/dev/null 2>&1 || true
+      fi
     done
-    SET_GOV_SUCCESS=true
-  elif sudo -n true 2>/dev/null; then
-    for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-      [ -f "$gov" ] && echo performance | sudo tee "$gov" >/dev/null 2>&1 || true
-    done
-    SET_GOV_SUCCESS=true
   fi
 fi
 
 CURRENT_GOV="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo 'unknown')"
 echo "   • Active CPU Governor: ${CURRENT_GOV}"
+
+if [ "${CURRENT_GOV}" != "performance" ]; then
+  echo "   ⚠️ Warning: CPU governor could not be switched to performance mode."
+fi
 echo ""
 
 # 3. Build framework bundles for size and startup measurements

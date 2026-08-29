@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-29T07:32:06.307Z",
+  "timestamp": "2026-08-29T14:09:29.378Z",
   "runs": 5,
   "tables": [
     {
@@ -13,7 +13,8 @@
         "React 19",
         "Vue 3.5",
         "SolidJS 1.9",
-        "Svelte 5"
+        "Svelte 5",
+        "Angular 22"
       ],
       "rows": [
         {
@@ -23,11 +24,12 @@
           "unit": "ms",
           "values": {
             "vanilla": 200.87,
-            "drift": 250,
+            "drift": 250.0,
             "react": 733.07,
             "vue": 237.33,
             "solid": 205.4,
-            "svelte": 262.67
+            "svelte": 262.67,
+            "angular": 231.87
           },
           "factors": {
             "vanilla": 1,
@@ -35,7 +37,8 @@
             "react": 3.65,
             "vue": 1.18,
             "solid": 1.02,
-            "svelte": 1.31
+            "svelte": 1.31,
+            "angular": 1.15
           }
         },
         {
@@ -49,7 +52,8 @@
             "react": 755.67,
             "vue": 280.27,
             "solid": 235.87,
-            "svelte": 324.27
+            "svelte": 324.27,
+            "angular": 253.87
           },
           "factors": {
             "vanilla": 1,
@@ -57,7 +61,8 @@
             "react": 3.17,
             "vue": 1.18,
             "solid": 0.99,
-            "svelte": 1.36
+            "svelte": 1.36,
+            "angular": 1.06
           }
         },
         {
@@ -67,19 +72,21 @@
           "unit": "ms",
           "values": {
             "vanilla": 101.27,
-            "drift": 147.27,
+            "drift": 120.33,
             "react": 219.67,
             "vue": 129.53,
             "solid": 103.4,
-            "svelte": 105.13
+            "svelte": 105.13,
+            "angular": 89.27
           },
           "factors": {
             "vanilla": 1,
-            "drift": 1.45,
+            "drift": 1.19,
             "react": 2.17,
             "vue": 1.28,
             "solid": 1.02,
-            "svelte": 1.04
+            "svelte": 1.04,
+            "angular": 0.88
           }
         },
         {
@@ -89,19 +96,21 @@
           "unit": "ms",
           "values": {
             "vanilla": 16.64,
-            "drift": 35.96,
+            "drift": 32.44,
             "react": 63.16,
             "vue": 32.72,
             "solid": 18.44,
-            "svelte": 21.8
+            "svelte": 21.8,
+            "angular": 24.44
           },
           "factors": {
             "vanilla": 1,
-            "drift": 2.16,
+            "drift": 1.95,
             "react": 3.8,
             "vue": 1.97,
             "solid": 1.11,
-            "svelte": 1.31
+            "svelte": 1.31,
+            "angular": 1.47
           }
         },
         {
@@ -111,19 +120,21 @@
           "unit": "ms",
           "values": {
             "vanilla": 88.33,
-            "drift": 107.2,
+            "drift": 93.67,
             "react": 280.93,
             "vue": 101.87,
             "solid": 74.93,
-            "svelte": 84.33
+            "svelte": 84.33,
+            "angular": 68.07
           },
           "factors": {
             "vanilla": 1,
-            "drift": 1.21,
+            "drift": 1.06,
             "react": 3.18,
             "vue": 1.15,
             "solid": 0.85,
-            "svelte": 0.95
+            "svelte": 0.95,
+            "angular": 0.77
           }
         },
         {
@@ -133,19 +144,21 @@
           "unit": "ms",
           "values": {
             "vanilla": 53.8,
-            "drift": 71.87,
+            "drift": 68.67,
             "react": 95.2,
             "vue": 68.6,
             "solid": 46.2,
-            "svelte": 69.87
+            "svelte": 69.87,
+            "angular": 48.53
           },
           "factors": {
             "vanilla": 1,
-            "drift": 1.34,
+            "drift": 1.28,
             "react": 1.77,
             "vue": 1.28,
             "solid": 0.86,
-            "svelte": 1.3
+            "svelte": 1.3,
+            "angular": 0.9
           }
         },
         {
@@ -158,8 +171,9 @@
             "drift": 1660.2,
             "react": 3793.33,
             "vue": 1638.6,
-            "solid": 1359,
-            "svelte": 2367.47
+            "solid": 1359.0,
+            "svelte": 2367.47,
+            "angular": 1346.47
           },
           "factors": {
             "vanilla": 1,
@@ -167,7 +181,8 @@
             "react": 2.98,
             "vue": 1.29,
             "solid": 1.07,
-            "svelte": 1.86
+            "svelte": 1.86,
+            "angular": 1.06
           }
         },
         {
@@ -181,7 +196,8 @@
             "react": 771.87,
             "vue": 286.93,
             "solid": 234.6,
-            "svelte": 372.13
+            "svelte": 372.13,
+            "angular": 192.53
           },
           "factors": {
             "vanilla": 1,
@@ -189,21 +205,23 @@
             "react": 3.57,
             "vue": 1.33,
             "solid": 1.08,
-            "svelte": 1.72
+            "svelte": 1.72,
+            "angular": 0.89
           }
         },
         {
           "id": "09_clear1k",
           "name": "09. Clear 1,000 rows",
-          "description": "Clears all 1,000 rows from the table.",
+          "description": "Clears all 1,000 rows from table.",
           "unit": "ms",
           "values": {
             "vanilla": 66.2,
             "drift": 81.33,
             "react": 112.73,
             "vue": 80.13,
-            "solid": 73,
-            "svelte": 70.07
+            "solid": 73.0,
+            "svelte": 70.07,
+            "angular": 75.6
           },
           "factors": {
             "vanilla": 1,
@@ -211,7 +229,8 @@
             "react": 1.7,
             "vue": 1.21,
             "solid": 1.1,
-            "svelte": 1.06
+            "svelte": 1.06,
+            "angular": 1.14
           }
         }
       ]
@@ -227,7 +246,8 @@
         "React 19",
         "Vue 3.5",
         "SolidJS 1.9",
-        "Svelte 5"
+        "Svelte 5",
+        "Angular 22"
       ],
       "rows": [
         {
@@ -241,7 +261,8 @@
             "react": 7.36,
             "vue": 3.69,
             "solid": 1.93,
-            "svelte": 3.78
+            "svelte": 3.78,
+            "angular": 11.59
           },
           "factors": {
             "vanilla": 1,
@@ -249,7 +270,8 @@
             "react": 6.08,
             "vue": 3.05,
             "solid": 1.6,
-            "svelte": 3.12
+            "svelte": 3.12,
+            "angular": 9.58
           }
         },
         {
@@ -263,7 +285,8 @@
             "react": 18.16,
             "vue": 6.65,
             "solid": 4.15,
-            "svelte": 7.66
+            "svelte": 7.66,
+            "angular": 14.43
           },
           "factors": {
             "vanilla": 1,
@@ -271,7 +294,8 @@
             "react": 7.47,
             "vue": 2.74,
             "solid": 1.71,
-            "svelte": 3.15
+            "svelte": 3.15,
+            "angular": 5.94
           }
         },
         {
@@ -285,7 +309,8 @@
             "react": 10.54,
             "vue": 5.03,
             "solid": 3.15,
-            "svelte": 5.23
+            "svelte": 5.23,
+            "angular": 13.25
           },
           "factors": {
             "vanilla": 1,
@@ -293,7 +318,8 @@
             "react": 4.58,
             "vue": 2.19,
             "solid": 1.37,
-            "svelte": 2.27
+            "svelte": 2.27,
+            "angular": 5.76
           }
         }
       ]
@@ -309,7 +335,8 @@
         "React 19",
         "Vue 3.5",
         "SolidJS 1.9",
-        "Svelte 5"
+        "Svelte 5",
+        "Angular 22"
       ],
       "rows": [
         {
@@ -323,7 +350,8 @@
             "react": 191.3,
             "vue": 64.6,
             "solid": 16.1,
-            "svelte": 43.2
+            "svelte": 43.2,
+            "angular": 147.5
           },
           "factors": {
             "vanilla": 1,
@@ -331,12 +359,13 @@
             "react": 54.66,
             "vue": 18.46,
             "solid": 4.6,
-            "svelte": 12.34
+            "svelte": 12.34,
+            "angular": 42.14
           }
         },
         {
           "id": "42_compressedSize",
-          "name": "42. Compressed Size",
+          "name": "42. Compressed Size (gzip)",
           "description": "Total gzipped JS bundle size.",
           "unit": "kB",
           "values": {
@@ -345,29 +374,32 @@
             "react": 60.1,
             "vue": 25.6,
             "solid": 6.4,
-            "svelte": 16.8
+            "svelte": 16.8,
+            "angular": 48.4
           },
           "factors": {
             "vanilla": 1,
-            "drift": 8,
+            "drift": 8.0,
             "react": 42.93,
             "vue": 18.29,
             "solid": 4.57,
-            "svelte": 12
+            "svelte": 12.0,
+            "angular": 34.57
           }
         },
         {
           "id": "43_firstPaint",
-          "name": "43. First Paint",
+          "name": "43. First Paint (ms)",
           "description": "Time in ms to First Contentful Paint / Initial Paint.",
           "unit": "ms",
           "values": {
-            "vanilla": 64,
+            "vanilla": 64.0,
             "drift": 93.33,
             "react": 94.67,
-            "vue": 84,
-            "solid": 92,
-            "svelte": 77.33
+            "vue": 84.0,
+            "solid": 92.0,
+            "svelte": 77.33,
+            "angular": 96.0
           },
           "factors": {
             "vanilla": 1,
@@ -375,1920 +407,11 @@
             "react": 1.48,
             "vue": 1.31,
             "solid": 1.44,
-            "svelte": 1.21
+            "svelte": 1.21,
+            "angular": 1.5
           }
         }
       ]
-    }
-  ],
-  "rawResults": [
-    {
-      "benchmarkId": "01_run1k",
-      "benchmarkName": "01. Create 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        208,
-        207,
-        207,
-        191,
-        217,
-        190,
-        220,
-        183,
-        195,
-        198,
-        218,
-        184,
-        179,
-        198,
-        218
-      ],
-      "mean": 200.87
-    },
-    {
-      "benchmarkId": "02_replace1k",
-      "benchmarkName": "02. Replace 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        211,
-        240,
-        281,
-        224,
-        214,
-        219,
-        214,
-        246,
-        236,
-        237,
-        234,
-        267,
-        235,
-        230,
-        288
-      ],
-      "mean": 238.4
-    },
-    {
-      "benchmarkId": "03_update10th1k",
-      "benchmarkName": "03. Update every 10th row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        105,
-        108,
-        108,
-        110,
-        89,
-        109,
-        72,
-        92,
-        100,
-        92,
-        109,
-        110,
-        104,
-        97,
-        114
-      ],
-      "mean": 101.27
-    },
-    {
-      "benchmarkId": "04_select1k",
-      "benchmarkName": "04. Select row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        14,
-        16,
-        15,
-        19,
-        17,
-        15,
-        14,
-        16,
-        15,
-        15,
-        18,
-        13,
-        16,
-        23,
-        13,
-        18,
-        13,
-        15,
-        27,
-        13,
-        20,
-        15,
-        14,
-        27,
-        15
-      ],
-      "mean": 16.64
-    },
-    {
-      "benchmarkId": "05_swap1k",
-      "benchmarkName": "05. Swap rows (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        102,
-        89,
-        85,
-        82,
-        83,
-        130,
-        79,
-        67,
-        144,
-        85,
-        80,
-        80,
-        65,
-        81,
-        73
-      ],
-      "mean": 88.33
-    },
-    {
-      "benchmarkId": "06_remove1k",
-      "benchmarkName": "06. Remove single row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        52,
-        44,
-        41,
-        40,
-        54,
-        49,
-        65,
-        93,
-        41,
-        87,
-        47,
-        50,
-        50,
-        44,
-        50
-      ],
-      "mean": 53.8
-    },
-    {
-      "benchmarkId": "07_create10k",
-      "benchmarkName": "07. Create 10,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        1294,
-        1225,
-        1197,
-        1287,
-        1270,
-        1455,
-        1283,
-        1307,
-        1213,
-        1270,
-        1221,
-        1272,
-        1280,
-        1258,
-        1243
-      ],
-      "mean": 1271.67
-    },
-    {
-      "benchmarkId": "08_append1k",
-      "benchmarkName": "08. Append 1,000 rows to 1k",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        211,
-        233,
-        233,
-        195,
-        237,
-        215,
-        212,
-        210,
-        199,
-        221,
-        212,
-        233,
-        197,
-        218,
-        220
-      ],
-      "mean": 216.4
-    },
-    {
-      "benchmarkId": "09_clear1k",
-      "benchmarkName": "09. Clear 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        69,
-        76,
-        62,
-        68,
-        66,
-        61,
-        71,
-        67,
-        66,
-        58,
-        59,
-        63,
-        61,
-        73,
-        73
-      ],
-      "mean": 66.2
-    },
-    {
-      "benchmarkId": "21_readyMemory",
-      "benchmarkName": "21. Ready Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        1.21
-      ],
-      "mean": 1.21
-    },
-    {
-      "benchmarkId": "22_runMemory",
-      "benchmarkName": "22. Run Memory (1k rows)",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        2.43
-      ],
-      "mean": 2.43
-    },
-    {
-      "benchmarkId": "25_clearMemory",
-      "benchmarkName": "25. Run-Clear Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        2.3
-      ],
-      "mean": 2.3
-    },
-    {
-      "benchmarkId": "41_uncompressedSize",
-      "benchmarkName": "41. Uncompressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        3.5
-      ],
-      "mean": 3.5
-    },
-    {
-      "benchmarkId": "42_compressedSize",
-      "benchmarkName": "42. Compressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        1.4
-      ],
-      "mean": 1.4
-    },
-    {
-      "benchmarkId": "43_firstPaint",
-      "benchmarkName": "43. First Paint",
-      "category": "startup",
-      "unit": "ms",
-      "frameworkId": "vanilla",
-      "frameworkName": "VanillaJS",
-      "values": [
-        68,
-        60,
-        64
-      ],
-      "mean": 64
-    },
-    {
-      "benchmarkId": "01_run1k",
-      "benchmarkName": "01. Create 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        267,
-        274,
-        241,
-        237,
-        254,
-        239,
-        233,
-        248,
-        233,
-        240,
-        269,
-        236,
-        279,
-        257,
-        243
-      ],
-      "mean": 250
-    },
-    {
-      "benchmarkId": "02_replace1k",
-      "benchmarkName": "02. Replace 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        282,
-        265,
-        273,
-        371,
-        284,
-        294,
-        279,
-        295,
-        291,
-        333,
-        285,
-        273,
-        309,
-        304,
-        308
-      ],
-      "mean": 296.4
-    },
-    {
-      "benchmarkId": "03_update10th1k",
-      "benchmarkName": "03. Update every 10th row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        136,
-        177,
-        154,
-        129,
-        127,
-        154,
-        136,
-        144,
-        137,
-        173,
-        150,
-        165,
-        148,
-        137,
-        142
-      ],
-      "mean": 147.27
-    },
-    {
-      "benchmarkId": "04_select1k",
-      "benchmarkName": "04. Select row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        35,
-        37,
-        38,
-        35,
-        34,
-        34,
-        39,
-        33,
-        39,
-        37,
-        43,
-        36,
-        36,
-        38,
-        36,
-        38,
-        33,
-        36,
-        36,
-        36,
-        33,
-        34,
-        38,
-        34,
-        31
-      ],
-      "mean": 35.96
-    },
-    {
-      "benchmarkId": "05_swap1k",
-      "benchmarkName": "05. Swap rows (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        98,
-        95,
-        112,
-        113,
-        110,
-        95,
-        95,
-        106,
-        91,
-        177,
-        94,
-        118,
-        99,
-        115,
-        90
-      ],
-      "mean": 107.2
-    },
-    {
-      "benchmarkId": "06_remove1k",
-      "benchmarkName": "06. Remove single row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        67,
-        72,
-        82,
-        72,
-        82,
-        73,
-        69,
-        71,
-        68,
-        61,
-        83,
-        63,
-        69,
-        72,
-        74
-      ],
-      "mean": 71.87
-    },
-    {
-      "benchmarkId": "07_create10k",
-      "benchmarkName": "07. Create 10,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        1797,
-        1538,
-        1709,
-        1758,
-        1718,
-        1746,
-        1800,
-        1575,
-        1526,
-        1653,
-        1473,
-        2088,
-        1507,
-        1450,
-        1565
-      ],
-      "mean": 1660.2
-    },
-    {
-      "benchmarkId": "08_append1k",
-      "benchmarkName": "08. Append 1,000 rows to 1k",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        287,
-        299,
-        267,
-        327,
-        272,
-        275,
-        348,
-        311,
-        296,
-        302,
-        287,
-        318,
-        280,
-        323,
-        277
-      ],
-      "mean": 297.93
-    },
-    {
-      "benchmarkId": "09_clear1k",
-      "benchmarkName": "09. Clear 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        92,
-        81,
-        73,
-        76,
-        89,
-        81,
-        73,
-        86,
-        88,
-        72,
-        78,
-        76,
-        89,
-        86,
-        80
-      ],
-      "mean": 81.33
-    },
-    {
-      "benchmarkId": "21_readyMemory",
-      "benchmarkName": "21. Ready Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        1.97
-      ],
-      "mean": 1.97
-    },
-    {
-      "benchmarkId": "22_runMemory",
-      "benchmarkName": "22. Run Memory (1k rows)",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        3.69
-      ],
-      "mean": 3.69
-    },
-    {
-      "benchmarkId": "25_clearMemory",
-      "benchmarkName": "25. Run-Clear Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        3.37
-      ],
-      "mean": 3.37
-    },
-    {
-      "benchmarkId": "41_uncompressedSize",
-      "benchmarkName": "41. Uncompressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        38.4
-      ],
-      "mean": 38.4
-    },
-    {
-      "benchmarkId": "42_compressedSize",
-      "benchmarkName": "42. Compressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        11.2
-      ],
-      "mean": 11.2
-    },
-    {
-      "benchmarkId": "43_firstPaint",
-      "benchmarkName": "43. First Paint",
-      "category": "startup",
-      "unit": "ms",
-      "frameworkId": "drift",
-      "frameworkName": "DriftJS",
-      "values": [
-        84,
-        84,
-        112
-      ],
-      "mean": 93.33
-    },
-    {
-      "benchmarkId": "01_run1k",
-      "benchmarkName": "01. Create 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        927,
-        756,
-        696,
-        692,
-        676,
-        728,
-        729,
-        758,
-        741,
-        713,
-        661,
-        743,
-        663,
-        758,
-        755
-      ],
-      "mean": 733.07
-    },
-    {
-      "benchmarkId": "02_replace1k",
-      "benchmarkName": "02. Replace 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        792,
-        763,
-        780,
-        779,
-        695,
-        761,
-        709,
-        766,
-        761,
-        771,
-        772,
-        732,
-        764,
-        773,
-        717
-      ],
-      "mean": 755.67
-    },
-    {
-      "benchmarkId": "03_update10th1k",
-      "benchmarkName": "03. Update every 10th row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        170,
-        179,
-        234,
-        234,
-        241,
-        229,
-        223,
-        209,
-        233,
-        205,
-        224,
-        245,
-        203,
-        237,
-        229
-      ],
-      "mean": 219.67
-    },
-    {
-      "benchmarkId": "04_select1k",
-      "benchmarkName": "04. Select row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        65,
-        62,
-        62,
-        63,
-        66,
-        62,
-        62,
-        64,
-        61,
-        60,
-        66,
-        69,
-        64,
-        64,
-        66,
-        64,
-        59,
-        62,
-        62,
-        62,
-        63,
-        65,
-        63,
-        61,
-        62
-      ],
-      "mean": 63.16
-    },
-    {
-      "benchmarkId": "05_swap1k",
-      "benchmarkName": "05. Swap rows (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        253,
-        298,
-        278,
-        284,
-        289,
-        253,
-        271,
-        275,
-        257,
-        278,
-        312,
-        288,
-        276,
-        307,
-        295
-      ],
-      "mean": 280.93
-    },
-    {
-      "benchmarkId": "06_remove1k",
-      "benchmarkName": "06. Remove single row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        97,
-        93,
-        93,
-        104,
-        93,
-        86,
-        100,
-        93,
-        97,
-        88,
-        96,
-        100,
-        99,
-        92,
-        97
-      ],
-      "mean": 95.2
-    },
-    {
-      "benchmarkId": "07_create10k",
-      "benchmarkName": "07. Create 10,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        4146,
-        3912,
-        3677,
-        3889,
-        3647,
-        3818,
-        3930,
-        3724,
-        3763,
-        3761,
-        3721,
-        3712,
-        3652,
-        3687,
-        3861
-      ],
-      "mean": 3793.33
-    },
-    {
-      "benchmarkId": "08_append1k",
-      "benchmarkName": "08. Append 1,000 rows to 1k",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        886,
-        779,
-        833,
-        745,
-        759,
-        774,
-        774,
-        742,
-        737,
-        752,
-        781,
-        751,
-        727,
-        757,
-        781
-      ],
-      "mean": 771.87
-    },
-    {
-      "benchmarkId": "09_clear1k",
-      "benchmarkName": "09. Clear 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        108,
-        112,
-        120,
-        112,
-        110,
-        100,
-        114,
-        114,
-        121,
-        112,
-        104,
-        119,
-        102,
-        121,
-        122
-      ],
-      "mean": 112.73
-    },
-    {
-      "benchmarkId": "21_readyMemory",
-      "benchmarkName": "21. Ready Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        7.36
-      ],
-      "mean": 7.36
-    },
-    {
-      "benchmarkId": "22_runMemory",
-      "benchmarkName": "22. Run Memory (1k rows)",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        18.16
-      ],
-      "mean": 18.16
-    },
-    {
-      "benchmarkId": "25_clearMemory",
-      "benchmarkName": "25. Run-Clear Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        10.54
-      ],
-      "mean": 10.54
-    },
-    {
-      "benchmarkId": "41_uncompressedSize",
-      "benchmarkName": "41. Uncompressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        191.3
-      ],
-      "mean": 191.3
-    },
-    {
-      "benchmarkId": "42_compressedSize",
-      "benchmarkName": "42. Compressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        60.1
-      ],
-      "mean": 60.1
-    },
-    {
-      "benchmarkId": "43_firstPaint",
-      "benchmarkName": "43. First Paint",
-      "category": "startup",
-      "unit": "ms",
-      "frameworkId": "react",
-      "frameworkName": "React 19",
-      "values": [
-        100,
-        88,
-        96
-      ],
-      "mean": 94.67
-    },
-    {
-      "benchmarkId": "01_run1k",
-      "benchmarkName": "01. Create 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        232,
-        251,
-        247,
-        238,
-        237,
-        239,
-        221,
-        237,
-        225,
-        272,
-        223,
-        284,
-        213,
-        212,
-        229
-      ],
-      "mean": 237.33
-    },
-    {
-      "benchmarkId": "02_replace1k",
-      "benchmarkName": "02. Replace 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        281,
-        276,
-        339,
-        330,
-        277,
-        262,
-        285,
-        257,
-        246,
-        262,
-        288,
-        239,
-        348,
-        242,
-        272
-      ],
-      "mean": 280.27
-    },
-    {
-      "benchmarkId": "03_update10th1k",
-      "benchmarkName": "03. Update every 10th row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        151,
-        134,
-        117,
-        139,
-        141,
-        139,
-        119,
-        127,
-        153,
-        129,
-        96,
-        103,
-        127,
-        129,
-        139
-      ],
-      "mean": 129.53
-    },
-    {
-      "benchmarkId": "04_select1k",
-      "benchmarkName": "04. Select row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        36,
-        33,
-        30,
-        33,
-        30,
-        30,
-        30,
-        31,
-        33,
-        37,
-        34,
-        33,
-        32,
-        34,
-        39,
-        33,
-        32,
-        33,
-        32,
-        33,
-        30,
-        33,
-        33,
-        32,
-        32
-      ],
-      "mean": 32.72
-    },
-    {
-      "benchmarkId": "05_swap1k",
-      "benchmarkName": "05. Swap rows (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        123,
-        90,
-        87,
-        93,
-        89,
-        99,
-        85,
-        104,
-        104,
-        131,
-        123,
-        102,
-        107,
-        97,
-        94
-      ],
-      "mean": 101.87
-    },
-    {
-      "benchmarkId": "06_remove1k",
-      "benchmarkName": "06. Remove single row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        67,
-        83,
-        73,
-        72,
-        73,
-        63,
-        75,
-        65,
-        82,
-        72,
-        62,
-        60,
-        64,
-        60,
-        58
-      ],
-      "mean": 68.6
-    },
-    {
-      "benchmarkId": "07_create10k",
-      "benchmarkName": "07. Create 10,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        1547,
-        1687,
-        1745,
-        1916,
-        1504,
-        1794,
-        1616,
-        1751,
-        1730,
-        1569,
-        1467,
-        1481,
-        1633,
-        1483,
-        1656
-      ],
-      "mean": 1638.6
-    },
-    {
-      "benchmarkId": "08_append1k",
-      "benchmarkName": "08. Append 1,000 rows to 1k",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        263,
-        276,
-        244,
-        284,
-        374,
-        305,
-        301,
-        286,
-        299,
-        284,
-        271,
-        283,
-        290,
-        302,
-        242
-      ],
-      "mean": 286.93
-    },
-    {
-      "benchmarkId": "09_clear1k",
-      "benchmarkName": "09. Clear 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        77,
-        85,
-        78,
-        72,
-        72,
-        80,
-        80,
-        81,
-        72,
-        77,
-        82,
-        78,
-        79,
-        96,
-        93
-      ],
-      "mean": 80.13
-    },
-    {
-      "benchmarkId": "21_readyMemory",
-      "benchmarkName": "21. Ready Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        3.69
-      ],
-      "mean": 3.69
-    },
-    {
-      "benchmarkId": "22_runMemory",
-      "benchmarkName": "22. Run Memory (1k rows)",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        6.65
-      ],
-      "mean": 6.65
-    },
-    {
-      "benchmarkId": "25_clearMemory",
-      "benchmarkName": "25. Run-Clear Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        5.03
-      ],
-      "mean": 5.03
-    },
-    {
-      "benchmarkId": "41_uncompressedSize",
-      "benchmarkName": "41. Uncompressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        64.6
-      ],
-      "mean": 64.6
-    },
-    {
-      "benchmarkId": "42_compressedSize",
-      "benchmarkName": "42. Compressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        25.6
-      ],
-      "mean": 25.6
-    },
-    {
-      "benchmarkId": "43_firstPaint",
-      "benchmarkName": "43. First Paint",
-      "category": "startup",
-      "unit": "ms",
-      "frameworkId": "vue",
-      "frameworkName": "Vue 3.5",
-      "values": [
-        84,
-        92,
-        76
-      ],
-      "mean": 84
-    },
-    {
-      "benchmarkId": "01_run1k",
-      "benchmarkName": "01. Create 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        225,
-        225,
-        227,
-        209,
-        182,
-        213,
-        211,
-        198,
-        211,
-        204,
-        228,
-        188,
-        180,
-        189,
-        191
-      ],
-      "mean": 205.4
-    },
-    {
-      "benchmarkId": "02_replace1k",
-      "benchmarkName": "02. Replace 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        256,
-        271,
-        282,
-        282,
-        232,
-        225,
-        218,
-        258,
-        217,
-        217,
-        206,
-        219,
-        218,
-        216,
-        221
-      ],
-      "mean": 235.87
-    },
-    {
-      "benchmarkId": "03_update10th1k",
-      "benchmarkName": "03. Update every 10th row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        134,
-        101,
-        82,
-        138,
-        106,
-        97,
-        107,
-        94,
-        113,
-        117,
-        77,
-        85,
-        113,
-        95,
-        92
-      ],
-      "mean": 103.4
-    },
-    {
-      "benchmarkId": "04_select1k",
-      "benchmarkName": "04. Select row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        19,
-        18,
-        18,
-        17,
-        18,
-        19,
-        19,
-        18,
-        18,
-        17,
-        19,
-        20,
-        19,
-        18,
-        18,
-        18,
-        17,
-        18,
-        20,
-        19,
-        18,
-        18,
-        18,
-        20,
-        20
-      ],
-      "mean": 18.44
-    },
-    {
-      "benchmarkId": "05_swap1k",
-      "benchmarkName": "05. Swap rows (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        84,
-        80,
-        65,
-        81,
-        66,
-        64,
-        82,
-        81,
-        68,
-        65,
-        77,
-        76,
-        85,
-        82,
-        68
-      ],
-      "mean": 74.93
-    },
-    {
-      "benchmarkId": "06_remove1k",
-      "benchmarkName": "06. Remove single row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        53,
-        40,
-        46,
-        45,
-        43,
-        49,
-        40,
-        48,
-        39,
-        42,
-        56,
-        54,
-        47,
-        42,
-        49
-      ],
-      "mean": 46.2
-    },
-    {
-      "benchmarkId": "07_create10k",
-      "benchmarkName": "07. Create 10,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        1333,
-        1275,
-        1248,
-        1386,
-        1361,
-        1490,
-        1611,
-        1602,
-        1520,
-        1409,
-        1202,
-        1280,
-        1238,
-        1216,
-        1214
-      ],
-      "mean": 1359
-    },
-    {
-      "benchmarkId": "08_append1k",
-      "benchmarkName": "08. Append 1,000 rows to 1k",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        229,
-        270,
-        217,
-        247,
-        210,
-        208,
-        208,
-        226,
-        220,
-        228,
-        251,
-        269,
-        251,
-        271,
-        214
-      ],
-      "mean": 234.6
-    },
-    {
-      "benchmarkId": "09_clear1k",
-      "benchmarkName": "09. Clear 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        76,
-        73,
-        76,
-        67,
-        72,
-        64,
-        67,
-        74,
-        85,
-        71,
-        63,
-        72,
-        76,
-        76,
-        83
-      ],
-      "mean": 73
-    },
-    {
-      "benchmarkId": "21_readyMemory",
-      "benchmarkName": "21. Ready Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        1.93
-      ],
-      "mean": 1.93
-    },
-    {
-      "benchmarkId": "22_runMemory",
-      "benchmarkName": "22. Run Memory (1k rows)",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        4.15
-      ],
-      "mean": 4.15
-    },
-    {
-      "benchmarkId": "25_clearMemory",
-      "benchmarkName": "25. Run-Clear Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        3.15
-      ],
-      "mean": 3.15
-    },
-    {
-      "benchmarkId": "41_uncompressedSize",
-      "benchmarkName": "41. Uncompressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        16.1
-      ],
-      "mean": 16.1
-    },
-    {
-      "benchmarkId": "42_compressedSize",
-      "benchmarkName": "42. Compressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        6.4
-      ],
-      "mean": 6.4
-    },
-    {
-      "benchmarkId": "43_firstPaint",
-      "benchmarkName": "43. First Paint",
-      "category": "startup",
-      "unit": "ms",
-      "frameworkId": "solid",
-      "frameworkName": "SolidJS 1.9",
-      "values": [
-        104,
-        92,
-        80
-      ],
-      "mean": 92
-    },
-    {
-      "benchmarkId": "01_run1k",
-      "benchmarkName": "01. Create 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        313,
-        259,
-        247,
-        258,
-        259,
-        262,
-        248,
-        254,
-        274,
-        252,
-        273,
-        254,
-        247,
-        266,
-        274
-      ],
-      "mean": 262.67
-    },
-    {
-      "benchmarkId": "02_replace1k",
-      "benchmarkName": "02. Replace 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        294,
-        291,
-        284,
-        302,
-        302,
-        278,
-        280,
-        397,
-        379,
-        398,
-        378,
-        350,
-        273,
-        378,
-        280
-      ],
-      "mean": 324.27
-    },
-    {
-      "benchmarkId": "03_update10th1k",
-      "benchmarkName": "03. Update every 10th row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        100,
-        96,
-        105,
-        100,
-        106,
-        98,
-        104,
-        103,
-        116,
-        108,
-        104,
-        110,
-        120,
-        100,
-        107
-      ],
-      "mean": 105.13
-    },
-    {
-      "benchmarkId": "04_select1k",
-      "benchmarkName": "04. Select row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        23,
-        23,
-        21,
-        23,
-        25,
-        22,
-        20,
-        21,
-        21,
-        20,
-        21,
-        21,
-        22,
-        21,
-        21,
-        21,
-        23,
-        26,
-        21,
-        21,
-        23,
-        21,
-        21,
-        24,
-        19
-      ],
-      "mean": 21.8
-    },
-    {
-      "benchmarkId": "05_swap1k",
-      "benchmarkName": "05. Swap rows (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        80,
-        105,
-        88,
-        103,
-        75,
-        73,
-        83,
-        79,
-        73,
-        78,
-        97,
-        79,
-        79,
-        83,
-        90
-      ],
-      "mean": 84.33
-    },
-    {
-      "benchmarkId": "06_remove1k",
-      "benchmarkName": "06. Remove single row (1k)",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        68,
-        61,
-        68,
-        69,
-        78,
-        64,
-        81,
-        77,
-        62,
-        70,
-        69,
-        78,
-        77,
-        61,
-        65
-      ],
-      "mean": 69.87
-    },
-    {
-      "benchmarkId": "07_create10k",
-      "benchmarkName": "07. Create 10,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        2307,
-        2456,
-        2483,
-        2706,
-        2422,
-        2241,
-        2374,
-        2146,
-        2135,
-        2277,
-        2350,
-        2420,
-        2252,
-        2559,
-        2384
-      ],
-      "mean": 2367.47
-    },
-    {
-      "benchmarkId": "08_append1k",
-      "benchmarkName": "08. Append 1,000 rows to 1k",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        379,
-        348,
-        446,
-        343,
-        332,
-        379,
-        331,
-        455,
-        333,
-        353,
-        414,
-        370,
-        432,
-        340,
-        327
-      ],
-      "mean": 372.13
-    },
-    {
-      "benchmarkId": "09_clear1k",
-      "benchmarkName": "09. Clear 1,000 rows",
-      "category": "cpu",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        65,
-        79,
-        69,
-        71,
-        68,
-        66,
-        65,
-        77,
-        76,
-        73,
-        70,
-        62,
-        78,
-        67,
-        65
-      ],
-      "mean": 70.07
-    },
-    {
-      "benchmarkId": "21_readyMemory",
-      "benchmarkName": "21. Ready Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        3.78
-      ],
-      "mean": 3.78
-    },
-    {
-      "benchmarkId": "22_runMemory",
-      "benchmarkName": "22. Run Memory (1k rows)",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        7.66
-      ],
-      "mean": 7.66
-    },
-    {
-      "benchmarkId": "25_clearMemory",
-      "benchmarkName": "25. Run-Clear Memory",
-      "category": "memory",
-      "unit": "MB",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        5.23
-      ],
-      "mean": 5.23
-    },
-    {
-      "benchmarkId": "41_uncompressedSize",
-      "benchmarkName": "41. Uncompressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        43.2
-      ],
-      "mean": 43.2
-    },
-    {
-      "benchmarkId": "42_compressedSize",
-      "benchmarkName": "42. Compressed Size",
-      "category": "startup",
-      "unit": "kB",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        16.8
-      ],
-      "mean": 16.8
-    },
-    {
-      "benchmarkId": "43_firstPaint",
-      "benchmarkName": "43. First Paint",
-      "category": "startup",
-      "unit": "ms",
-      "frameworkId": "svelte",
-      "frameworkName": "Svelte 5",
-      "values": [
-        76,
-        76,
-        80
-      ],
-      "mean": 77.33
     }
   ]
 }

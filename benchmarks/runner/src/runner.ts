@@ -14,10 +14,9 @@ export async function runBenchmarks(options: RunOptions): Promise<BenchmarkRepor
     ? BENCHMARKS.filter(b => options.benchmarks!.includes(b.id))
     : BENCHMARKS;
 
-  console.log(`\n🚀 Starting DriftJS Benchmark Suite`);
+  console.log(`\n🚀 Starting JS Framework Benchmark Suite`);
   console.log(`📊 Frameworks (${selectedFrameworks.length}): ${selectedFrameworks.map(f => f.name).join(', ')}`);
   console.log(`🧪 Benchmarks (${selectedBenchmarks.length}): ${selectedBenchmarks.map(b => b.id).join(', ')}`);
-  console.log(`🔁 Iterations: ${options.runs} runs per test (Aggregation: Mean)\n`);
 
   const browser: Browser = await chromium.launch({
     headless: options.headless,
@@ -70,7 +69,9 @@ export async function runBenchmarks(options: RunOptions): Promise<BenchmarkRepor
     }
 
     for (const benchmark of selectedBenchmarks) {
-      process.stdout.write(`   • [${benchmark.id}] ${benchmark.name} ... `);
+      const warmupCount = benchmark.warmupRuns ?? options.warmup ?? 1;
+      const runCount = benchmark.runs ?? options.runs ?? 5;
+      process.stdout.write(`   • [${benchmark.id}] ${benchmark.name} (${runCount} runs) ... `);
       const measuredValues: number[] = [];
 
       try {

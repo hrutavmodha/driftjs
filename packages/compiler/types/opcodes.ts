@@ -80,8 +80,10 @@ export interface CompiledModule {
 export interface ItemRecord {
   key: unknown;
   nodes: any[];
-  childRegions?: any[];
+  childRegions?: any[] | undefined;
   itemVal: unknown;
   indexVal: number;
+  registers?: any[] | undefined;
+  scope?: Record<string, any> | undefined;
 }
 

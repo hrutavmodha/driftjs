@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "tsx src/cli.ts",
     "bench": "tsx src/cli.ts",
     "app": "pnpm --filter driftjs-benchmark-app dev",
     "build": "pnpm --filter driftjs-benchmark-app build"

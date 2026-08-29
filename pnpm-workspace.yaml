@@ -9,3 +9,8 @@ allowBuilds:
   '@vscode/vsce-sign': true
   keytar: true
   esbuild: true
+  '@parcel/watcher': true
+  lmdb: true
+  msgpackr-extract: true
+overrides:
+  typescript: '^6.0.3'

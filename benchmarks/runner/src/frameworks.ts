@@ -42,4 +42,10 @@ export const FRAMEWORKS: FrameworkDef[] = [
     dir: resolve(benchmarksRoot, 'frameworks/svelte'),
     port: 5206,
   },
+  {
+    id: 'angular',
+    name: 'Angular 22',
+    dir: resolve(benchmarksRoot, 'frameworks/angular'),
+    port: 5207,
+  },
 ];

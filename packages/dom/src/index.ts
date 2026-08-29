@@ -96,6 +96,7 @@ export class DriftClientVM {
   private isUpdateScheduled = false;
   private isUnmounted = false;
   private static readonly MAX_FLUSH_ITERATIONS = 100;
+  private static dynamicPcsCache = new WeakMap<CompiledModule, number[]>();
   private depToDerived = new Map<string, DerivedBinding[]>();
   private derivedCache = new Map<string, { val: any; isDirty: boolean; exprConst: any }>();
   private effects: RunningEffect[] = [];
@@ -183,7 +184,9 @@ export class DriftClientVM {
           delete handlers[eventName];
         }
         if (typeof (elem as Element).removeAttribute === 'function') {
-          (elem as Element).removeAttribute(attrName);
+          if ((elem as Element).hasAttribute(attrName)) {
+            (elem as Element).removeAttribute(attrName);
+          }
         }
       }
     } else {
@@ -191,22 +194,39 @@ export class DriftClientVM {
         val = normalizeStyle(val);
       }
       if (attrName in elem && (attrName === 'value' || attrName === 'checked' || attrName === 'selected' || attrName === 'disabled')) {
-        (elem as any)[attrName] = val ?? '';
+        const targetVal = val ?? '';
+        if ((elem as any)[attrName] !== targetVal) {
+          (elem as any)[attrName] = targetVal;
+        }
       }
       if (typeof (elem as Element).setAttribute === 'function') {
         const isAriaOrData = attrName.startsWith('aria-') || attrName.startsWith('data-');
         if (val === true) {
-          (elem as Element).setAttribute(attrName, isAriaOrData ? 'true' : '');
+          const target = isAriaOrData ? 'true' : '';
+          if ((elem as Element).getAttribute(attrName) !== target) {
+            (elem as Element).setAttribute(attrName, target);
+          }
         } else if (val === false) {
           if (isAriaOrData) {
-            (elem as Element).setAttribute(attrName, 'false');
+            if ((elem as Element).getAttribute(attrName) !== 'false') {
+              (elem as Element).setAttribute(attrName, 'false');
+            }
           } else if (typeof (elem as Element).removeAttribute === 'function') {
-            (elem as Element).removeAttribute(attrName);
+            if ((elem as Element).hasAttribute(attrName)) {
+              (elem as Element).removeAttribute(attrName);
+            }
           }
         } else if (val == null || (attrName === 'style' && val === '')) {
-          if (typeof (elem as Element).removeAttribute === 'function') (elem as Element).removeAttribute(attrName);
+          if (typeof (elem as Element).removeAttribute === 'function') {
+            if ((elem as Element).hasAttribute(attrName)) {
+              (elem as Element).removeAttribute(attrName);
+            }
+          }
         } else {
-          (elem as Element).setAttribute(attrName, String(val));
+          const strVal = String(val);
+          if ((elem as Element).getAttribute(attrName) !== strVal) {
+            (elem as Element).setAttribute(attrName, strVal);
+          }
         }
       }
     }
@@ -566,12 +586,12 @@ export class DriftClientVM {
 
   /**
    * Runs the bytecode of a sub-module using a dedicated register window without copying parent registers.
-   * Directly returns the created DOM fragment and the exact child reactive regions created during execution.
+   * Directly returns the created DOM fragment, the exact child reactive regions, and the instantiated registers.
    */
   private runSubModule(
     rawSubMod: { bytecode: readonly number[] | Uint32Array; constants: readonly any[] },
     scope: Record<string, any>
-  ): { fragment: DocumentFragment | null; createdRegions: ReactiveRegion[] } {
+  ): { fragment: DocumentFragment | null; createdRegions: ReactiveRegion[]; registers: (Node | any)[] } {
     const subMod = (resolveComponentModule(rawSubMod) || rawSubMod) as CompiledModule;
     const savedModule = this.module;
     const savedDeclaredVars = this.declaredVars;
@@ -590,7 +610,88 @@ export class DriftClientVM {
     this.regionCollectorStack.pop();
     this.module = savedModule;
     this.declaredVars = savedDeclaredVars;
-    return { fragment, createdRegions };
+    return { fragment, createdRegions, registers: subRegisters };
+  }
+
+  private getDynamicPcs(mod: CompiledModule): number[] {
+    let pcs = DriftClientVM.dynamicPcsCache.get(mod);
+    if (pcs) return pcs;
+
+    pcs = [];
+    const bytecode = mod.bytecode;
+    for (let pc = 0; pc < bytecode.length; ) {
+      const opcode = bytecode[pc]!;
+      switch (opcode) {
+        case Opcode.SET_ATTR: {
+          const isDynamic = bytecode[pc + 4]!;
+          if (isDynamic === 1) {
+            pcs.push(pc);
+          }
+          pc += 5;
+          break;
+        }
+        case Opcode.INTERPOLATE_TEXT: {
+          pcs.push(pc);
+          pc += 3;
+          break;
+        }
+        case Opcode.MOUNT_COMPONENT: {
+          pcs.push(pc);
+          pc += 4;
+          break;
+        }
+        case Opcode.CREATE_ELEMENT:
+        case Opcode.CREATE_TEXT:
+        case Opcode.CREATE_COMMENT:
+        case Opcode.APPEND_CHILD:
+          pc += 3;
+          break;
+        case Opcode.CREATE_FRAGMENT:
+        case Opcode.EXEC_SCRIPT:
+          pc += 2;
+          break;
+        case Opcode.REACTIVE_IF:
+          pc += 6;
+          break;
+        case Opcode.REACTIVE_FOR:
+          pc += 8;
+          break;
+        case Opcode.RETURN:
+          pc += 1;
+          break;
+        default:
+          pc = bytecode.length;
+          break;
+      }
+    }
+
+    DriftClientVM.dynamicPcsCache.set(mod, pcs);
+    return pcs;
+  }
+
+  /**
+   * Fast-path in-place update for reactive list items with persistent register frames.
+   * Jumps directly to dynamic instruction PCs in VMMode.UPDATE on the row's register array.
+   */
+  public updateRowRegisters(
+    bodyMod: CompiledModule,
+    childScope: Record<string, any>,
+    registers: (Node | any)[],
+    childRegions?: ReactiveRegion[]
+  ): void {
+    const dynamicPcs = this.getDynamicPcs(bodyMod);
+    for (let i = 0; i < dynamicPcs.length; i++) {
+      const pc = dynamicPcs[i]!;
+      this.executeFrom(pc, bodyMod.bytecode, bodyMod.constants, childScope, VMMode.UPDATE, registers);
+    }
+    if (childRegions && childRegions.length > 0) {
+      for (let i = 0; i < childRegions.length; i++) {
+        const region = childRegions[i];
+        if (region && typeof region.reRender === 'function') {
+          region.reRender();
+        }
+      }
+    }
   }
 
   /**
@@ -917,6 +1018,10 @@ export class DriftClientVM {
                   vm.unmountSubtree(node);
                 }
               }
+              if (record.registers) {
+                record.registers.fill(null);
+                record.registers = undefined;
+              }
             };
 
             const renderFor = () => {
@@ -940,7 +1045,7 @@ export class DriftClientVM {
                   const childScope = Object.create(scope);
                   populateItemScope(childScope, itemName, itemVal, indexName, indexVal);
 
-                  const { fragment: frag, createdRegions: childRegions } = vm.runSubModule(bodyMod, childScope);
+                  const { fragment: frag, createdRegions: childRegions, registers: rowRegisters } = vm.runSubModule(bodyMod, childScope);
                   const nodes: Node[] = frag
                     ? frag.nodeType === 11
                       ? Array.from(frag.childNodes)
@@ -965,6 +1070,8 @@ export class DriftClientVM {
                     childRegions,
                     itemVal,
                     indexVal,
+                    registers: rowRegisters,
+                    scope: childScope,
                   };
                 },
                 (record, itemVal, indexVal) => {
@@ -981,19 +1088,25 @@ export class DriftClientVM {
                     return true;
                   };
 
-                  const childScope = Object.create(scope);
+                  const childScope = record.scope || Object.create(scope);
                   populateItemScope(childScope, itemName, itemVal, indexName, indexVal);
+                  record.scope = childScope;
 
-                  if (itemsEqual(record.itemVal, itemVal) && (!indexName || record.indexVal === indexVal)) {
-                    record.indexVal = indexVal;
+                  const equal = itemsEqual(record.itemVal, itemVal) && (!indexName || record.indexVal === indexVal);
+                  record.itemVal = itemVal;
+                  record.indexVal = indexVal;
+
+                  if (record.registers && record.nodes.length > 0) {
+                    vm.updateRowRegisters(bodyMod, childScope, record.registers, equal ? undefined : record.childRegions);
+                    return;
+                  }
+
+                  if (equal) {
                     if (record.nodes.length > 0) {
                       vm.patchItemAttributes(bodyMod, childScope, record.nodes);
                     }
                     return;
                   }
-
-                  record.itemVal = itemVal;
-                  record.indexVal = indexVal;
 
                   if (record.childRegions) {
                     for (const r of record.childRegions) {
@@ -1001,8 +1114,9 @@ export class DriftClientVM {
                     }
                   }
 
-                  const { fragment: frag, createdRegions } = vm.runSubModule(bodyMod, childScope);
+                  const { fragment: frag, createdRegions, registers: newRegisters } = vm.runSubModule(bodyMod, childScope);
                   record.childRegions = createdRegions;
+                  record.registers = newRegisters;
 
                   if (frag && record.nodes.length > 0) {
                     const rootNode = record.nodes[0];
@@ -1093,8 +1207,13 @@ export class DriftClientVM {
   public patchItemAttributes(
     bodyMod: CompiledModule,
     childScope: Record<string, any>,
-    rootNodeOrNodes: Node | Node[] | readonly Node[]
+    rootNodeOrNodes: Node | Node[] | readonly Node[],
+    registers?: (Node | any)[]
   ): void {
+    if (registers) {
+      this.updateRowRegisters(bodyMod, childScope, registers);
+      return;
+    }
     const nodes: Node[] = Array.isArray(rootNodeOrNodes)
       ? Array.from(rootNodeOrNodes)
       : [rootNodeOrNodes as Node];
