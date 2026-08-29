@@ -6,6 +6,6 @@
   "scripts": {
     "bench": "pnpm --filter driftjs-benchmark-runner start",
     "bench:perf": "./run-benchmarks.sh",
-    "build": "pnpm -r --filter \"./frameworks/**\" build"
+    "bench:build": "pnpm -r --filter \"./frameworks/**\" build"
   }
 }
