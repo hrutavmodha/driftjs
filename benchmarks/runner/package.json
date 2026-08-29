@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/cli.ts",
-    "bench": "tsx src/cli.ts"
+    "bench": "tsx src/cli.ts",
+    "app": "pnpm --filter driftjs-benchmark-app dev",
+    "build:app": "pnpm --filter driftjs-benchmark-app build"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

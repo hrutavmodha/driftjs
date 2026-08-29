@@ -3,6 +3,7 @@ packages:
   - 'playground'
   - 'benchmarks'
   - 'benchmarks/runner'
+  - 'benchmarks/runner/app'
   - 'benchmarks/frameworks/*'
 allowBuilds:
   '@vscode/vsce-sign': true

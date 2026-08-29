@@ -143,14 +143,25 @@ a.remove {
   font-weight: bold;
   padding: 2px 6px;
   display: inline-block;
+  min-width: 16px;
+  min-height: 16px;
+  line-height: 1;
 }
 
 a.remove:hover {
   color: #991b1b;
 }
 
+.glyphicon {
+  display: inline-block;
+  min-width: 14px;
+  min-height: 14px;
+  line-height: 1;
+}
+
 .glyphicon-remove::before {
   content: "✕";
+  display: inline-block;
 }
 
 .preloadicon {

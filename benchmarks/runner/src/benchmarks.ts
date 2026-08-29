@@ -1,4 +1,32 @@
-import type { BenchmarkDef } from './types.js';
+import type { BenchmarkDef, FrameworkDef } from './types.js';
+import { readFileSync, readdirSync, existsSync } from 'fs';
+import { resolve } from 'path';
+import { gzipSync } from 'zlib';
+
+function getFrameworkBundleSizes(framework?: FrameworkDef): { uncompressedBytes: number; compressedBytes: number } {
+  if (!framework) return { uncompressedBytes: 0, compressedBytes: 0 };
+  let uncompressedBytes = 0;
+  let compressedBytes = 0;
+
+  const distAssets = resolve(framework.dir, 'dist/assets');
+  if (existsSync(distAssets)) {
+    const files = readdirSync(distAssets).filter(f => f.endsWith('.js'));
+    for (const f of files) {
+      const buf = readFileSync(resolve(distAssets, f));
+      uncompressedBytes += buf.length;
+      compressedBytes += gzipSync(buf).length;
+    }
+  } else {
+    const mainJs = resolve(framework.dir, 'src/main.js');
+    if (existsSync(mainJs)) {
+      const buf = readFileSync(mainJs);
+      uncompressedBytes += buf.length;
+      compressedBytes += gzipSync(buf).length;
+    }
+  }
+
+  return { uncompressedBytes, compressedBytes };
+}
 
 /**
  * Force garbage collection in Chromium via Chrome DevTools Protocol.
@@ -96,7 +124,10 @@ export const BENCHMARKS: BenchmarkDef[] = [
       await forceGC(cdpSession);
 
       const start = Date.now();
-      await page.click('#tbody tr:nth-child(2) a.lbl');
+      await page.evaluate(() => {
+        const el = document.querySelector('#tbody tr:nth-child(2) a.lbl') as HTMLElement;
+        if (el) el.click();
+      });
       await page.waitForFunction(() => {
         const tr = document.querySelector('#tbody tr:nth-child(2)');
         return tr && tr.classList.contains('danger');
@@ -139,7 +170,10 @@ export const BENCHMARKS: BenchmarkDef[] = [
       await forceGC(cdpSession);
 
       const start = Date.now();
-      await page.click('#tbody tr:nth-child(2) a.remove');
+      await page.evaluate(() => {
+        const el = document.querySelector('#tbody tr:nth-child(2) a.remove') as HTMLElement;
+        if (el) el.click();
+      });
       await page.waitForFunction(() => document.querySelectorAll('#tbody tr').length === 999, { timeout: 10000 });
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0))));
       return Date.now() - start;
@@ -251,32 +285,22 @@ export const BENCHMARKS: BenchmarkDef[] = [
     id: '41_uncompressedSize',
     name: '41. Uncompressed Size',
     category: 'startup',
-    description: 'Total uncompressed JS size downloaded by the page.',
+    description: 'Total uncompressed JS bundle size on disk.',
     unit: 'kB',
-    run: async (page) => {
-      const sizeBytes = await page.evaluate(() => {
-        const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
-        return resources
-          .filter((r) => r.name.endsWith('.js') || r.name.endsWith('.ts') || r.name.endsWith('.jsx') || r.initiatorType === 'script')
-          .reduce((sum, r) => sum + (r.decodedBodySize || r.encodedBodySize || 0), 0);
-      });
-      return Math.round((sizeBytes / 1024) * 10) / 10;
+    run: async (page, cdpSession, config, framework) => {
+      const { uncompressedBytes } = getFrameworkBundleSizes(framework);
+      return Math.round((uncompressedBytes / 1024) * 10) / 10;
     },
   },
   {
     id: '42_compressedSize',
     name: '42. Compressed Size',
     category: 'startup',
-    description: 'Total transfer size for scripts.',
+    description: 'Total gzipped JS bundle size.',
     unit: 'kB',
-    run: async (page) => {
-      const sizeBytes = await page.evaluate(() => {
-        const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
-        return resources
-          .filter((r) => r.name.endsWith('.js') || r.name.endsWith('.ts') || r.name.endsWith('.jsx') || r.initiatorType === 'script')
-          .reduce((sum, r) => sum + (r.transferSize || r.encodedBodySize || 0), 0);
-      });
-      return Math.round((sizeBytes / 1024) * 10) / 10;
+    run: async (page, cdpSession, config, framework) => {
+      const { compressedBytes } = getFrameworkBundleSizes(framework);
+      return Math.round((compressedBytes / 1024) * 10) / 10;
     },
   },
   {

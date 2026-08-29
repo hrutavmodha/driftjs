@@ -6,7 +6,7 @@ import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const defaultOutDir = resolve(__dirname, '../results');
+const defaultOutDir = resolve(__dirname, '../app/public');
 
 function parseArgs(): RunOptions {
   const args = process.argv.slice(2);
@@ -48,10 +48,9 @@ async function main() {
     : FRAMEWORKS;
 
   const report = await runBenchmarks(options);
-  const { htmlPath, jsonPath } = saveReport(report, selectedFrameworks, options.outputDir);
+  const { jsonPath } = saveReport(report, options.outputDir);
 
   console.log(`\n✅ Benchmarks complete!`);
-  console.log(`📄 HTML Report: ${htmlPath}`);
   console.log(`📊 JSON Data:   ${jsonPath}\n`);
 }
 

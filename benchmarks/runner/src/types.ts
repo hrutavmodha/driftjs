@@ -6,7 +6,7 @@ export interface BenchmarkDef {
   category: BenchmarkCategory;
   description: string;
   unit: string;
-  run: (page: any, cdpSession: any, config: RunOptions) => Promise<number>;
+  run: (page: any, cdpSession: any, config: RunOptions, framework?: FrameworkDef) => Promise<number>;
   warmupRuns?: number;
 }
 

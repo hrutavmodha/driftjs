@@ -78,13 +78,13 @@ export async function runBenchmarks(options: RunOptions): Promise<BenchmarkRepor
         const warmupCount = options.warmup || benchmark.warmupRuns || 1;
         for (let w = 0; w < warmupCount; w++) {
           await page.goto(frameworkUrl, { waitUntil: 'networkidle' });
-          await benchmark.run(page, cdpSession, options);
+          await benchmark.run(page, cdpSession, options, framework);
         }
 
         // Measurement runs
         for (let r = 0; r < options.runs; r++) {
           await page.goto(frameworkUrl, { waitUntil: 'networkidle' });
-          const val = await benchmark.run(page, cdpSession, options);
+          const val = await benchmark.run(page, cdpSession, options, framework);
           measuredValues.push(val);
         }
 
