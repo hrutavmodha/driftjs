@@ -207,4 +207,19 @@ describe('driftPlugin – HMR', () => {
     const code = transform(plugin, sfc)!;
     expect(code).toContain('derived: [{"name":"double","deps":["count"],"exprIdx":');
   });
+
+  it('serializes effect bindings in compiledModule', () => {
+    const plugin = makePlugin();
+    const sfc = `
+      <script>
+        let count = 1;
+        effect(() => {
+          console.log(count);
+        });
+      </script>
+      <div>{count}</div>
+    `;
+    const code = transform(plugin, sfc)!;
+    expect(code).toContain('effects: [{"deps":["count"],"exprIdx":');
+  });
 });

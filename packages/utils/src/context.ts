@@ -97,6 +97,32 @@ export const provide = provideContext;
 export const inject = injectContext;
 
 /**
+ * Registers a reactive side-effect callback to run after the component mounts or updates.
+ * Can return an optional cleanup function `() => void`.
+ */
+export function effect(callback: () => void | (() => void) | Promise<any>): void {
+  const vm = getActiveVM();
+  if (vm && typeof vm.registerProgrammaticEffect === 'function') {
+    vm.registerProgrammaticEffect(callback);
+  } else if (!vm) {
+    console.warn('[DriftJS] effect() was called outside a component execution context. Lifecycle hooks must be called synchronously during component setup.');
+  }
+}
+
+/**
+ * Registers a callback to be executed once after the currently active component is mounted in the DOM.
+ * Can return an optional cleanup function `() => void` executed upon unmount.
+ */
+export function onMount(callback: () => void | (() => void) | Promise<any>): void {
+  const vm = getActiveVM();
+  if (vm && typeof vm.registerProgrammaticEffect === 'function') {
+    vm.registerProgrammaticEffect(callback, true);
+  } else if (!vm) {
+    console.warn('[DriftJS] onMount() was called outside a component execution context. Lifecycle hooks must be called synchronously during component setup.');
+  }
+}
+
+/**
  * Registers a callback to be executed when the currently active component VM is unmounted.
  */
 export function onUnmount(callback: () => void): void {

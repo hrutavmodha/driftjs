@@ -69,6 +69,7 @@ function generateESM(mod: CompiledModule, filePath: string): string {
   const bindingsJSON = JSON.stringify(mod.reactiveBindings ?? []);
   const declaredVarsJSON = JSON.stringify(mod.declaredVars ?? []);
   const derivedJSON = JSON.stringify(mod.derived ?? []);
+  const effectsJSON = JSON.stringify(mod.effects ?? []);
 
   const importStatements: string[] = [];
   const scopeEntries: string[] = [];
@@ -103,6 +104,7 @@ const compiledModule = {
   reactiveBindings: ${bindingsJSON},
   declaredVars: ${declaredVarsJSON},
   derived: ${derivedJSON},
+  effects: ${effectsJSON},
   scope: ${scopeObj},
 };
 

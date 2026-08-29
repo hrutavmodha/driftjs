@@ -2,9 +2,11 @@ import type {
   CompiledModule,
   ReactiveBinding,
   DerivedBinding,
+  EffectBinding,
   ItemRecord,
   VMExecutionOptions,
   ReactiveRegion,
+  RunningEffect,
 } from "../types/index.js";
 import { Opcode, VMMode } from "../types/index.js";
 import { reconcileKeyedList } from "./reconciler.js";
@@ -25,6 +27,9 @@ import {
   inject,
   provideContext,
   injectContext,
+  effect,
+  onMount,
+  onUnmount,
   type Context,
 } from "driftjs-shared";
 
@@ -93,6 +98,10 @@ export class DriftClientVM {
   private static readonly MAX_FLUSH_ITERATIONS = 100;
   private depToDerived = new Map<string, DerivedBinding[]>();
   private derivedCache = new Map<string, { val: any; isDirty: boolean; exprConst: any }>();
+  private effects: RunningEffect[] = [];
+  private depToEffects = new Map<string, RunningEffect[]>();
+  private pendingEffects = new Set<RunningEffect>();
+  private isRunningEffects = false;
 
   public parentVM: DriftClientVM | null = null;
   public contextMap = new Map<symbol | string, any>();
@@ -100,6 +109,17 @@ export class DriftClientVM {
 
   constructor() {
     DriftClientVM.activeVMCount++;
+  }
+
+  public registerProgrammaticEffect(fn: () => void | (() => void) | Promise<any>, isMountOnly: boolean = false): void {
+    const runningEff: RunningEffect = {
+      deps: [],
+      rawFn: fn,
+      isDirty: true,
+      isMountOnly,
+    };
+    this.effects.push(runningEff);
+    this.pendingEffects.add(runningEff);
   }
 
   public applyDOMAttribute(
@@ -149,7 +169,7 @@ export class DriftClientVM {
               targetVM.pendingDirtyVars.clear();
               targetVM.triggerUpdates(changedVars);
             }
-            if (targetVM.pendingDirtyVars.size > 0) targetVM.flushUpdates();
+            if (targetVM.pendingDirtyVars.size > 0 || targetVM.pendingEffects.size > 0) targetVM.flushUpdates();
             return result;
           };
           (wrappedHandler as any)._fn = val;
@@ -316,6 +336,8 @@ export class DriftClientVM {
       DriftClientVM.globalDelegatedListeners.clear();
     }
 
+    this.clearEffects();
+
     if (this.unmountCallbacks && this.unmountCallbacks.length > 0) {
       for (const cb of this.unmountCallbacks) {
         try {
@@ -338,10 +360,27 @@ export class DriftClientVM {
     this.parentVM = null;
   }
 
+  private clearEffects(): void {
+    for (const eff of this.effects) {
+      if (typeof eff.cleanup === 'function') {
+        try {
+          eff.cleanup();
+        } catch (err) {
+          console.error('[DriftJS] Error executing effect cleanup:', err);
+        }
+        eff.cleanup = undefined;
+      }
+    }
+    this.effects = [];
+    this.depToEffects.clear();
+    this.pendingEffects.clear();
+  }
+
   public markDirty(varName: string): void {
     if (!this.module) return;
     this.pendingDirtyVars.add(varName);
     this.invalidateDerived(varName);
+    this.invalidateEffects(varName);
     if (!this.isUpdateScheduled) {
       this.isUpdateScheduled = true;
       queueMicrotask(() => this.flushUpdates());
@@ -360,28 +399,84 @@ export class DriftClientVM {
           cache.isDirty = true;
         }
         this.pendingDirtyVars.add(d.name);
+        this.invalidateEffects(d.name);
         this.invalidateDerived(d.name, visited);
+      }
+    }
+  }
+
+  private invalidateEffects(varName: string): void {
+    const effectList = this.depToEffects.get(varName);
+    if (effectList && effectList.length > 0) {
+      for (const eff of effectList) {
+        if (!eff.isMountOnly) {
+          eff.isDirty = true;
+          this.pendingEffects.add(eff);
+        }
       }
     }
   }
 
   private flushUpdates(): void {
     this.isUpdateScheduled = false;
-    if (!this.module || this.pendingDirtyVars.size === 0) return;
+    if (!this.module || (this.pendingDirtyVars.size === 0 && this.pendingEffects.size === 0)) return;
 
     let iterations = 0;
-    while (this.pendingDirtyVars.size > 0) {
+    while (this.pendingDirtyVars.size > 0 || this.pendingEffects.size > 0) {
       if (iterations >= DriftClientVM.MAX_FLUSH_ITERATIONS) {
         this.pendingDirtyVars.clear();
+        this.pendingEffects.clear();
         console.error(
           `DriftClientVM: Maximum recursive update limit (${DriftClientVM.MAX_FLUSH_ITERATIONS}) exceeded. Possible infinite reactivity loop detected.`
         );
         break;
       }
       iterations++;
-      const dirty = new Set(this.pendingDirtyVars);
-      this.pendingDirtyVars.clear();
-      this.triggerUpdates(dirty);
+      if (this.pendingDirtyVars.size > 0) {
+        const dirty = new Set(this.pendingDirtyVars);
+        this.pendingDirtyVars.clear();
+        this.triggerUpdates(dirty);
+      }
+      if (this.pendingEffects.size > 0) {
+        this.flushPendingEffects();
+      }
+    }
+  }
+
+  public flushPendingEffects(): void {
+    if (this.isRunningEffects || this.pendingEffects.size === 0 || this.isUnmounted) return;
+    this.isRunningEffects = true;
+    try {
+      const effectsToRun = Array.from(this.pendingEffects);
+      this.pendingEffects.clear();
+      for (const eff of effectsToRun) {
+        if (this.isUnmounted) break;
+        if (typeof eff.cleanup === 'function') {
+          try {
+            eff.cleanup();
+          } catch (err) {
+            console.error('[DriftJS] Error executing effect cleanup:', err);
+          }
+          eff.cleanup = undefined;
+        }
+
+        try {
+          let res: any;
+          if (eff.rawFn) {
+            res = eff.rawFn();
+          } else if (eff.exprConst) {
+            res = evaluateExpression(eff.exprConst, this.scope, this.declaredVars);
+          }
+          if (typeof res === 'function') {
+            eff.cleanup = res;
+          }
+        } catch (err) {
+          console.error('[DriftJS] Error executing effect callback:', err);
+        }
+        eff.isDirty = false;
+      }
+    } finally {
+      this.isRunningEffects = false;
     }
   }
 
@@ -1149,6 +1244,25 @@ export class DriftClientVM {
 
     this.depToDerived.clear();
     this.derivedCache.clear();
+    this.clearEffects();
+
+    if (module.effects && module.effects.length > 0) {
+      for (const e of module.effects) {
+        const runningEff: RunningEffect = {
+          deps: e.deps,
+          exprConst: module.constants[e.exprIdx],
+          isDirty: true,
+        };
+        this.effects.push(runningEff);
+        this.pendingEffects.add(runningEff);
+        for (const dep of e.deps) {
+          if (!this.depToEffects.has(dep)) {
+            this.depToEffects.set(dep, []);
+          }
+          this.depToEffects.get(dep)!.push(runningEff);
+        }
+      }
+    }
 
     if (module.derived && module.derived.length > 0) {
       for (const d of module.derived) {
@@ -1187,6 +1301,7 @@ export class DriftClientVM {
     try {
       const result = this.executeFrom(0, module.bytecode, module.constants, scope, VMMode.MOUNT);
       this.cursor = null;
+      this.flushPendingEffects();
       return result;
     } finally {
       popActiveVM();
@@ -1199,6 +1314,10 @@ export class DriftClientVM {
    */
   public triggerUpdates(changedVars: Set<string>): void {
     if (changedVars.size === 0) return;
+
+    for (const varName of changedVars) {
+      this.invalidateEffects(varName);
+    }
 
     if (this.reactiveBindingsMap.size > 0 && this.module) {
       this.updatedPcs.clear();
@@ -1262,6 +1381,9 @@ export {
   inject,
   provideContext,
   injectContext,
+  effect,
+  onMount,
+  onUnmount,
   type Context,
 };
 

@@ -14,6 +14,9 @@ import {
   inject,
   provideContext,
   injectContext,
+  effect,
+  onMount,
+  onUnmount,
   type Context,
 } from "driftjs-shared";
 import type { SSRExecutionOptions, ServerNode } from "../types/index.js";
@@ -25,6 +28,9 @@ export {
   inject,
   provideContext,
   injectContext,
+  effect,
+  onMount,
+  onUnmount,
   type Context,
 };
 

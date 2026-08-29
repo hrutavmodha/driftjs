@@ -289,4 +289,32 @@ describe('DriftServerVM (SSR Engine)', () => {
     expect(html).toContain('<h3>Server Rendered Card</h3>');
     expect(html).toContain('<div class="body"><p class="server-text">Hello from slotted server children!</p></div>');
   });
+
+  it('safely renders components containing effect() without executing side effects on server', () => {
+    let serverEffectRan = false;
+    (globalThis as any).__server_side_effect__ = () => {
+      serverEffectRan = true;
+    };
+
+    const sfc = `
+      <script>
+        let message = "SSR Safe";
+
+        effect(() => {
+          globalThis.__server_side_effect__();
+        });
+      </script>
+      <div class="box">
+        <h1>{message}</h1>
+      </div>
+    `;
+
+    const compiled = compile(sfc);
+    const html = renderToString(compiled);
+
+    expect(html).toContain('<h1>SSR Safe</h1>');
+    expect(serverEffectRan).toBe(false);
+
+    delete (globalThis as any).__server_side_effect__;
+  });
 });

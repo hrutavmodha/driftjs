@@ -24,3 +24,13 @@ export interface ReactiveRegion {
   endAnchor?: Node;
 }
 
+/** Describes an active running side-effect instance tracked by DriftClientVM. */
+export interface RunningEffect {
+  readonly deps: readonly string[];
+  readonly exprConst?: any;
+  readonly rawFn?: () => void | (() => void) | Promise<any>;
+  cleanup?: (() => void) | void;
+  isDirty: boolean;
+  isMountOnly?: boolean;
+}
+

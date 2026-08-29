@@ -85,24 +85,48 @@ Upgrade `driftjs-dom` hydration from a monolithic full-page scan to fine-grained
 
 ---
 
-## 🔄 Priority 3: Reactive Side-Effects & Watchers (`$effect` / `watch`)
+---
 
-### Proposed Design
+## ✅ Completed: Reactive Side-Effects & Lifecycle Hooks (`effect()`, `onMount()`, `onUnmount()`)
 
-Allow developers to execute asynchronous or synchronous side-effects whenever targeted dependencies change:
+### Overview
+
+In Single File Components (`.drift`), reactive side-effects are authored using `effect(() => { ... })`:
 
 ```drift
 <script>
   let userId = 1;
   let userData = null;
 
-  $effect(() => {
-    fetch(`/api/users/${userId}`).then(res => res.json()).then(data => {
-      userData = data;
-    });
+  // Reactively re-runs whenever `userId` changes:
+  effect(async () => {
+    const res = await fetch(`/api/users/${userId}`);
+    userData = await res.json();
+  });
+
+  // Supports optional cleanup callback:
+  effect(() => {
+    const timer = setInterval(() => console.log('Tick'), 1000);
+    return () => clearInterval(timer);
   });
 </script>
+
+<p>User: {userData ? userData.name : 'Loading...'}</p>
 ```
+
+### Compiler & VM Implementation
+
+1. **Compiler AST Analysis & Codegen (`driftjs-compiler`):**
+   - Statically detects `effect(...)` function statements in `<script>`.
+   - Extracts referenced scope variables (`deps`) from the effect expression / function AST.
+   - Emits `CompiledModule.effects: EffectBinding[]` mapping dependencies to compiled constant pool functions.
+   - Automatically filters top-level `effect(...)` statements out of `EXEC_SCRIPT` scope initialization.
+2. **Runtime VM Execution & Lifecycle (`driftjs-dom` & `driftjs-ssr`):**
+   - Executes registered effects immediately after initial DOM construction on mount.
+   - Automatically re-runs dependent effects during microtask batched updates when tracked state changes (after in-place DOM updates).
+   - Safely invokes cleanup return functions prior to effect re-execution and on component `unmount()`.
+   - Exposes programmatic `effect(cb)`, `onMount(cb)`, and `onUnmount(cb)` lifecycle hooks.
+   - Safe server-side rendering parity: `DriftServerVM` renders template HTML without executing client side-effects.
 
 ---
 
