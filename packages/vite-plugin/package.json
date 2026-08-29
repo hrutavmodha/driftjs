@@ -1,6 +1,6 @@
 {
   "name": "driftjs-vite-plugin",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Vite plugin for build-time compilation of DriftJS Single File Components (.drift) into executable ESM bytecode modules.",
   "keywords": [
     "driftjs",
