@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@glimmer/component": "^2.1.1",
-    "@glimmer/tracking": "^1.1.2",
     "decorator-transforms": "^2.4.0",
     "ember-source": "^7.2.0"
   },

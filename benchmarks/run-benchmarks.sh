@@ -93,10 +93,10 @@ pnpm -r --filter "./benchmarks/frameworks/**" build
 # 4. Run the benchmarks
 echo ""
 echo "⚡ Starting Benchmark Suite with CPU in performance mode..."
-pnpm --filter driftjs-benchmark-runner start "$@"
+pnpm --filter driftjs-benchmark-runner bench "$@"
 
 # 5. Start the TS + Vite results dashboard app
 echo ""
 echo "📊 Launching DriftJS Benchmark Results Dashboard..."
-pnpm --filter driftjs-benchmark-app dev -- --open
+pnpm --filter driftjs-benchmark-app dev --open
 

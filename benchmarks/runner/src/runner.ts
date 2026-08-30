@@ -43,6 +43,7 @@ export async function runBenchmarks(options: RunOptions): Promise<BenchmarkRepor
 
   for (const framework of selectedFrameworks) {
     console.log(`\n🔹 Testing Framework: ${framework.name}`);
+    const origCwd = process.cwd();
     let serverInstance: any = null;
     let frameworkUrl: string = '';
 
@@ -52,6 +53,7 @@ export async function runBenchmarks(options: RunOptions): Promise<BenchmarkRepor
       frameworkUrl = url;
     } catch (err: any) {
       console.error(`❌ Failed to start server for ${framework.name}:`, err.message);
+      process.chdir(origCwd);
       continue;
     }
 
@@ -114,6 +116,7 @@ export async function runBenchmarks(options: RunOptions): Promise<BenchmarkRepor
     if (serverInstance) {
       await serverInstance.close();
     }
+    process.chdir(origCwd);
   }
 
   await browser.close();

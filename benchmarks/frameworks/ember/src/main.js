@@ -4,3 +4,5 @@ import { App } from './App.gjs';
 renderComponent(App, {
   into: document.getElementById('main') || document.body,
 });
+
+
