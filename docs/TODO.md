@@ -68,20 +68,26 @@ Enable progressive HTML streaming for DriftJS server-side rendering, allowing in
 
 ---
 
-## ⚡ Priority 2: Selective & Progressive Hydration
+## ✅ Completed: Selective & Progressive Hydration (`hydrateSelectively()`, `hydrateOnIdle()`, `hydrateWhenVisible()`, `hydrateOnInteraction()`, `hydrateOnMedia()`, `hydrateIslands()`)
 
 ### Overview
 
-Upgrade `driftjs-dom` hydration from a monolithic full-page scan to fine-grained, non-blocking selective hydration of independent component subtrees.
+Fine-grained, non-blocking selective and island hydration of independent component subtrees in `driftjs-dom`.
 
 ### Architecture & Design
 
-1. **Partial / Island Hydration Triggers:**
-   - **`hydrateOnIdle`**: Hydrates interactive subtrees during browser idle periods (`requestIdleCallback`).
-   - **`hydrateWhenVisible`**: Defers subtree hydration until the component enters the viewport (`IntersectionObserver`).
-   - **`hydrateOnInteraction`**: Defers event listener attachment and VM instantiation until the user hovers, touches, or clicks the element.
+1. **Selective Hydration Triggers:**
+   - **`hydrateSelectively(component, container, options)`**: Universal selective hydration dispatcher supporting `'eager'`, `'idle'`, `'visible'`, `'interaction'`, `'media'`, and custom trigger callbacks. Returns a `SelectiveHydrationController` with `ready` promise, `hydrateNow()`, `cancel()`, and `unmount()`.
+   - **`hydrateOnIdle(component, container, options)`**: Hydrates interactive subtrees during browser idle periods (`requestIdleCallback`) with fallback timeout.
+   - **`hydrateWhenVisible(component, container, options)`**: Defers subtree hydration until the component enters the viewport (`IntersectionObserver`).
+   - **`hydrateOnInteraction(component, container, options)`**: Defers event listener attachment and VM instantiation until the user interacts (hover, touch, click, focus, keydown) with instant capture-phase hydration.
+   - **`hydrateOnMedia(component, container, query, options)`**: Hydrates when a CSS media query matches (`window.matchMedia`).
+   - **`hydrateIslands(root, components, options)`**: Auto-discovers and hydrates multiple islands matching `[data-drift-island]` across the page.
 2. **TreeWalker Hydration Cursor Integration:**
-   - Uses existing `HydrationCursor` comment anchors (`<!--if-->`, `<!--for-->`, `<!--comp:name-->`) to claim DOM sub-trees on-demand without reconstructing or resetting state.
+   - Uses `HydrationCursor` with shared cursor propagation across nested sub-modules and child component boundaries (`MOUNT_COMPONENT`) to claim DOM sub-trees on-demand with 0 duplicate DOM node creations.
+   - Enhanced `HydrationCursor` with `claimComponentAnchor()`, `claimComponentEndAnchor()`, `peek()`, and `getUnclaimed()`.
+3. **SSR Island Serialization:**
+   - `renderIslandToString(islandName, component, options)` in `driftjs-ssr` serializes SSR islands with hydration trigger metadata (`data-drift-island`, `data-drift-trigger`, `data-drift-props`, etc.).
 
 ---
 

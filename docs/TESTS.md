@@ -255,6 +255,21 @@ Total Test Suites: **8** | Total Test Cases: **69**
 | 1 | `hydrates pre-rendered SSR HTML without destroying existing DOM nodes and binds event listeners` | Verifies `hydrate()` claims pre-rendered HTML nodes in-place with 0 node recreations and attaches reactive event listeners |
 | 2 | `hydrates conditional @if and loop @for blocks without creating duplicate DOM nodes` | Verifies comment anchor claiming and reactive region registration during hydration |
 
+### 3.9 Selective Hydration Suite (`tests/selective.test.ts` — 10 tests)
+
+| # | Test Suite Description | Test Target & Behavior |
+| :-: | :--- | :--- |
+| 1 | `hydrates eagerly by default with controller ready promise` | Verifies `hydrateSelectively()` default eager execution and `ready` promise |
+| 2 | `hydrates with custom trigger function and handles cancel / unmount` | Verifies custom trigger callback, cleanup on unmount |
+| 3 | `defers hydration until requestIdleCallback executes` | Verifies idle-period hydration scheduling via `hydrateOnIdle()` |
+| 4 | `falls back to setTimeout when requestIdleCallback is unavailable` | Verifies robust fallback for idle hydration |
+| 5 | `supports hydrateNow() forcing immediate hydration and cancel()` | Verifies manual trigger and idempotence on idle controller |
+| 6 | `defers hydration until container intersects viewport` | Verifies viewport intersection hydration via `hydrateWhenVisible()` and `IntersectionObserver` |
+| 7 | `defers hydration until user interaction and replays the event` | Verifies capture-phase interaction hydration via `hydrateOnInteraction()` |
+| 8 | `hydrates when media query matches` | Verifies media query hydration via `hydrateOnMedia()` |
+| 9 | `discovers and selective-hydrates multiple islands across container` | Verifies multi-island hydration via `hydrateIslands()` with data attributes |
+| 10 | `hydrates parent and nested child component with zero duplicate DOM nodes` | Verifies shared `HydrationCursor` across nested component hierarchy |
+
 ---
 
 ## 📦 4. Package: `driftjs-ssr` (`packages/ssr`)

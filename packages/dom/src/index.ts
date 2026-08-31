@@ -755,7 +755,7 @@ export class DriftClientVM {
                   if (childrenSubMod) {
                     childrenVM = new DriftClientVM();
                     childrenVM.parentVM = this;
-                    childrenNode = childrenVM.execute(childrenSubMod, { scope, document: doc }) as Node | undefined;
+                    childrenNode = childrenVM.execute(childrenSubMod, { scope, document: doc, cursor: this.cursor }) as Node | undefined;
                   }
                 }
 
@@ -765,7 +765,7 @@ export class DriftClientVM {
                 if (childrenNode !== undefined) {
                   childScope.children = childrenNode;
                 }
-                const compNode = childVM.execute(compMod, { scope: childScope, document: doc });
+                const compNode = childVM.execute(compMod, { scope: childScope, document: doc, cursor: this.cursor });
                 if (compNode) {
                   const childEntry = { vm: childVM, scope: childVM.scope, propsSpec, nodes: [] as Node[], childrenVM };
                   this.childVMs.set(compNode, childEntry);
@@ -1332,7 +1332,9 @@ export class DriftClientVM {
     this.reactiveRegionsIndex.clear();
     this.nodeToRegions.clear();
 
-    if (options.hydrate && options.container) {
+    if (options.cursor) {
+      this.cursor = options.cursor;
+    } else if (options.hydrate && options.container) {
       this.cursor = new HydrationCursor(options.container, doc);
     } else {
       this.cursor = null;
@@ -1494,6 +1496,8 @@ export function hydrate(component: CompiledModule, container: HTMLElement, optio
 }
 
 export * from "../types/index.js";
+export * from "./selective.js";
+export { HydrationCursor } from "./hydration.js";
 export {
   createContext,
   provide,

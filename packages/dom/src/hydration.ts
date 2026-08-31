@@ -19,17 +19,17 @@ export class HydrationCursor {
   }
 
   private claimNode<T extends Node>(predicate: (n: Node) => boolean, fallback: () => T): T {
-    // 1. Check unclaimed pool first
-    const poolIdx = this.unclaimed.findIndex(predicate);
-    if (poolIdx !== -1) {
-      return this.unclaimed.splice(poolIdx, 1)[0] as T;
-    }
-
-    // 2. Check current node
+    // 1. Check current node first
     if (this.current && predicate(this.current)) {
       const node = this.current as T;
       this.current = this.walker.nextNode();
       return node;
+    }
+
+    // 2. Check unclaimed pool
+    const poolIdx = this.unclaimed.findIndex(predicate);
+    if (poolIdx !== -1) {
+      return this.unclaimed.splice(poolIdx, 1)[0] as T;
     }
 
     // 3. Lookahead in TreeWalker preserving uncollected intermediate nodes
@@ -70,5 +70,40 @@ export class HydrationCursor {
       () => doc.createComment(expectedContent)
     );
   }
-}
 
+  public claimComponentAnchor(name: string, doc: Document): Comment {
+    const expectedVariants = new Set([
+      `comp:${name}`,
+      `drift-island:${name}`,
+      `island:${name}`,
+    ]);
+    return this.claimNode(
+      (n) => n.nodeType === 8 && expectedVariants.has((n as Comment).data.trim()),
+      () => doc.createComment(`comp:${name}`)
+    );
+  }
+
+  public claimComponentEndAnchor(name: string, doc: Document): Comment {
+    const expectedVariants = new Set([
+      `/comp:${name}`,
+      `/drift-island:${name}`,
+      `/island:${name}`,
+    ]);
+    return this.claimNode(
+      (n) => n.nodeType === 8 && expectedVariants.has((n as Comment).data.trim()),
+      () => doc.createComment(`/comp:${name}`)
+    );
+  }
+
+  public peek(): Node | null {
+    return this.current;
+  }
+
+  public getUnclaimed(): readonly Node[] {
+    return this.unclaimed;
+  }
+
+  public isExhausted(): boolean {
+    return !this.current && this.unclaimed.length === 0;
+  }
+}

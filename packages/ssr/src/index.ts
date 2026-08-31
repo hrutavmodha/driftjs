@@ -20,7 +20,7 @@ import {
   onUnmount,
   type Context,
 } from "driftjs-shared";
-import type { SSRExecutionOptions, StreamOptions, DriftStream, ServerNode } from "../types/index.js";
+import type { SSRExecutionOptions, StreamOptions, DriftStream, ServerNode, IslandRenderOptions } from "../types/index.js";
 
 export * from "../types/index.js";
 export {
