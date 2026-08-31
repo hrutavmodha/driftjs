@@ -1,3 +1,4 @@
+import * as acorn from 'acorn';
 import { DriftLexer } from './lexer.js';
 import type {
   Token,
@@ -11,6 +12,8 @@ import type {
   ForNode,
   SwitchNode,
   CaseBranch,
+  AsyncNode,
+  CatchBranch,
 } from '../types/index.js';
 import {
   TokenType,
@@ -19,9 +22,7 @@ import {
 } from '../types/index.js';
 import {
   VOID_ELEMENTS,
-  scanBalancedDelimiters,
   hasMatchingOuterParens,
-  findTopLevelChar,
 } from 'driftjs-shared';
 
 class ArrayTokenSource implements TokenSource {
@@ -176,6 +177,10 @@ export class DriftParser {
 
     if (token.type === TokenType.DirectiveSwitch) {
       return this.parseSwitchDirective();
+    }
+
+    if (token.type === TokenType.DirectiveAsync) {
+      return this.parseAsyncDirective();
     }
 
     if (token.type === TokenType.Text) {
@@ -431,115 +436,150 @@ export class DriftParser {
     const startLoc = forToken.loc.start;
     let header = forToken.value.trim();
 
-    function findTopLevelIn(str: string): number {
-      return scanBalancedDelimiters(str, (i, ch) => {
-        if (ch === 'i' && str[i + 1] === 'n') {
-          const beforeWord = i === 0 || !/[a-zA-Z0-9_$]/.test(str[i - 1]!);
-          const afterWord = i + 2 >= str.length || !/[a-zA-Z0-9_$]/.test(str[i + 2]!);
-          if (beforeWord && afterWord) {
-            // Check preceding non-whitespace char is not dot property access (e.g. foo.in)
-            let prevIdx = i - 1;
-            while (prevIdx >= 0 && /\s/.test(str[prevIdx]!)) prevIdx--;
-            if (prevIdx < 0 || str[prevIdx] !== '.') {
-              return true;
-            }
-          }
-        }
-      });
-    }
-
-    function findTopLevelComma(str: string): number {
-      return findTopLevelChar(str, ',');
-    }
-
-    function findTopLevelKey(str: string): { index: number; keyExpr: string } | null {
-      let matchIdx = -1;
-      scanBalancedDelimiters(str, (i) => {
-        if (str.slice(i, i + 3) === 'key') {
-          const beforeWord = i === 0 || !/[a-zA-Z0-9_$]/.test(str[i - 1]!);
-          const afterWord = i + 3 >= str.length || !/[a-zA-Z0-9_$]/.test(str[i + 3]!);
-          if (beforeWord && afterWord) {
-            let prevIdx = i - 1;
-            while (prevIdx >= 0 && /\s/.test(str[prevIdx]!)) prevIdx--;
-            if (prevIdx < 0 || (str[prevIdx] !== '.' && str[prevIdx] !== '?')) {
-              const remaining = str.slice(i + 3).trim();
-              if (remaining.length > 0) {
-                matchIdx = i;
-                return true;
-              }
-            }
-          }
-        }
-      });
-
-      if (matchIdx !== -1) {
-        return {
-          index: matchIdx,
-          keyExpr: str.slice(matchIdx + 3).trim(),
-        };
-      }
-      return null;
-    }
-
     while (hasMatchingOuterParens(header)) {
       header = header.slice(1, -1).trim();
     }
 
-    let inIndex = findTopLevelIn(header);
-    if (inIndex === -1 && hasMatchingOuterParens(header)) {
-      const stripped = header.slice(1, -1).trim();
-      const strippedIn = findTopLevelIn(stripped);
-      if (strippedIn !== -1) {
-        header = stripped;
-        inIndex = strippedIn;
-      }
-    }
-
-    if (inIndex === -1) {
-      throw new DriftParserError(
-        `Invalid @for header syntax '${header}'. Expected format: 'item in list' or '(item, index) in list'`,
-        forToken.loc.start.line,
-        forToken.loc.start.column,
-        forToken.loc.start.offset
-      );
-    }
-
-    const lhs = header.slice(0, inIndex).trim();
-    let rhs = header.slice(inIndex + 2).trim();
-
-    let key: string | null = null;
-    const keyInfo = findTopLevelKey(rhs);
-    if (keyInfo) {
-      key = keyInfo.keyExpr;
-      rhs = rhs.slice(0, keyInfo.index).trim();
-    }
-
-    const iterable = rhs;
-
-    let item = lhs;
+    let item = '';
     let index: string | null = null;
+    let iterable = '';
+    let key: string | null = null;
 
-    while (hasMatchingOuterParens(item)) {
-      item = item.slice(1, -1).trim();
+    let forAst: any = null;
+    try {
+      forAst = acorn.parseExpressionAt(header, 0, { ecmaVersion: 'latest' });
+    } catch {
+      forAst = null;
     }
 
-    const commaIdx = findTopLevelComma(item);
-    if (commaIdx !== -1) {
-      const firstPart = item.slice(0, commaIdx).trim();
-      index = item.slice(commaIdx + 1).trim() || null;
-      item = firstPart;
-      while (hasMatchingOuterParens(item)) {
-        item = item.slice(1, -1).trim();
+    if (forAst && forAst.type === 'BinaryExpression' && forAst.operator === 'in') {
+      if (forAst.left.type === 'SequenceExpression') {
+        const exprs = forAst.left.expressions;
+        if (exprs.length < 1 || exprs.length > 2) {
+          throw new DriftParserError(
+            `Invalid @for target bindings. Expected at most 2 variables (item, index).`,
+            forToken.loc.start.line,
+            forToken.loc.start.column,
+            forToken.loc.start.offset
+          );
+        }
+        item = header.slice(exprs[0].start, exprs[0].end).trim();
+        index = exprs.length === 2 ? header.slice(exprs[1].start, exprs[1].end).trim() : null;
+      } else {
+        item = header.slice(forAst.left.start, forAst.left.end).trim();
       }
-    }
 
-    if (!item || !iterable) {
-      throw new DriftParserError(
-        `Invalid @for header syntax '${forToken.value.trim()}'. Expected format: 'item in list' or '(item, index) in list'`,
-        forToken.loc.start.line,
-        forToken.loc.start.column,
-        forToken.loc.start.offset
-      );
+      iterable = header.slice(forAst.right.start, forAst.right.end).trim();
+
+      const remaining = header.slice(forAst.end).trim();
+      if (remaining.length > 0) {
+        if (remaining.startsWith('key ') || remaining.startsWith('key\t') || remaining.startsWith('key\n')) {
+          const keyRaw = remaining.slice(3).trim();
+          try {
+            const keyAst = acorn.parseExpressionAt(keyRaw, 0, { ecmaVersion: 'latest' });
+            key = keyRaw.slice(0, keyAst.end).trim();
+          } catch {
+            throw new DriftParserError(
+              `Invalid key expression in @for directive: '${keyRaw}'`,
+              forToken.loc.start.line,
+              forToken.loc.start.column,
+              forToken.loc.start.offset
+            );
+          }
+        } else {
+          throw new DriftParserError(
+            `Unexpected token '${remaining}' in @for header. Expected 'key <expression>' or block opening '{'.`,
+            forToken.loc.start.line,
+            forToken.loc.start.column,
+            forToken.loc.start.offset
+          );
+        }
+      }
+    } else {
+      let inIdx = -1;
+      let matchedParamsAst: any = null;
+
+      for (let i = 0; i < header.length - 1; i++) {
+        if (header[i] === 'i' && header[i + 1] === 'n') {
+          const before = i === 0 || !/[a-zA-Z0-9_$]/.test(header[i - 1]!);
+          const after = i + 2 >= header.length || !/[a-zA-Z0-9_$]/.test(header[i + 2]!);
+          if (before && after) {
+            const candidateLhs = header.slice(0, i).trim();
+            const wrappedLhs = candidateLhs.startsWith('(') && candidateLhs.endsWith(')')
+              ? candidateLhs
+              : `(${candidateLhs})`;
+            try {
+              const arrowFnAst: any = acorn.parseExpressionAt(`${wrappedLhs} => {}`, 0, { ecmaVersion: 'latest' });
+              if (arrowFnAst && arrowFnAst.type === 'ArrowFunctionExpression') {
+                inIdx = i;
+                matchedParamsAst = arrowFnAst.params;
+                break;
+              }
+            } catch {
+              // Try next boundary
+            }
+          }
+        }
+      }
+
+      if (inIdx === -1 || !matchedParamsAst) {
+        throw new DriftParserError(
+          `Invalid @for header syntax '${forToken.value.trim()}'. Expected format: 'item in list' or '(item, index) in list'`,
+          forToken.loc.start.line,
+          forToken.loc.start.column,
+          forToken.loc.start.offset
+        );
+      }
+
+      const lhs = header.slice(0, inIdx).trim();
+      const rhs = header.slice(inIdx + 2).trim();
+
+      if (matchedParamsAst.length === 1) {
+        let rawItem = lhs;
+        while (hasMatchingOuterParens(rawItem)) rawItem = rawItem.slice(1, -1).trim();
+        item = rawItem;
+      } else if (matchedParamsAst.length === 2) {
+        let unwrapped = lhs;
+        while (hasMatchingOuterParens(unwrapped)) unwrapped = unwrapped.slice(1, -1).trim();
+        const comma = unwrapped.lastIndexOf(',');
+        item = unwrapped.slice(0, comma).trim();
+        index = unwrapped.slice(comma + 1).trim();
+      } else {
+        throw new DriftParserError(
+          `Invalid @for target bindings. Expected at most 2 variables (item, index).`,
+          forToken.loc.start.line,
+          forToken.loc.start.column,
+          forToken.loc.start.offset
+        );
+      }
+
+      try {
+        const iterAst = acorn.parseExpressionAt(rhs, 0, { ecmaVersion: 'latest' });
+        iterable = rhs.slice(0, iterAst.end).trim();
+        const remaining = rhs.slice(iterAst.end).trim();
+        if (remaining.length > 0) {
+          if (remaining.startsWith('key ') || remaining.startsWith('key\t') || remaining.startsWith('key\n')) {
+            const keyRaw = remaining.slice(3).trim();
+            const keyAst = acorn.parseExpressionAt(keyRaw, 0, { ecmaVersion: 'latest' });
+            key = keyRaw.slice(0, keyAst.end).trim();
+          } else {
+            throw new DriftParserError(
+              `Unexpected token '${remaining}' in @for header. Expected 'key <expression>' or block opening '{'.`,
+              forToken.loc.start.line,
+              forToken.loc.start.column,
+              forToken.loc.start.offset
+            );
+          }
+        }
+      } catch (err: any) {
+        if (err instanceof DriftParserError) throw err;
+        throw new DriftParserError(
+          `Invalid @for iterable expression in '${forToken.value.trim()}'`,
+          forToken.loc.start.line,
+          forToken.loc.start.column,
+          forToken.loc.start.offset
+        );
+      }
     }
 
     const body: TemplateChildNode[] = [];
@@ -609,6 +649,126 @@ export class DriftParser {
       discriminant,
       cases,
       loc: { start: startLoc, end: endBlockToken.loc.end },
+    };
+  }
+
+  private parseAsyncDirective(): AsyncNode {
+    const asyncToken = this.consume(TokenType.DirectiveAsync, 'Expected @async directive');
+    const startLoc = asyncToken.loc.start;
+    let header = asyncToken.value.trim();
+
+    while (hasMatchingOuterParens(header)) {
+      header = header.slice(1, -1).trim();
+    }
+
+    let promiseAst: any = null;
+    try {
+      promiseAst = acorn.parseExpressionAt(header, 0, { ecmaVersion: 'latest' });
+    } catch {
+      throw new DriftParserError(
+        `Invalid @async header syntax '${asyncToken.value.trim()}'. Expected format: '@async <promise> as <alias>'`,
+        asyncToken.loc.start.line,
+        asyncToken.loc.start.column,
+        asyncToken.loc.start.offset
+      );
+    }
+
+    const promise = header.slice(0, promiseAst.end).trim();
+    const remaining = header.slice(promiseAst.end).trim();
+
+    let alias = 'data';
+    if (remaining.length > 0) {
+      if (remaining.startsWith('as ') || remaining.startsWith('as\t') || remaining.startsWith('as\n')) {
+        alias = remaining.slice(2).trim();
+        while (hasMatchingOuterParens(alias)) {
+          alias = alias.slice(1, -1).trim();
+        }
+      } else {
+        throw new DriftParserError(
+          `Unexpected token '${remaining}' in @async header. Expected 'as <alias>'.`,
+          asyncToken.loc.start.line,
+          asyncToken.loc.start.column,
+          asyncToken.loc.start.offset
+        );
+      }
+    }
+
+    if (!promise || !alias) {
+      throw new DriftParserError(
+        `Invalid @async header syntax '${asyncToken.value.trim()}'. Expected format: '@async <promise> as <alias>'`,
+        asyncToken.loc.start.line,
+        asyncToken.loc.start.column,
+        asyncToken.loc.start.offset
+      );
+    }
+
+    const body: TemplateChildNode[] = [];
+    while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+      body.push(this.parseChild());
+    }
+    let endToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @async block');
+
+    let fallback: TemplateChildNode[] | null = null;
+    let catchBranch: CatchBranch | null = null;
+
+    while (!this.isAtEnd()) {
+      this.skipWhitespaceTokens();
+
+      if (this.check(TokenType.DirectiveFallback)) {
+        if (fallback !== null) {
+          const tok = this.peek();
+          throw new DriftParserError(
+            `Duplicate @fallback directive for @async block`,
+            tok.loc.start.line,
+            tok.loc.start.column,
+            tok.loc.start.offset
+          );
+        }
+        this.consume(TokenType.DirectiveFallback, 'Expected @fallback directive');
+        const fallbackBody: TemplateChildNode[] = [];
+        while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+          fallbackBody.push(this.parseChild());
+        }
+        endToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @fallback block');
+        fallback = fallbackBody;
+      } else if (this.check(TokenType.DirectiveCatch)) {
+        if (catchBranch !== null) {
+          const tok = this.peek();
+          throw new DriftParserError(
+            `Duplicate @catch directive for @async block`,
+            tok.loc.start.line,
+            tok.loc.start.column,
+            tok.loc.start.offset
+          );
+        }
+        const catchToken = this.consume(TokenType.DirectiveCatch, 'Expected @catch directive');
+        let errAlias = catchToken.value.trim() || 'error';
+        while (hasMatchingOuterParens(errAlias)) {
+          errAlias = errAlias.slice(1, -1).trim();
+        }
+        const catchBody: TemplateChildNode[] = [];
+        while (!this.check(TokenType.BlockClose) && !this.isAtEnd()) {
+          catchBody.push(this.parseChild());
+        }
+        endToken = this.consume(TokenType.BlockClose, 'Expected closing brace } for @catch block');
+        catchBranch = {
+          errorVar: errAlias,
+          body: catchBody,
+          loc: { start: catchToken.loc.start, end: endToken.loc.end },
+        };
+      } else {
+        break;
+      }
+    }
+
+    return {
+      type: ASTNodeType.Async,
+      promise,
+      alias,
+      body,
+      fallback,
+      catchBranch,
+      loc: { start: startLoc, end: endToken.loc.end },
     };
   }
 

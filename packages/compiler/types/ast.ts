@@ -14,6 +14,7 @@ export const ASTNodeType = {
   If: 'If',
   For: 'For',
   Switch: 'Switch',
+  Async: 'Async',
 } as const;
 
 export type ASTNodeType = typeof ASTNodeType[keyof typeof ASTNodeType];
@@ -73,6 +74,21 @@ export interface SwitchNode extends BaseASTNode {
   readonly cases: readonly CaseBranch[];
 }
 
+export interface CatchBranch {
+  readonly errorVar: string;
+  readonly body: readonly TemplateChildNode[];
+  readonly loc: SourceRange;
+}
+
+export interface AsyncNode extends BaseASTNode {
+  readonly type: typeof ASTNodeType.Async;
+  readonly promise: string | AcornNode;
+  readonly alias: string;
+  readonly body: readonly TemplateChildNode[];
+  readonly fallback: readonly TemplateChildNode[] | null;
+  readonly catchBranch: CatchBranch | null;
+}
+
 export interface ElementNode extends BaseASTNode {
   readonly type: typeof ASTNodeType.Element;
   readonly tagName: string;
@@ -81,7 +97,15 @@ export interface ElementNode extends BaseASTNode {
   readonly isSelfClosing: boolean;
 }
 
-export type TemplateChildNode = ElementNode | TextNode | InterpolationNode | CommentNode | IfNode | ForNode | SwitchNode;
+export type TemplateChildNode =
+  | ElementNode
+  | TextNode
+  | InterpolationNode
+  | CommentNode
+  | IfNode
+  | ForNode
+  | SwitchNode
+  | AsyncNode;
 
 export interface ProgramNode extends BaseASTNode {
   readonly type: typeof ASTNodeType.Program;
@@ -126,6 +150,10 @@ export interface TemplateASTVisitor {
   ) => TemplateChildNode | TemplateChildNode[] | null | void;
   Switch?: (
     node: SwitchNode,
+    parent: TemplateChildNode | ProgramNode | null
+  ) => TemplateChildNode | TemplateChildNode[] | null | void;
+  Async?: (
+    node: AsyncNode,
     parent: TemplateChildNode | ProgramNode | null
   ) => TemplateChildNode | TemplateChildNode[] | null | void;
   Attribute?: (

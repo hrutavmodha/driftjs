@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { DriftServerVM, renderToString } from '../src/index.js';
+import { describe, it, expect, vi } from 'vitest';
+import { DriftServerVM, renderToString, renderToStream } from '../src/index.js';
 import { Opcode, type CompiledModule, compile } from 'driftjs-compiler';
 
 describe('DriftServerVM (SSR Engine)', () => {
@@ -316,5 +316,252 @@ describe('DriftServerVM (SSR Engine)', () => {
     expect(serverEffectRan).toBe(false);
 
     delete (globalThis as any).__server_side_effect__;
+  });
+
+  describe('Streaming SSR (renderToStream)', () => {
+    async function readAllStream(stream: ReadableStream<Uint8Array>): Promise<string> {
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let result = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        result += decoder.decode(value, { stream: true });
+      }
+      result += decoder.decode();
+      return result;
+    }
+
+    it('streams shell instantly with fallback and out-of-order resolved template chunks', async () => {
+      let resolveUser!: (val: any) => void;
+      const userPromise = new Promise((res) => {
+        resolveUser = res;
+      });
+
+      const sfc = `
+        <div class="app">
+          <h1>Dashboard</h1>
+          @async userPromise as user {
+            <div class="user-card">Welcome, {user.name}!</div>
+          } @fallback {
+            <div class="skeleton">Loading user...</div>
+          }
+        </div>
+      `;
+
+      const compiled = compile(sfc);
+      let shellReady = false;
+      let allReady = false;
+
+      const stream = renderToStream(compiled, {
+        scope: { userPromise },
+        onShellReady: () => {
+          shellReady = true;
+        },
+        onAllReady: () => {
+          allReady = true;
+        },
+      });
+
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+
+      // Read initial shell chunk
+      const firstChunk = await reader.read();
+      expect(firstChunk.done).toBe(false);
+      const shellHtml = decoder.decode(firstChunk.value);
+
+      expect(shellReady).toBe(true);
+      expect(shellHtml).toContain('<h1>Dashboard</h1>');
+      expect(shellHtml).toContain('<!--drift-async:');
+      expect(shellHtml).toContain('<div class="skeleton">Loading user...</div>');
+      expect(shellHtml).toContain('function __drift_swap(');
+
+      // Resolve the promise
+      resolveUser({ name: 'Alice' });
+
+      // Read async resolved chunk
+      const secondChunk = await reader.read();
+      expect(secondChunk.done).toBe(false);
+      const asyncHtml = decoder.decode(secondChunk.value);
+
+      expect(asyncHtml).toContain('<template id="drift-t-');
+      expect(asyncHtml).toContain('<div class="user-card">Welcome, Alice!</div>');
+      expect(asyncHtml).toContain('__drift_swap(');
+
+      // End of stream
+      const endChunk = await reader.read();
+      expect(endChunk.done).toBe(true);
+      expect(allReady).toBe(true);
+    });
+
+    it('streams multiple async boundaries resolving out-of-order', async () => {
+      let resolveSlow!: (val: any) => void;
+      let resolveFast!: (val: any) => void;
+
+      const slowPromise = new Promise((res) => {
+        resolveSlow = res;
+      });
+      const fastPromise = new Promise((res) => {
+        resolveFast = res;
+      });
+
+      const sfc = `
+        <div>
+          @async slowPromise as slow {
+            <p id="slow">{slow}</p>
+          } @fallback {
+            <p id="slow-loading">Loading slow...</p>
+          }
+
+          @async fastPromise as fast {
+            <p id="fast">{fast}</p>
+          } @fallback {
+            <p id="fast-loading">Loading fast...</p>
+          }
+        </div>
+      `;
+
+      const compiled = compile(sfc);
+      const stream = renderToStream(compiled, {
+        scope: { slowPromise, fastPromise },
+      });
+
+      const chunks: string[] = [];
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+
+      // Read shell
+      const shellChunk = await reader.read();
+      chunks.push(decoder.decode(shellChunk.value));
+
+      // Resolve fast FIRST
+      resolveFast('Fast Data');
+
+      const fastChunk = await reader.read();
+      chunks.push(decoder.decode(fastChunk.value));
+      expect(chunks[1]).toContain('Fast Data');
+
+      // Resolve slow SECOND
+      resolveSlow('Slow Data');
+
+      const slowChunk = await reader.read();
+      chunks.push(decoder.decode(slowChunk.value));
+      expect(chunks[2]).toContain('Slow Data');
+
+      const finalChunk = await reader.read();
+      expect(finalChunk.done).toBe(true);
+    });
+
+    it('handles @catch branch upon promise rejection in streaming SSR', async () => {
+      let rejectPromise!: (reason?: any) => void;
+      const failingPromise = new Promise((_, reject) => {
+        rejectPromise = reject;
+      });
+      const onError = vi.fn();
+
+      const sfc = `
+        <div>
+          @async failingPromise as data {
+            <div>{data}</div>
+          } @fallback {
+            <div>Connecting...</div>
+          } @catch err {
+            <div class="error-banner">Error: {err.message}</div>
+          }
+        </div>
+      `;
+
+      const compiled = compile(sfc);
+      const stream = renderToStream(compiled, {
+        scope: { failingPromise },
+        onError,
+      });
+
+      rejectPromise(new Error('Database offline'));
+
+      const fullHtml = await readAllStream(stream);
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(fullHtml).toContain('Connecting...');
+      expect(fullHtml).toContain('Error: Database offline');
+      expect(fullHtml).toContain('__drift_swap(');
+    });
+
+    it('supports Node.js Writable pipe() method', async () => {
+      const userPromise = Promise.resolve({ username: 'john_doe' });
+
+      const sfc = `
+        <div>
+          @async userPromise as u {
+            <span>User: {u.username}</span>
+          }
+        </div>
+      `;
+
+      const compiled = compile(sfc);
+      const stream = renderToStream(compiled, {
+        scope: { userPromise },
+      });
+
+      let writtenOutput = '';
+      const fakeNodeResponse = {
+        write(chunk: Uint8Array) {
+          writtenOutput += Buffer.from(chunk).toString('utf-8');
+        },
+        end() {
+          // finished
+        },
+      };
+
+      stream.pipe(fakeNodeResponse);
+
+      // Wait for resolution
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(writtenOutput).toContain('User: john_doe');
+      expect(writtenOutput).toContain('__drift_swap(');
+    });
+
+    it('applies CSP nonce to inline scripts when provided in StreamOptions', async () => {
+      const dataPromise = Promise.resolve('Secure Data');
+
+      const sfc = `
+        <div>
+          @async dataPromise as d {
+            <span>{d}</span>
+          }
+        </div>
+      `;
+
+      const compiled = compile(sfc);
+      const stream = renderToStream(compiled, {
+        scope: { dataPromise },
+        nonce: 'secret-nonce-123',
+      });
+
+      const output = await readAllStream(stream);
+      expect(output).toContain('script nonce="secret-nonce-123"');
+    });
+
+    it('synchronous renderToString falls back gracefully if promise is unresolved', () => {
+      const pendingPromise = new Promise(() => {});
+
+      const sfc = `
+        <div>
+          @async pendingPromise as p {
+            <p>{p}</p>
+          } @fallback {
+            <p>Fallback Content</p>
+          }
+        </div>
+      `;
+
+      const compiled = compile(sfc);
+      const html = renderToString(compiled, { scope: { pendingPromise } });
+
+      expect(html).toContain('Fallback Content');
+      expect(html).toContain('<!--drift-async:');
+    });
   });
 });

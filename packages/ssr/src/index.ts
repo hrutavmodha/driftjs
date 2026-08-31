@@ -7,6 +7,7 @@ import {
   pushActiveVM,
   popActiveVM,
   populateItemScope,
+  populateAsyncScope,
   resolveIterable,
   VOID_ELEMENTS,
   createContext,
@@ -19,7 +20,7 @@ import {
   onUnmount,
   type Context,
 } from "driftjs-shared";
-import type { SSRExecutionOptions, ServerNode } from "../types/index.js";
+import type { SSRExecutionOptions, StreamOptions, DriftStream, ServerNode } from "../types/index.js";
 
 export * from "../types/index.js";
 export {
@@ -59,9 +60,19 @@ export class DriftServerVM {
   private readonly registers: ServerNode[] = new Array(DriftServerVM.MAX_REGISTERS);
   private scope: Record<string, any> = {};
   private declaredVars: Set<string> = new Set();
-
   public parentVM: DriftServerVM | null = null;
   public contextMap = new Map<symbol | string, any>();
+  public asyncBoundaries: Array<{
+    id: number;
+    promise: any;
+    alias: string;
+    bodyMod: any;
+    fallbackMod: any;
+    catchMod: any;
+    scope: any;
+  }> = [];
+  public isStreaming = false;
+  private static nextAsyncId = 1;
 
   private checkRegister(index: number): void {
     if (index < 0 || index >= DriftServerVM.MAX_REGISTERS) {
@@ -334,6 +345,71 @@ export class DriftServerVM {
           break;
         }
 
+        case Opcode.REACTIVE_ASYNC: {
+          const parentReg = bytecode[pc + 1]!;
+          const promiseIdx = bytecode[pc + 2]!;
+          const aliasIdx = bytecode[pc + 3]!;
+          const bodyIdx = bytecode[pc + 4]!;
+          const fallbackIdx = bytecode[pc + 5]!;
+          const catchIdx = bytecode[pc + 6]!;
+
+          const parentNode = this.getRegister(parentReg);
+          const promiseExpr = constants[promiseIdx];
+          const alias = constants[aliasIdx] as string;
+          const bodyMod = constants[bodyIdx];
+          const fallbackMod = fallbackIdx !== 0xFF ? constants[fallbackIdx] : null;
+          const catchMod = catchIdx !== 0xFF ? constants[catchIdx] : null;
+
+          const rawPromise = evaluateExpression(promiseExpr, this.scope, this.declaredVars);
+          const boundaryId = DriftServerVM.nextAsyncId++;
+
+          if (this.isStreaming) {
+            parentNode.children.push({ type: 'comment', content: `drift-async:${boundaryId}`, children: [] });
+            if (fallbackMod) {
+              const childScope = Object.create(this.scope);
+              const subVm = new DriftServerVM();
+              subVm.parentVM = this;
+              subVm.isStreaming = true;
+              const subResult = subVm.execute(fallbackMod, { scope: childScope });
+              if (subResult) parentNode.children.push(subResult);
+            }
+            parentNode.children.push({ type: 'comment', content: `/drift-async:${boundaryId}`, children: [] });
+
+            this.asyncBoundaries.push({
+              id: boundaryId,
+              promise: rawPromise,
+              alias,
+              bodyMod,
+              fallbackMod,
+              catchMod,
+              scope: this.scope,
+            });
+          } else {
+            if (rawPromise && typeof rawPromise.then === 'function') {
+              parentNode.children.push({ type: 'comment', content: `drift-async:${boundaryId}`, children: [] });
+              if (fallbackMod) {
+                const childScope = Object.create(this.scope);
+                const subVm = new DriftServerVM();
+                subVm.parentVM = this;
+                const subResult = subVm.execute(fallbackMod, { scope: childScope });
+                if (subResult) parentNode.children.push(subResult);
+              }
+              parentNode.children.push({ type: 'comment', content: `/drift-async:${boundaryId}`, children: [] });
+            } else {
+              parentNode.children.push({ type: 'comment', content: `drift-async:${boundaryId}`, children: [] });
+              const childScope = Object.create(this.scope);
+              populateAsyncScope(childScope, alias, rawPromise);
+              const subVm = new DriftServerVM();
+              subVm.parentVM = this;
+              const subResult = subVm.execute(bodyMod, { scope: childScope });
+              if (subResult) parentNode.children.push(subResult);
+              parentNode.children.push({ type: 'comment', content: `/drift-async:${boundaryId}`, children: [] });
+            }
+          }
+          pc += 8;
+          break;
+        }
+
         default:
           throw new Error(`DriftServerVM: Unknown Opcode ${opcode} at PC ${pc}`);
       }
@@ -420,3 +496,164 @@ export function renderToString(component: CompiledModule, options: SSRExecutionO
   const rootNode = vm.execute(component, options);
   return rootNode ? serializeNode(rootNode) : '';
 }
+
+/**
+ * Renders a compiled Drift component to a WHATWG ReadableStream with Node.js .pipe() support.
+ */
+export function renderToStream(
+  component: CompiledModule,
+  options: StreamOptions = {}
+): DriftStream {
+  let isAborted = false;
+  let timerId: any = null;
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const encoder = new TextEncoder();
+
+      const pushChunk = (html: string) => {
+        if (isAborted) return;
+        controller.enqueue(encoder.encode(html));
+      };
+
+      const closeStream = () => {
+        if (isAborted) return;
+        if (timerId) clearTimeout(timerId);
+        try {
+          controller.close();
+        } catch (err) {
+          console.debug("[DriftJS SSR] Stream controller already closed:", err);
+        }
+        options.onAllReady?.();
+      };
+
+      try {
+        const vm = new DriftServerVM();
+        vm.isStreaming = true;
+        const rootNode = vm.execute(component, options);
+        let shellHtml = rootNode ? serializeNode(rootNode) : '';
+
+        const boundaries = vm.asyncBoundaries;
+
+        if (boundaries.length > 0) {
+          const nonceAttr = options.nonce ? ` nonce="${escapeHtml(options.nonce)}"` : '';
+          const swapScript = `<script${nonceAttr}>function __drift_swap(d,t){var e=document.getElementById(t);if(!e)return;var w=document.createTreeWalker(document.body,128,null),s=null,k=null;while(w.nextNode()){var c=w.currentNode;if(c.nodeValue==='drift-async:'+d)s=c;else if(c.nodeValue==='/drift-async:'+d){k=c;break;}}if(s&&k&&s.parentNode){var p=s.parentNode,r=s.nextSibling;while(r&&r!==k){var n=r.nextSibling;p.removeChild(r);r=n;}p.insertBefore(e.content,k);e.remove();}}</script>`;
+          shellHtml += swapScript;
+        }
+
+        pushChunk(shellHtml);
+        options.onShellReady?.();
+
+        if (boundaries.length === 0) {
+          closeStream();
+          return;
+        }
+
+        if (options.timeoutMs && options.timeoutMs > 0) {
+          timerId = setTimeout(() => {
+            if (!isAborted) {
+              const timeoutErr = new Error(`[DriftJS] renderToStream timed out after ${options.timeoutMs}ms`);
+              options.onError?.(timeoutErr);
+              closeStream();
+            }
+          }, options.timeoutMs);
+        }
+
+        let pendingCount = boundaries.length;
+
+        for (const boundary of boundaries) {
+          const { id, promise, alias, bodyMod, catchMod, scope } = boundary;
+          Promise.resolve(promise)
+            .then((resolvedVal) => {
+              if (isAborted) return;
+              const childScope = Object.create(scope);
+              populateAsyncScope(childScope, alias, resolvedVal);
+
+              const subVm = new DriftServerVM();
+              const resultNode = subVm.execute(bodyMod, { scope: childScope });
+              const bodyHtml = resultNode ? serializeNode(resultNode) : '';
+
+              const nonceAttr = options.nonce ? ` nonce="${escapeHtml(options.nonce)}"` : '';
+              const chunk = `<template id="drift-t-${id}">${bodyHtml}</template><script${nonceAttr}>__drift_swap("${id}","drift-t-${id}")</script>`;
+              pushChunk(chunk);
+            })
+            .catch((err) => {
+              if (isAborted) return;
+              options.onError?.(err);
+
+              if (catchMod) {
+                const childScope = Object.create(scope);
+                if (catchMod.errorVar) {
+                  populateAsyncScope(childScope, catchMod.errorVar, err);
+                }
+                const subVm = new DriftServerVM();
+                const resultNode = subVm.execute(catchMod.module, { scope: childScope });
+                const catchHtml = resultNode ? serializeNode(resultNode) : '';
+
+                const nonceAttr = options.nonce ? ` nonce="${escapeHtml(options.nonce)}"` : '';
+                const chunk = `<template id="drift-t-${id}">${catchHtml}</template><script${nonceAttr}>__drift_swap("${id}","drift-t-${id}")</script>`;
+                pushChunk(chunk);
+              }
+            })
+            .finally(() => {
+              pendingCount--;
+              if (pendingCount === 0) {
+                closeStream();
+              }
+            });
+        }
+      } catch (err) {
+        options.onError?.(err);
+        controller.error(err);
+      }
+    },
+    cancel(reason) {
+      isAborted = true;
+      if (timerId) clearTimeout(timerId);
+    },
+  });
+
+  const driftStream = stream as DriftStream;
+
+  driftStream.abort = (reason?: any) => {
+    isAborted = true;
+    if (timerId) clearTimeout(timerId);
+    try {
+      driftStream.cancel(reason);
+    } catch (err) {
+      console.debug("[DriftJS SSR] Stream abort cancel error:", err);
+    }
+  };
+
+  driftStream.pipe = function <T>(destination: T): T {
+    const reader = stream.getReader();
+    const dest = destination as any;
+
+    async function pump() {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            if (typeof dest.end === 'function') {
+              dest.end();
+            }
+            break;
+          }
+          if (typeof dest.write === 'function') {
+            dest.write(Buffer.from(value));
+          }
+        }
+      } catch (err) {
+        if (typeof dest.destroy === 'function') {
+          dest.destroy(err);
+        }
+      }
+    }
+
+    pump();
+    return destination;
+  };
+
+  return driftStream;
+}
+

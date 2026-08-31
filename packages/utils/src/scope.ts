@@ -201,3 +201,15 @@ function parseDefaultValue(defStr: string, scope?: Record<string, any>): any {
   }
 }
 
+/**
+ * Populates scope for @async resolution, supporting identifier and destructuring patterns.
+ */
+export function populateAsyncScope(
+  scope: Record<string, any>,
+  aliasName: string,
+  resolvedVal: any
+): void {
+  populateItemScope(scope, aliasName, resolvedVal, null, 0);
+}
+
+

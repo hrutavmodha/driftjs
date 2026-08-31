@@ -89,6 +89,26 @@ describe('DriftGenerator', () => {
     expect(module.bytecode).toContain(Opcode.REACTIVE_IF);
   });
 
+  it('generates REACTIVE_ASYNC opcode for @async directives with sub-modules', () => {
+    const src = `
+      @async loadUser(userId) as user {
+        <h1>{user.name}</h1>
+      } @fallback {
+        <p>Loading...</p>
+      } @catch err {
+        <p class="error">{err.message}</p>
+      }
+    `;
+    const module = compile(src);
+
+    expect(module.bytecode).toContain(Opcode.REACTIVE_ASYNC);
+    const asyncIdx = module.bytecode.indexOf(Opcode.REACTIVE_ASYNC);
+    expect(asyncIdx).toBeGreaterThan(-1);
+
+    // Operands: parentReg, promiseIdx, aliasIdx, bodyIdx, fallbackIdx, catchIdx, depsIdx
+    expect(module.bytecode.length).toBeGreaterThan(asyncIdx + 7);
+  });
+
   it('works end-to-end via compile() function', () => {
     const template = `
       <ul>

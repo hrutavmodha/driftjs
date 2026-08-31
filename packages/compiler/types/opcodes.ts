@@ -18,6 +18,8 @@ export enum Opcode {
   REACTIVE_FOR = 0x0E,
   /** Mounts a child Single File Component (SFC) into a register. */
   MOUNT_COMPONENT = 0x0F,
+  /** Reactive async block: suspends and streams subtree when promise resolves or rejects. */
+  REACTIVE_ASYNC = 0x10,
 }
 
 /**

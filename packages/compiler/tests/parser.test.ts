@@ -417,5 +417,67 @@ describe('DriftParser', () => {
     const text = span.children[0] as TextNode;
     expect(text.content).toBe('© ® ™ ∞ ∑ ∏ √ € £ ¥ α β ω — …');
   });
+
+  describe('@async Directives', () => {
+    it('parses @async directive with promise and alias', () => {
+      const src = `
+        @async fetchUser(id) as user {
+          <div>{user.name}</div>
+        }
+      `;
+      const ast = new DriftParser(new DriftLexer(src)).parse();
+      const asyncNode = ast.body.find((n: any) => n.type === ASTNodeType.Async) as any;
+      expect(asyncNode).toBeDefined();
+      expect(asyncNode.promise).toBe('fetchUser(id)');
+      expect(asyncNode.alias).toBe('user');
+      const divNode = asyncNode.body.find((n: any) => n.type === ASTNodeType.Element);
+      expect(divNode).toBeDefined();
+      expect(divNode.tagName).toBe('div');
+      expect(asyncNode.fallback).toBeNull();
+      expect(asyncNode.catchBranch).toBeNull();
+    });
+
+    it('parses @async with @fallback and @catch blocks', () => {
+      const src = `
+        @async fetchUser({ id: 101, token: 'secret' }) as { name, email } {
+          <div class="user-card">
+            <h1>{name}</h1>
+            <p>{email}</p>
+          </div>
+        }
+        @fallback {
+          <div class="skeleton">Loading...</div>
+        }
+        @catch err {
+          <div class="error">{err.message}</div>
+        }
+      `;
+      const ast = new DriftParser(new DriftLexer(src)).parse();
+      const asyncNode = ast.body.find((n: any) => n.type === ASTNodeType.Async) as any;
+      expect(asyncNode).toBeDefined();
+      expect(asyncNode.promise).toBe("fetchUser({ id: 101, token: 'secret' })");
+      expect(asyncNode.alias).toBe('{ name, email }');
+      const fallbackDiv = asyncNode.fallback.find((n: any) => n.type === ASTNodeType.Element);
+      expect(fallbackDiv).toBeDefined();
+      expect(fallbackDiv.tagName).toBe('div');
+      expect(asyncNode.catchBranch).toBeDefined();
+      expect(asyncNode.catchBranch.errorVar).toBe('err');
+      const catchDiv = asyncNode.catchBranch.body.find((n: any) => n.type === ASTNodeType.Element);
+      expect(catchDiv).toBeDefined();
+      expect(catchDiv.tagName).toBe('div');
+    });
+
+    it('throws on duplicate @fallback blocks', () => {
+      const src = `
+        @async loadData() as data {
+          <p>{data}</p>
+        }
+        @fallback { <span>Loading 1</span> }
+        @fallback { <span>Loading 2</span> }
+      `;
+      expect(() => new DriftParser(new DriftLexer(src)).parse()).toThrow('Duplicate @fallback');
+    });
+  });
 });
+
 

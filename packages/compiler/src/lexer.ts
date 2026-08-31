@@ -81,7 +81,7 @@ export function isRawTextTagName(tagName: string): tagName is RawTextTagName {
   return tagName === 'script' || tagName === 'style';
 }
 
-const KNOWN_DIRECTIVES = new Set(['if', 'else', 'for', 'switch', 'case', 'default']);
+const KNOWN_DIRECTIVES = new Set(['if', 'else', 'for', 'switch', 'case', 'default', 'async', 'fallback', 'catch']);
 
 const REGEX_PRECEDING_KEYWORDS = new Set([
   'return',
@@ -264,6 +264,24 @@ export class DriftLexer {
       return this.readDirectiveHeader(startLoc, TokenType.DirectiveSwitch);
     } else if (name === 'case') {
       return this.readDirectiveHeader(startLoc, TokenType.DirectiveCase);
+    } else if (name === 'async') {
+      return this.readDirectiveHeader(startLoc, TokenType.DirectiveAsync);
+    } else if (name === 'catch') {
+      return this.readDirectiveHeader(startLoc, TokenType.DirectiveCatch);
+    } else if (name === 'fallback') {
+      this.skipWhitespace();
+      if (this.peek() === '{') {
+        this.advance();
+        this.blockDepth++;
+        this.blockElementDepthStack.push(this.elementDepth);
+        return this.createToken(TokenType.DirectiveFallback, '', startLoc);
+      }
+      throw new DriftLexerError(
+        `Expected '{' after @fallback directive`,
+        startLoc.line,
+        startLoc.column,
+        startLoc.offset
+      );
     } else {
       this.skipWhitespace();
       if (this.peek() === '{') {
@@ -401,7 +419,8 @@ export class DriftLexer {
       }
 
       if (ch === '{') {
-        if (parenDepth === 0 && bracketDepth === 0 && braceDepth === 0 && templateStack.length === 0) {
+        const isPatternStart = /\b(as|catch)\s*$/.test(headerContent);
+        if (!isPatternStart && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0 && templateStack.length === 0) {
           this.blockDepth++;
           this.blockElementDepthStack.push(this.elementDepth);
           return this.createToken(type, headerContent.trim(), startLoc);

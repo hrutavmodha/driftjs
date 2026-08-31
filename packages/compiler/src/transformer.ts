@@ -10,6 +10,7 @@ import type {
   IfNode,
   ForNode,
   SwitchNode,
+  AsyncNode,
   TemplateASTVisitor,
 } from '../types/index.js';
 import {
@@ -120,6 +121,24 @@ export function traverseTemplateAST<T extends ProgramNode | TemplateChildNode>(
         }
         break;
       }
+      case ASTNodeType.Async: {
+        const newBody = visitChildren(current.body, current);
+        const newFallback = current.fallback ? visitChildren(current.fallback, current) : null;
+        let newCatchBranch = current.catchBranch;
+        if (current.catchBranch) {
+          newCatchBranch = {
+            ...current.catchBranch,
+            body: visitChildren(current.catchBranch.body, current),
+          };
+        }
+        current = {
+          ...current,
+          body: newBody,
+          fallback: newFallback,
+          catchBranch: newCatchBranch,
+        };
+        break;
+      }
     }
 
     // 4. leave hook
@@ -217,6 +236,15 @@ export class DriftTransformer {
             typeof node.key === 'string' && node.key.trim().length > 0
               ? acorn.parseExpressionAt(node.key, 0, { ecmaVersion: 'latest' })
               : (node.key ?? null),
+        };
+      },
+      Async: (node) => {
+        return {
+          ...node,
+          promise:
+            typeof node.promise === 'string' && node.promise.trim().length > 0
+              ? acorn.parseExpressionAt(node.promise, 0, { ecmaVersion: 'latest' })
+              : node.promise,
         };
       },
     });

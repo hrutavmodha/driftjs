@@ -1,8 +1,8 @@
 <div align="center">
   <h1>⚡ DriftJS</h1>
   <p>
-    <strong>Ultra-Fast, Register-Based Bytecode Virtual Machine UI Framework</strong><br />
-    <em>Zero Virtual DOM Overhead • Expression Engine • Keyed LIS Reconciliation • Built for Speed</em>
+    <strong>Register-Based Bytecode Virtual Machine UI Framework</strong><br />
+    <em>256-Register Virtual Machine • AOT Bytecode Stream • Comment-Anchored Reactive Regions • Zero Virtual DOM</em>
   </p>
   <br />
   <img src="packages/vscode-plugin/assets/icon.png" alt="DriftJS Logo" width="180" />
@@ -20,28 +20,18 @@ Connect with core developers, ask questions, share feedback, and help shape the 
 
 ## 📌 Overview
 
-**DriftJS** is a next-generation frontend framework powered by an in-browser **register-based Bytecode Virtual Machine (VM)**.
+**DriftJS** is a frontend UI framework powered by an in-browser **register-based Bytecode Virtual Machine (VM)**.
 
 Unlike traditional Virtual DOM frameworks (e.g., React) that re-evaluate large tree structures or compiler-only reactive frameworks (e.g., Svelte), DriftJS compiles `.drift` single-file templates into compact binary-serializable bytecode streams (`CompiledModule`). At runtime, a lightweight 256-register VM executes these instructions directly against the DOM with minimal memory allocation and surgical updates.
-
-> [!NOTE]
-> DriftJS is currently an **experimental prototype** exploring register-based Virtual Machine execution for web UI. While single-template bytecode compilation, expression evaluation, and basic keyed LIS list reconciliation are implemented and passing test suites:
->
-> - **Current Limitations**: Component composition/nesting, props passing, routing, state management stores, SSR/hydration, and developer debugging tools are not yet implemented.
-> - **Under Active Design**: Complex JS syntax in directives, deep reactivity tracking, and robust compiler error recovery.
->
-> We warmly invite framework researchers, compiler engineers, and open-source contributors to collaborate with us on building out these features and advancing this experimental architecture into a production-grade framework!
 
 ---
 
 ## 🔥 Key Architectural Features
 
-- **⚡ High-Performance Expression Engine**: Evaluates JS expressions in scope with compiled functions for optimal runtime execution.
-- **⚡ Register-Based Virtual Machine**: Uses 256 fast virtual registers (`r0`, `r1`, ...) for DOM elements, text nodes, fragments, and evaluated primitive values.
-- **🔄 Keyed LIS Reconciliation**: Features a Longest Increasing Subsequence (LIS) list reconciler (`reconcileKeyedList`) that minimizes DOM node movements, insertions, and deletions.
-- **🎯 Fast-Path Attribute Patching**: Re-evaluates element attributes in-place without rebuilding DOM subtrees when data object references remain stable.
-- **📍 Fine-Grained Reactive Regions**: HTML comment anchors (`<!--if-->`, `<!--for-->`) visually bound `@if` and `@for` blocks, allowing surgical re-rendering of targeted regions without disturbing surrounding DOM elements.
-- **⚡ Vite Integration & Instant HMR**: Includes [`driftjs-vite-plugin`](packages/vite-plugin) for instant template compilation and full-reload HMR on file save.
+- **⚡ 256-Register Virtual Machine**: Executes a streamlined bytecode stream across dedicated register slots (`r0`–`r255`) for DOM elements, text nodes, and primitives—avoiding the overhead and memory churn of virtual DOM trees.
+- **📦 AOT Bytecode & Constant Pool Emission**: Compiles `.drift` Single File Components ahead-of-time into binary-like instruction streams and static constant pools, with reactive state dependencies mapped directly to bytecode program counters.
+- **📍 Comment-Anchored Reactive Regions**: Uses DOM comment boundaries (`<!--if-->`, `<!--for-->`) to isolate dynamic subtrees, enabling surgical, in-place updates without traversing or re-evaluating surrounding component trees.
+- **🔄 Unified Client & Server VM Execution**: The same compiled bytecode runs natively in the browser against the DOM (`driftjs-dom`) and headlessly on the server (`driftjs-ssr`), producing identical comment anchors for 1:1 SSR hydration.
 
 ---
 
@@ -66,13 +56,14 @@ DriftJS is organized as a monorepo published on npm:
 | Package                           | Path                                                | Description                                                                          |
 | :-------------------------------- | :-------------------------------------------------- | :----------------------------------------------------------------------------------- |
 | **`create-drift`**        | [`packages/cli`](packages/cli)                     | Interactive CLI scaffolding tool (`npm create drift`)                              |
-| **`driftjs-compiler`**    | [`packages/compiler`](packages/compiler)           | Lexer, Parser, Transformer, & Bytecode Generator emitting`CompiledModule` bytecode |
-| **`driftjs-dom`**         | [`packages/dom`](packages/dom)                     | 256-Register Client VM, Expression Engine, Keyed LIS reconciler, &`mount()` API    |
-| **`driftjs-ssr`**         | [`packages/ssr`](packages/ssr)                     | Headless Server-Side Rendering VM engine (`renderToString()`)                      |
-| **`driftjs-shared`**      | [`packages/utils`](packages/utils)                 | Shared Scope & Expression Evaluator engine                                           |
-| **`driftjs-vite-plugin`** | [`packages/vite-plugin`](packages/vite-plugin)     | Vite plugin transforming`.drift` SFCs into synthetic ESM modules                   |
-| **`driftjs-vscode`**      | [`packages/vscode-plugin`](packages/vscode-plugin) | VS Code Extension for`.drift` SFC syntax highlighting & diagnostics                |
-| **`template`**            | [`template`](template)                             | Starter project template with Vite, TypeScript, and`.drift` counter example        |
+| **`driftjs-compiler`**    | [`packages/compiler`](packages/compiler)           | Lexer, Parser, Transformer, & Bytecode Generator emitting `CompiledModule` bytecode |
+| **`driftjs-dom`**         | [`packages/dom`](packages/dom)                     | 256-Register Client VM, DOM reconciler, SSR hydration, & `mount()` API               |
+| **`driftjs-router`**      | [`packages/router`](packages/router)               | Client-side SPA routing engine with history drivers & matched route views           |
+| **`driftjs-ssr`**         | [`packages/ssr`](packages/ssr)                     | Headless Server-Side Rendering VM engine (`renderToString()`)                       |
+| **`driftjs-shared`**      | [`packages/utils`](packages/utils)                 | Shared Scope, Context API, and Expression Evaluator engine                          |
+| **`driftjs-vite-plugin`** | [`packages/vite-plugin`](packages/vite-plugin)     | Vite plugin transforming `.drift` SFCs into synthetic ESM modules                  |
+| **`driftjs-vscode`**      | [`packages/vscode-plugin`](packages/vscode-plugin) | VS Code Extension for `.drift` SFC syntax highlighting & diagnostics                |
+| **`template`**            | [`template`](template)                             | Starter project template with Vite, TypeScript, and `.drift` counter example         |
 
 ---
 
@@ -96,7 +87,7 @@ The compilation and execution workflow consists of 5 tightly decoupled stages:
 [ DriftGenerator ] ───► Emits 15-Opcode Bytecode Array, Constant Pool, & Reactive Bindings
    │
    ▼
-[ DriftClientVirtualMachine ] ──► Executes Bytecode via 256 Registers & Keyed LIS Reconciler
+[ DriftClientVM / DriftServerVM ] ──► Executes Bytecode via 256 Registers & Reactive Anchors
 ```
 
 ---

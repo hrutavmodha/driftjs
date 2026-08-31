@@ -9,6 +9,7 @@ import type {
   IfNode,
   ForNode,
   SwitchNode,
+  AsyncNode,
   CompiledModule,
   ReactiveBinding,
   DerivedBinding,
@@ -126,6 +127,9 @@ export class DriftGenerator {
         break;
       case ASTNodeType.For:
         this.compileForNode(node, parentReg);
+        break;
+      case ASTNodeType.Async:
+        this.compileAsyncNode(node as AsyncNode, parentReg);
         break;
     }
   }
@@ -434,6 +438,49 @@ export class DriftGenerator {
 
     // REACTIVE_FOR parentReg iterIdx itemNameIdx indexNameIdx keyIdx bodyIdx depsIdx
     this.emit(Opcode.REACTIVE_FOR, parentReg, iterIdx, itemNameIdx, indexNameIdx, keyIdx, bodyIdx, depsIdx);
+  }
+
+  private compileAsyncNode(node: AsyncNode, parentReg: number): void {
+    const bodyMod = this.compileNodesToSubModule(node.body);
+    const bodyIdx = this.addConstant(bodyMod);
+
+    const fallbackMod = node.fallback ? this.compileNodesToSubModule(node.fallback) : null;
+    const fallbackIdx = fallbackMod ? this.addConstant(fallbackMod) : 0xFF;
+
+    let catchIdx = 0xFF;
+    if (node.catchBranch) {
+      const catchMod = this.compileNodesToSubModule(node.catchBranch.body);
+      catchIdx = this.addConstant({
+        errorVar: node.catchBranch.errorVar,
+        module: catchMod,
+      });
+    }
+
+    const promiseIdx = this.addConstant(node.promise);
+    const aliasIdx = this.addConstant(node.alias);
+
+    const depsSet = new Set<string>();
+    for (const dep of this.collectDepsFromSubModule(bodyMod, node.promise)) {
+      depsSet.add(dep);
+    }
+    if (fallbackMod) {
+      for (const dep of this.collectDepsFromSubModule(fallbackMod)) {
+        depsSet.add(dep);
+      }
+    }
+    const depsIdx = this.addConstant(Array.from(depsSet));
+
+    // REACTIVE_ASYNC parentReg promiseIdx aliasIdx bodyIdx fallbackIdx catchIdx depsIdx
+    this.emit(
+      Opcode.REACTIVE_ASYNC,
+      parentReg,
+      promiseIdx,
+      aliasIdx,
+      bodyIdx,
+      fallbackIdx,
+      catchIdx,
+      depsIdx
+    );
   }
 
   private collectDeclaredVars(nodes: readonly TemplateChildNode[]): void {
