@@ -35,12 +35,12 @@ function hookClientVM(VMClass: any) {
     return origExecute.call(this, rawModule, options);
   };
 
-  const origPatch = VMClass.prototype.patchItemAttributes;
-  if (origPatch) {
-    VMClass.prototype.patchItemAttributes = function(bodyMod: any, childScope: any, rootNodes: any) {
+  const origUpdate = VMClass.prototype.updateRowRegisters;
+  if (origUpdate) {
+    VMClass.prototype.updateRowRegisters = function(bodyMod: any, childScope: any, registers: any, childRegions: any) {
       instantiateFunctionsRecursively(bodyMod);
       if (childScope) instantiateFunctionsRecursively(childScope);
-      return origPatch.call(this, bodyMod, childScope, rootNodes);
+      return origUpdate.call(this, bodyMod, childScope, registers, childRegions);
     };
   }
 }

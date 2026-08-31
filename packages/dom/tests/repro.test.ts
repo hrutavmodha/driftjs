@@ -61,7 +61,7 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     doc.body.removeChild(container2);
   });
 
-  it('patchItemAttributes updates input element "value" and "checked" DOM properties', () => {
+  it('updateRowRegisters updates input element "value" and "checked" DOM properties', () => {
     const doc = document;
     const vm = new DriftClientVM();
 
@@ -88,13 +88,13 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     expect(inputNode.checked).toBe(false);
 
     const updatedScope = { item: { text: 'Updated Text', done: true } };
-    vm.patchItemAttributes(bodyMod, updatedScope, inputNode);
+    vm.updateRowRegisters(bodyMod, updatedScope, (vm as any).registers);
 
     expect(inputNode.value).toBe('Updated Text');
     expect(inputNode.checked).toBe(true);
   });
 
-  it('patchItemAttributes does not apply child element attributes onto the root element', () => {
+  it('updateRowRegisters does not apply child element attributes onto the root element', () => {
     const doc = document;
     const vm = new DriftClientVM();
 
@@ -124,7 +124,7 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     expect(btn.className).toBe('btn-danger');
 
     const updatedScope = { item: { btnClass: 'btn-success' } };
-    vm.patchItemAttributes(bodyMod, updatedScope, rootLi);
+    vm.updateRowRegisters(bodyMod, updatedScope, (vm as any).registers);
 
     expect(rootLi.className).toBe('row');
   });
@@ -377,7 +377,7 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     expect(claimedIf.data.trim()).toBe('if');
   });
 
-  it('patchItemAttributes targets correct DOM element when sibling elements are preceded by comment boundaries', () => {
+  it('updateRowRegisters targets correct DOM element when sibling elements are preceded by comment boundaries', () => {
     const doc = document;
     const vm = new DriftClientVM();
 
@@ -407,12 +407,12 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     expect(btn.getAttribute('class')).toBe('btn-primary');
 
     const updatedScope = { item: { btnClass: 'btn-danger' } };
-    vm.patchItemAttributes(bodyMod, updatedScope, rootElem);
+    vm.updateRowRegisters(bodyMod, updatedScope, (vm as any).registers);
 
     expect(btn.getAttribute('class')).toBe('btn-danger');
   });
 
-  it('patchItemAttributes updates attributes across multi-root sibling elements', () => {
+  it('updateRowRegisters updates attributes across multi-root sibling elements', () => {
     const doc = document;
     const vm = new DriftClientVM();
 
@@ -444,7 +444,7 @@ describe('DriftClientVM (DOM Engine) - Reproduction Test Cases', () => {
     expect((nodes[1] as HTMLElement).className).toBe('dd-1');
 
     const updatedScope = { item: { dtClass: 'dt-updated', ddClass: 'dd-updated' } };
-    vm.patchItemAttributes(bodyMod, updatedScope, nodes);
+    vm.updateRowRegisters(bodyMod, updatedScope, (vm as any).registers);
 
     expect((nodes[0] as HTMLElement).className).toBe('dt-updated');
     expect((nodes[1] as HTMLElement).className).toBe('dd-updated');

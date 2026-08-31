@@ -2,157 +2,161 @@
 
 This document tracks identified bugs, duplication defects, native runtime re-inventions, architecture violations, and correctness issues across the DriftJS monorepo.
 
+> **Last full audit:** 2026-08-31 — Full codebase re-read across all 8 packages.
+
 ---
 
 ## 📊 Summary Matrix
 
 | Bug ID | Title & Summary | Category | Severity | Target Package | Status |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| [`BUG-001`](#bug-001-triplicate-dom-element-attribute-patching--normalization-in-driftclientvm) | Triplicate DOM Element Attribute Patching (`execute`, `updateAt`, and `patchItemAttributes`) | Duplication / Maintenance | **High** | `driftjs-dom` | **Resolved** |
-| [`BUG-002`](#bug-002-duplicated-3-step-node-claiming--lookahead-in-hydrationcursor) | Duplicated 3-Step Node Claiming & Lookahead across `claimElement`, `claimText`, `claimComment` | Duplication / Clean Code | **Medium** | `driftjs-dom` | **Resolved** |
-| [`BUG-003`](#bug-003-incomplete-constant-literal-serialization-in-driftjs-vite-plugin) | Incomplete Constant Literal Serialization in `serializeValueToJS` (`RegExp`, `Date`, `Set`, `Map` serialize to `{}`) | Correctness / Runtime Bug | **High** | `driftjs-vite-plugin` | **Resolved** |
-| [`BUG-004`](#bug-004-brittle-string-based-destructuring--default-value-parsing-in-populateitemscope) | Brittle String-Based Destructuring & Default Value Parsing in `populateItemScope` | Correctness / Edge Cases | **Medium** | `driftjs-shared` | **Resolved** |
-| [`BUG-005`](#bug-005-duplicate-history-state-wrapping--listener-management-in-historyts) | Duplicate History State Wrapping & Listener Management across `createWebHistory` and `createWebHashHistory` | Duplication / Architecture | **Low** | `driftjs-router` | **Resolved** |
-| [`BUG-006`](#bug-006-redundant-function-calls-in-linkdrift-sfc-template) | Redundant Function Calls in `Link.drift` template instead of direct reactive bindings | Performance / Clean Code | **Low** | `driftjs-router` | **Resolved** |
-| [`BUG-007`](#bug-007-ad-hoc-ascii-whitespace-checker-in-drifttransformer) | Ad-hoc ASCII Whitespace Checker in `DriftTransformer` (manual character code loops vs native regex/trim) | Re-invented Wheel | **Low** | `driftjs-compiler` | **Resolved** |
-| [`BUG-008`](#bug-008-keyed-list-reconciler-fails-to-move-elements-to-list-end-when-refnode-is-null) | Keyed List Reconciler Fails to Move Elements to List End When `refNode` is Null | Correctness / Runtime Bug | **High** | `driftjs-dom` | **Resolved** |
-| [`BUG-009`](#bug-009-catch-clause-ast-to-js-generator-evaluates-destructuring-parameter-defaults-with-outer-locals) | Catch Clause Ast-to-JS Generator Evaluates Destructuring Parameter Defaults with Outer Locals | Correctness / AST Codegen | **Medium** | `driftjs-compiler` | **Resolved** |
-| [`BUG-010`](#bug-010-documentfragment-child-vms-retain-orphaned-references-in-weakmap-on-partial-subtree-unmounting) | DocumentFragment Child VMs Retain Orphaned References in WeakMap on Partial Subtree Unmounting | Lifecycle / Memory Leak | **Medium** | `driftjs-dom` | **Resolved** |
-| [`BUG-011`](#bug-011-type-interface-and-enum-declarations-defined-directly-inside-src-files) | Type, Interface, and Enum Declarations Defined Directly Inside `src/` Files (Violating Monorepo Architecture Rule 1) | Architecture / Strict Typing | **Medium** | `driftjs-compiler` / `driftjs-router` | **Resolved** |
+| [`BUG-001`](#bug-001-ssr-reactive_if-opcode-reads-only-4-operands-but-the-isa-emits-5) | SSR `REACTIVE_IF` Opcode Reads 4 Operands but ISA Emits 5 (Operand Alignment) | Correctness / Code Quality | **Low** | `driftjs-ssr` | **Open** |
+| [`BUG-002`](#bug-002-scopets-mutates-globalthis_get-at-module-load-time-as-a-side-effect) | `scope.ts` Mutates `globalThis._get` at Module Load Time as a Side Effect | Architecture / Portability | **Medium** | `driftjs-shared` | **Open** |
+| [`BUG-003`](#bug-003-driftclientvm-event-handler-scope-snapshotdiff-on-every-dom-event) | `DriftClientVM` Event Handler Scope Snapshot+Diff Optimization | Performance | **Medium** | `driftjs-dom` | **Open** |
+| [`BUG-004`](#bug-004-hydrateselectively-eager-case-unmount-breaks-vm--ishydrated-invariant) | `hydrateSelectively` Eager Case `unmount()` Breaks `.vm` / `.isHydrated` Invariant | Correctness / API Contract | **Low** | `driftjs-dom` | **Open** |
+| [`BUG-005`](#bug-005-router-runguardqueue-guard-arity-detection-via-guardlength-is-unreliable-after-transpilation) | Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable | Correctness | **Medium** | `driftjs-router` | **Open** |
+| [`BUG-006`](#bug-006-addconstant-duck-type-detection-of-acorn-nodes-via-type-string-incorrectly-converts-heterogeneous-arrays) | `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String | Correctness / Runtime Bug | **High** | `driftjs-compiler` | **Open** |
+| [`BUG-007`](#bug-007-getdynamicpcs-bytecode-scanner-missing-reactive_async-opcode-case--scan-aborts-early) | `getDynamicPcs` Bytecode Scanner Missing `REACTIVE_ASYNC` Opcode Case | Correctness / Runtime Bug | **High** | `driftjs-dom` | **Open** |
 
 ---
 
 ## 🔍 Detailed Bug Findings & Resolutions
 
-### `BUG-001`: Triplicate DOM Element Attribute Patching & Normalization in `DriftClientVM`
+### `BUG-001`: SSR `REACTIVE_IF` Opcode Reads Only 4 Operands but the ISA Emits 5
 
-- **Package:** `driftjs-dom`
-- **Severity:** High
-- **Category:** Code Duplication & Maintenance
-- **Location:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L458-L546), [`lines 1025-1049`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L1025-L1049), [`lines 1139-1230`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L1139-L1230)
-- **Description:** ~90 lines of DOM attribute setting and patching logic were duplicated across 3 separate execution paths (`execute()`, `updateAt()`, and `patchItemAttributes()`).
-- **Resolution:** Extracted unified `applyDOMAttribute(elem, attrName, val, scope)` method on `DriftClientVM` and reused across all 3 execution paths.
-- **Status:** **Resolved**
+- **Package:** `driftjs-ssr`
+- **Severity:** Low
+- **Category:** Correctness / Code Quality
+- **Location:** [`packages/ssr/src/index.ts` L289–L313](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L289-L313)
+- **Description:** In `DriftServerVM.execute()`, `case Opcode.REACTIVE_IF` reads operands at `pc+1` through `pc+4` (4 operands) then advances `pc += 6`. However, the generator emits `REACTIVE_IF` with **5 operands**:
 
----
+  ```
+  REACTIVE_IF  parentReg  condIdx  consIdx  altIdx  depsIdx   ← 5 operands, 6 total words
+  ```
 
-### `BUG-002`: Duplicated 3-Step Node Claiming & Lookahead in `HydrationCursor`
+  The 5th operand `depsIdx` at `bytecode[pc + 5]` is silently skipped — this is intentional since SSR has no reactive engine, but it is undocumented. The operand should be explicitly named `const _depsIdx = bytecode[pc + 5];` with documentation.
+- **Fix:** Read but discard the `depsIdx` operand with documentation:
 
-- **Package:** `driftjs-dom`
-- **Severity:** Medium
-- **Category:** Code Duplication & Clean Code
-- **Location:** [`packages/dom/src/hydration.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/hydration.ts#L21-L134)
-- **Description:** `claimElement()`, `claimText()`, and `claimComment()` each implemented identical 3-step search/lookahead algorithms.
-- **Resolution:** Consolidated into a generic `claimNode<T extends Node>(predicate: (n: Node) => boolean, fallback: () => T): T` method.
-- **Status:** **Resolved**
-
----
-
-### `BUG-003`: Incomplete Constant Literal Serialization in `driftjs-vite-plugin`
-
-- **Package:** `driftjs-vite-plugin`
-- **Severity:** High
-- **Category:** Correctness & Runtime Bug
-- **Location:** [`packages/vite-plugin/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/vite-plugin/src/index.ts#L17-L42)
-- **Description:** `serializeValueToJS()` converted non-POJO objects into `{}` because it lacked explicit handlers for built-ins.
-- **Resolution:** Added serialization handlers for `RegExp` (`val.toString()`), `Date` (`new Date(...)`), `Set` (`new Set(...)`), `Map` (`new Map(...)`), and TypedArrays (`new Uint8Array(...)`, `new Uint32Array(...)`).
-- **Status:** **Resolved**
+  ```ts
+  const parentReg = bytecode[pc + 1]!;
+  const condIdx   = bytecode[pc + 2]!;
+  const consIdx   = bytecode[pc + 3]!;
+  const altIdx    = bytecode[pc + 4]!;
+  const _depsIdx  = bytecode[pc + 5]!; // Unused in SSR (no reactive engine)
+  pc += 6;
+  ```
+- **Status:** **Open**
 
 ---
 
-### `BUG-004`: Brittle String-Based Destructuring & Default Value Parsing in `populateItemScope`
+### `BUG-002`: `scope.ts` Mutates `globalThis._get` at Module Load Time as a Side Effect
 
 - **Package:** `driftjs-shared`
 - **Severity:** Medium
-- **Category:** Correctness & Edge Cases
-- **Location:** [`packages/utils/src/scope.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L170-L190)
-- **Description:** `populateItemScope()` failed when destructuring default values contained dynamic expressions or function calls (e.g. `getFallbackName()`).
-- **Resolution:** Enhanced `parseDefaultValue()` to evaluate dynamic expressions against scope keys and lookup valid scope variables without `with` statements.
-- **Status:** **Resolved**
+- **Category:** Architecture / Portability / Side Effects
+- **Location:** [`packages/utils/src/scope.ts` L99–L101](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L99-L101)
+- **Description:** Lines 99–101 unconditionally write a property to `globalThis` at module import time:
+
+  ```ts
+  if (typeof globalThis !== 'undefined' && !(globalThis as any)._get) {
+    (globalThis as any)._get = getScopeValue;
+  }
+  ```
+
+  This is a **global side effect** that pollutes the host environment. In a multi-tenant Edge runtime (Cloudflare Workers, Vercel Edge), multiple isolates sharing the same `globalThis` could conflict over `_get`. The `_get` function is already injected as the 6th closure parameter of every generated `__drift_fn__` closure, so the global assignment is completely redundant.
+- **Fix:** Remove lines 99–101 entirely.
+- **Status:** **Open**
 
 ---
 
-### `BUG-005`: Duplicate History State Wrapping & Listener Management in `history.ts`
+### `BUG-003`: `DriftClientVM` Event Handler Scope Snapshot+Diff Optimization
+
+- **Package:** `driftjs-dom`
+- **Severity:** Medium
+- **Category:** Performance
+- **Location:** [`packages/dom/src/index.ts` L149–L173](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L149-L173)
+- **Description:** The wrapped event handler (`wrappedHandler`) performs a full O(d) scope snapshot via `new Map()` on every single DOM event. On high-frequency events (like `onmousemove` or `onscroll`), creating `new Map()` instances on every frame causes garbage collection churn.
+- **Fix:** Skip snapshotting when `targetVM.declaredVars` is empty, and replace `new Map()` with lightweight record snapshots to eliminate allocation overhead.
+- **Status:** **Open**
+
+---
+
+### `BUG-004`: `hydrateSelectively` Eager Case `unmount()` Breaks `.vm` / `.isHydrated` Invariant
+
+- **Package:** `driftjs-dom`
+- **Severity:** Low
+- **Category:** Correctness / API Contract
+- **Location:** [`packages/dom/src/selective.ts` L449–L468](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/selective.ts#L449-L468)
+- **Description:** The eager case `unmount` handler sets `isHydrated = false` but the `vm` getter still returns the (now unmounted) `vmInstance`. After calling `ctrl.unmount()`, `ctrl.isHydrated` returns `false` while `ctrl.vm` returns a non-null dead VM — inconsistent with all other strategies where both become falsy after unmount.
+- **Fix:** After `vmInstance.unmount()`, null out the local `vmInstance` variable so `.vm` also returns `null`.
+- **Status:** **Open**
+
+---
+
+### `BUG-005`: Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable After Transpilation
 
 - **Package:** `driftjs-router`
-- **Severity:** Low
-- **Category:** Code Duplication & Architecture
-- **Location:** [`packages/router/src/history.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/history.ts#L75-L122), [`lines 180-227`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/history.ts#L180-L227)
-- **Description:** Both `createWebHistory()` and `createWebHashHistory()` duplicated subscription management and state packing/unpacking.
-- **Resolution:** Extracted shared helpers `createHistoryListeners()`, `extractHistoryState()`, and `buildHistoryState()`.
-- **Status:** **Resolved**
+- **Severity:** Medium
+- **Category:** Correctness
+- **Location:** [`packages/router/src/router.ts` L107–L153](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/router.ts#L107-L153)
+- **Description:** `runGuardQueue` uses `guard.length >= 3` to detect callback-style (`next`-based) navigation guards. `Function.length` is unreliable when functions use default parameters `(to, from, next = () => {}) => {}` or rest parameters `(...args) => {}`.
+- **Fix:** Always provide a tracking `next` function and resolve immediately if either `next()` is called or a non-undefined value is returned/resolved.
+- **Status:** **Open**
 
 ---
 
-### `BUG-006`: Redundant Function Calls in `Link.drift` SFC Template
-
-- **Package:** `driftjs-router`
-- **Severity:** Low
-- **Category:** Performance & Clean Code
-- **Location:** [`packages/router/src/components/Link.drift`](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/components/Link.drift#L90-L98)
-- **Description:** Cleaned up redundant local variable caching and ensured reactive attribute bindings connect directly with route changes.
-- **Resolution:** Refactored `<script>` state and unified template expressions to bind directly to reactive variables.
-- **Status:** **Resolved**
-
----
-
-### `BUG-007`: Ad-hoc ASCII Whitespace Checker in `DriftTransformer`
+### `BUG-006`: `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String
 
 - **Package:** `driftjs-compiler`
-- **Severity:** Low
-- **Category:** Re-invented Wheel
-- **Location:** [`packages/compiler/src/transformer.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/transformer.ts#L495-L504)
-- **Description:** `isWhitespaceOnly()` in `DriftTransformer` used a manual char-code loop.
-- **Resolution:** Replaced with standard `/^\s*$/.test(text)`.
-- **Status:** **Resolved**
+- **Severity:** High
+- **Category:** Correctness / Runtime Bug
+- **Location:** [`packages/compiler/src/generator.ts` L684–L700](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L684-L700)
+- **Description:** `addConstant()` uses duck-typing to detect Acorn AST nodes by checking `typeof value[0] === 'object' && value[0]?.type`. This only checks the first element of an array, which could misidentify heterogeneous arrays.
+- **Fix:** Add strict validation or explicit AST wrappers to ensure only valid Acorn AST statement/expression nodes are transpiled.
+- **Status:** **Open**
 
 ---
 
-### `BUG-008`: Keyed List Reconciler Fails to Move Elements to List End When `refNode` is Null
+### `BUG-007`: `getDynamicPcs` Bytecode Scanner Missing `REACTIVE_ASYNC` Opcode Case — Scan Aborts Early
 
 - **Package:** `driftjs-dom`
 - **Severity:** High
-- **Category:** Correctness & Runtime Bug
-- **Location:** [`packages/dom/src/reconciler.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/reconciler.ts#L201-L208)
-- **Description:** When an item was moved to the tail of a keyed list, `refNode` was `null` and `insertBefore()` was skipped entirely, stranding the element in its old DOM position.
-- **Resolution:** Added fallback to `parent.insertBefore(n, null)` when `refNode` is null. Added regression test verifying head-to-tail item reordering.
-- **Status:** **Resolved**
+- **Category:** Correctness / Runtime Bug
+- **Location:** [`packages/dom/src/index.ts` L616–L670](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L616-L670)
+- **Description:** `getDynamicPcs()` scans bytecode to locate all dynamic instruction positions for `updateRowRegisters`. The switch handles `REACTIVE_IF` (+6), `REACTIVE_FOR` (+8), `RETURN` (+1), etc. — but has **no case for `REACTIVE_ASYNC`**, which the generator emits with **8 words**. The `default` branch sets `pc = bytecode.length`, terminating the scan immediately. Any module containing an `@async` block will return an incomplete `dynamicPcs` list, causing `updateRowRegisters` to silently skip all `INTERPOLATE_TEXT` and dynamic `SET_ATTR` instructions that appear **after** the async boundary.
+- **Fix:**
+  ```ts
+  case Opcode.REACTIVE_ASYNC:
+    pc += 8;  // parentReg + promiseIdx + aliasIdx + bodyIdx + fallbackIdx + catchIdx + depsIdx
+    break;
+  ```
+- **Status:** **Open**
 
 ---
 
-### `BUG-009`: Catch Clause Ast-to-JS Generator Evaluates Destructuring Parameter Defaults with Outer Locals
+## 📋 Audit Notes — Feature Areas Audited & Verified Clean
 
-- **Package:** `driftjs-compiler`
-- **Severity:** Medium
-- **Category:** Correctness & AST Codegen
-- **Location:** [`packages/compiler/src/generator.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L943-L953)
-- **Description:** In `astToJS()` under `case 'CatchClause'`, `paramToJS(node.param, locals)` passed outer `locals` instead of `newLocals`.
-- **Resolution:** Passed `newLocals` to `paramToJS(node.param, newLocals)`. Added compiler regression test for catch clause destructuring.
-- **Status:** **Resolved**
+The following feature areas were audited and found to be correct and production-grade:
 
----
-
-### `BUG-010`: DocumentFragment Child VMs Retain Orphaned References in WeakMap on Partial Subtree Unmounting
-
-- **Package:** `driftjs-dom`
-- **Severity:** Medium
-- **Category:** Lifecycle & Memory Leak
-- **Location:** [`packages/dom/src/index.ts`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L407-L411), [`lines 102-113`](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L102-L113)
-- **Description:** Multi-root child component nodes left orphaned sibling entries in `childVMs` when unmounted individually.
-- **Resolution:** Tracked all sibling nodes in `childEntry.nodes` and cleaned up all mapped nodes when `childVM.unmount()` executes.
-- **Status:** **Resolved**
-
----
-
-### `BUG-011`: Type, Interface, and Enum Declarations Defined Directly Inside `src/` Files
-
-- **Package:** `driftjs-compiler` / `driftjs-router`
-- **Severity:** Medium
-- **Category:** Architecture & Strict Typing
-- **Location:**
-  - `packages/compiler/types/lexer-state.ts`: `ExprTokenKind`
-  - `packages/compiler/types/ast.ts`: `TemplateASTVisitor`
-  - `packages/router/types/index.ts`: `PathTokens`, `RouteMatcher`
-- **Description:** Rule 1 of `AGENTS.md` mandates that all types, interfaces, and enums reside exclusively in `types/`.
-- **Resolution:** Moved `ExprTokenKind`, `TemplateASTVisitor`, `PathTokens`, and `RouteMatcher` into their respective `types/` directories and updated barrel exports.
-- **Status:** **Resolved**
+| Feature Area | Verdict |
+| :--- | :--- |
+| **`HydrationCursor`** (`claimNode` generic, TreeWalker-based) | ✅ Clean. Generic helper correctly implemented. |
+| **LIS `getSequence`** (`packages/dom/src/reconciler.ts`) | ✅ Correct. Implements optimal patience-sorting LIS algorithm. |
+| **Lexer Char-Code Scanning** (`packages/compiler/src/lexer.ts`) | ✅ Correct. Optimized ASCII char-code scanning with hyphen support. |
+| **Context API** (`createContext`, `provideContext`, `injectContext`) | ✅ Correct. Uses `Symbol` keys, walks `parentVM` chain. |
+| **`effect`, `onMount`, `onUnmount` lifecycle** | ✅ Correct. Uses active VM stack for registration. |
+| **`DriftTransformer` AST visitor pattern** | ✅ Clean. Visitor correctly recurses all 7 node types including `AsyncNode`. |
+| **`@switch` lowering to `@if` chains** | ✅ Correct. Uses `structuredClone` for discriminant, handles `@default` as `true` literal. |
+| **`parseQuery` / `stringifyQuery` using `URLSearchParams`** | ✅ Correct. Native API used. Prototype pollution guards present. |
+| **Route scoring and `path-to-regexp` integration** | ✅ Correct. Score computed per-segment, sorted descending. |
+| **Navigation guards (`beforeEach`, `afterEach`, redirect loop guard)** | ✅ Correct. Token-based cancellation, 20-redirect limit. |
+| **`renderToString` HTML escaping** | ✅ Correct. All 5 characters (`&`, `<`, `>`, `"`, `'`) escaped. |
+| **`serializeNode` attribute sanitization** | ✅ Correct. `VALID_ATTR_NAME_REGEX` and `VALID_TAG_NAME_REGEX` applied. |
+| **`renderToStream` out-of-order streaming shell** | ✅ Correct. Template/script swap mechanism functions correctly. |
+| **`hydrateSelectively` dispatch** | ✅ Correct. All 5 strategies plus custom callback correctly dispatched. |
+| **`reconcileKeyedList` prefix/suffix fast-path** | ✅ Correct. Prefix and suffix sync loops correctly update and reuse records. |
+| **`DriftClientVM` microtask batching** | ✅ Correct. `queueMicrotask` used, `MAX_FLUSH_ITERATIONS` guard prevents infinite loops. |
+| **Event delegation with `NON_BUBBLING_EVENTS` capture** | ✅ Correct. Capture mode used for focus/blur/scroll/pointer-enter/leave. |
+| **`$derived` lazy caching** | ✅ Correct. `isDirty` flag used; cache invalidated on dependency change. |
+| **`vite-plugin` HMR invalidation** | ✅ Correct. Module graph invalidated, full-reload triggered. |
+| **`scanBalancedDelimiters` / `scanner.ts`** | ✅ Clean. Full awareness of quotes, template literals, comments, regex, and nesting. Shared by `scope.ts` and `lexer.ts`. |

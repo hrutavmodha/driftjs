@@ -189,7 +189,7 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
     }
   });
 
-  it('correctly advances PC over CREATE_ELEMENT with props spec in patchItemAttributes without desynchronization', () => {
+  it('correctly updates attributes via updateRowRegisters through the core interpreter loop', () => {
     const vm = new DriftClientVM();
     const elem = doc.createElement('div');
     elem.setAttribute('data-test', 'initial');
@@ -211,7 +211,8 @@ describe('DriftJS Runtime Edge Cases & Scope Fixes', () => {
       declaredVars: ['updatedValue'],
     };
 
-    vm.patchItemAttributes(bodyMod, { updatedValue: 'patched' }, elem);
+    const registers = [elem];
+    vm.updateRowRegisters(bodyMod, { updatedValue: 'patched' }, registers);
     expect(elem.getAttribute('data-test')).toBe('patched');
   });
 

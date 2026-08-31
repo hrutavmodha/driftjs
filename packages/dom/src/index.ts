@@ -1102,9 +1102,6 @@ export class DriftClientVM {
                   }
 
                   if (equal) {
-                    if (record.nodes.length > 0) {
-                      vm.patchItemAttributes(bodyMod, childScope, record.nodes);
-                    }
                     return;
                   }
 
@@ -1196,127 +1193,6 @@ export class DriftClientVM {
       return this.mode === VMMode.MOUNT ? (this.getRegister(0, registers) as Node | null) : null;
     } finally {
       this.mode = prevMode;
-    }
-  }
-
-  /**
-   * Fast-path attribute patcher for reactive list items whose item data object hasn't changed.
-   * Evaluates dynamic SET_ATTR opcodes in bodyMod against childScope and updates the root DOM element
-   * only if an attribute value actually changed.
-   */
-  public patchItemAttributes(
-    bodyMod: CompiledModule,
-    childScope: Record<string, any>,
-    rootNodeOrNodes: Node | Node[] | readonly Node[],
-    registers?: (Node | any)[]
-  ): void {
-    if (registers) {
-      this.updateRowRegisters(bodyMod, childScope, registers);
-      return;
-    }
-    const nodes: Node[] = Array.isArray(rootNodeOrNodes)
-      ? Array.from(rootNodeOrNodes)
-      : [rootNodeOrNodes as Node];
-    if (nodes.length === 0) return;
-    const firstNode = nodes[0]!;
-    if (firstNode.nodeType !== 1 && firstNode.nodeType !== 11 && firstNode.nodeType !== 3) return;
-    const bytecode = bodyMod.bytecode;
-    const constants = bodyMod.constants;
-
-    const regs = new Map<number, Node>();
-    const rootNode = nodes[0]!;
-    regs.set(0, rootNode);
-
-    const elements: Node[] = [];
-    for (const n of nodes) {
-      if (n.nodeType === 1) {
-        elements.push(n);
-        elements.push(...(n as Element).querySelectorAll('*'));
-      } else {
-        elements.push(n);
-      }
-    }
-    let elemIdx = 0;
-    for (let pc = 0; pc < bytecode.length; ) {
-      const opcode = bytecode[pc]!;
-      if (opcode === Opcode.CREATE_ELEMENT) {
-        const reg = bytecode[pc + 1]!;
-        if (elemIdx < elements.length) {
-          regs.set(reg, elements[elemIdx]!);
-          elemIdx++;
-        }
-        pc += 3;
-      } else if (
-        opcode === Opcode.CREATE_TEXT ||
-        opcode === Opcode.CREATE_COMMENT ||
-        opcode === Opcode.INTERPOLATE_TEXT
-      ) {
-        pc += 3;
-      } else if (opcode === Opcode.SET_ATTR) {
-        pc += 5;
-      } else if (opcode === Opcode.MOUNT_COMPONENT) {
-        pc += 4;
-      } else if (opcode === Opcode.APPEND_CHILD) {
-        pc += 3;
-      } else if (opcode === Opcode.CREATE_FRAGMENT || opcode === Opcode.EXEC_SCRIPT) {
-        pc += 2;
-      } else if (opcode === Opcode.REACTIVE_IF) {
-        pc += 6;
-      } else if (opcode === Opcode.REACTIVE_FOR) {
-        pc += 8;
-      } else if (opcode === Opcode.RETURN) {
-        pc += 1;
-      } else {
-        break;
-      }
-    }
-
-    for (let pc = 0; pc < bytecode.length; ) {
-      const opcode = bytecode[pc]!;
-      switch (opcode) {
-        case Opcode.SET_ATTR: {
-          const targetReg = bytecode[pc + 1]!;
-          const attrName = String(constants[bytecode[pc + 2]!]);
-          const rawVal = constants[bytecode[pc + 3]!];
-          const isDynamic = bytecode[pc + 4]!;
-
-          if (isDynamic === 1) {
-            const targetNode = regs.get(targetReg) ?? (targetReg === 0 ? rootNode : null);
-            if (targetNode) {
-              const val = evaluateExpression(rawVal, childScope, this.declaredVars);
-              this.applyDOMAttribute(targetNode, attrName, val, childScope);
-            }
-          }
-          pc += 5;
-          break;
-        }
-        case Opcode.CREATE_ELEMENT:
-        case Opcode.CREATE_TEXT:
-        case Opcode.CREATE_COMMENT:
-        case Opcode.INTERPOLATE_TEXT:
-        case Opcode.APPEND_CHILD:
-          pc += 3;
-          break;
-        case Opcode.MOUNT_COMPONENT:
-          pc += 4;
-          break;
-        case Opcode.CREATE_FRAGMENT:
-        case Opcode.EXEC_SCRIPT:
-          pc += 2;
-          break;
-        case Opcode.REACTIVE_IF:
-          pc += 6;
-          break;
-        case Opcode.REACTIVE_FOR:
-          pc += 8;
-          break;
-        case Opcode.RETURN:
-          pc += 1;
-          break;
-        default:
-          pc = bytecode.length;
-          break;
-      }
     }
   }
 
