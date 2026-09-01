@@ -603,6 +603,14 @@ describe('DriftGenerator', () => {
       expect(scriptConst.__drift_fn__).toContain('"title"');
       expect(scriptConst.__drift_fn__).not.toContain('.log');
     });
+
+    it('does not mangle regular data objects or arrays containing a .type property', () => {
+      const src = `
+        <div>{items}</div>
+      `;
+      const module = compile(src);
+      expect(module.constants.some((c) => typeof c === 'object' && c?.__drift_fn__)).toBe(true);
+    });
   });
 });
 

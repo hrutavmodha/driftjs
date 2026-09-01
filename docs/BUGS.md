@@ -11,7 +11,6 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 | Bug ID | Title & Summary | Category | Severity | Target Package | Status |
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | [`BUG-001`](#bug-001-driftclientvm-event-handler-scope-snapshotdiff-on-every-dom-event) | `DriftClientVM` Event Handler Scope Snapshot+Diff Optimization | Performance | **Medium** | `driftjs-dom` | **Open** |
-| [`BUG-002`](#bug-002-addconstant-duck-type-detection-of-acorn-nodes-via-type-string-incorrectly-converts-heterogeneous-arrays) | `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String | Correctness / Runtime Bug | **High** | `driftjs-compiler` | **Open** |
 
 ---
 
@@ -25,18 +24,6 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 - **Location:** [`packages/dom/src/index.ts` L149–L173](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L149-L173)
 - **Description:** The wrapped event handler (`wrappedHandler`) performs a full O(d) scope snapshot via `new Map()` on every single DOM event. On high-frequency events (like `onmousemove` or `onscroll`), creating `new Map()` instances on every frame causes garbage collection churn.
 - **Fix:** Skip snapshotting when `targetVM.declaredVars` is empty, and replace `new Map()` with lightweight record snapshots to eliminate allocation overhead.
-- **Status:** **Open**
-
----
-
-### `BUG-002`: `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String
-
-- **Package:** `driftjs-compiler`
-- **Severity:** High
-- **Category:** Correctness / Runtime Bug
-- **Location:** [`packages/compiler/src/generator.ts` L684–L700](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L684-L700)
-- **Description:** `addConstant()` uses duck-typing to detect Acorn AST nodes by checking `typeof value[0] === 'object' && value[0]?.type`. This only checks the first element of an array, which could misidentify heterogeneous arrays.
-- **Fix:** Add strict validation or explicit AST wrappers to ensure only valid Acorn AST statement/expression nodes are transpiled.
 - **Status:** **Open**
 
 ---

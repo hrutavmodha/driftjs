@@ -180,7 +180,7 @@ export class DriftGenerator {
       if (child.type === ASTNodeType.Text && typeof child.content === 'object' && child.content !== null) {
         const filtered = this.filterRuntimeScriptAst(child.content);
         if (filtered !== null && (!Array.isArray(filtered) || filtered.length > 0)) {
-          const scriptBodyIdx = this.addConstant(filtered);
+          const scriptBodyIdx = this.addScriptConstant(filtered);
           this.emit(Opcode.EXEC_SCRIPT, scriptBodyIdx);
         }
       }
@@ -284,7 +284,7 @@ export class DriftGenerator {
       const valIdx = this.addConstant(attr.value);
       this.emit(Opcode.SET_ATTR, elemReg, nameIdx, valIdx, 0);
     } else if (attr.value.type === ASTNodeType.Interpolation) {
-      const exprIdx = this.addConstant(attr.value.expression);
+      const exprIdx = this.addExpressionConstant(attr.value.expression);
       const pc = this.bytecode.length;
       this.emit(Opcode.SET_ATTR, elemReg, nameIdx, exprIdx, 1);
       this.emit(Opcode.RETURN);
@@ -301,7 +301,7 @@ export class DriftGenerator {
 
   private compileInterpolationNode(node: InterpolationNode, parentReg: number): void {
     const textReg = this.allocRegister();
-    const exprConstIdx = this.addConstant(node.expression);
+    const exprConstIdx = this.addExpressionConstant(node.expression);
     const pc = this.bytecode.length;
     this.emit(Opcode.INTERPOLATE_TEXT, textReg, exprConstIdx);
     this.emit(Opcode.RETURN);
@@ -416,7 +416,7 @@ export class DriftGenerator {
     }
     const depsIdx = this.addConstant(Array.from(depsSet));
 
-    const condIdx = this.addConstant(node.test);
+    const condIdx = this.addExpressionConstant(node.test);
 
     // REACTIVE_IF parentReg condIdx consIdx altIdx depsIdx  (5 operand bytes)
     this.emit(Opcode.REACTIVE_IF, parentReg, condIdx, consIdx, altIdx, depsIdx);
@@ -427,10 +427,10 @@ export class DriftGenerator {
     const bodyMod = this.compileNodesToSubModule(node.body);
     const bodyIdx = this.addConstant(bodyMod);
 
-    const iterIdx = this.addConstant(node.iterable);
+    const iterIdx = this.addExpressionConstant(node.iterable);
     const itemNameIdx = this.addConstant(node.item);
     const indexNameIdx = node.index !== null ? this.addConstant(node.index) : 0xFF;
-    const keyIdx = node.key ? this.addConstant(node.key) : 0xFF;
+    const keyIdx = node.key ? this.addExpressionConstant(node.key) : 0xFF;
 
     // Deps = body's reactive vars + identifiers from iterable expression
     const deps = this.collectDepsFromSubModule(bodyMod, node.iterable);
@@ -456,7 +456,7 @@ export class DriftGenerator {
       });
     }
 
-    const promiseIdx = this.addConstant(node.promise);
+    const promiseIdx = this.addExpressionConstant(node.promise);
     const aliasIdx = this.addConstant(node.alias);
 
     const depsSet = new Set<string>();
@@ -681,15 +681,23 @@ export class DriftGenerator {
     return this.nextRegisterId++;
   }
 
-  private addConstant(value: any): number {
-    if (value && typeof value === 'object' && value.type && typeof value.type === 'string') {
-      const codeStr = astToJS(value);
-      value = { __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => (${codeStr})` };
-    } else if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0]?.type) {
-      const codeStr = astToJS(value);
-      value = { __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => { ${codeStr}; }` };
-    }
+  private addExpressionConstant(ast: any): number {
+    const codeStr = astToJS(ast);
+    const fnVal = {
+      __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => (${codeStr})`
+    };
+    return this.addConstant(fnVal);
+  }
 
+  private addScriptConstant(ast: any): number {
+    const codeStr = astToJS(ast);
+    const fnVal = {
+      __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => { ${codeStr}; }`
+    };
+    return this.addConstant(fnVal);
+  }
+
+  private addConstant(value: any): number {
     const existingIndex = this.constants.findIndex((c) => this.isConstantEqual(c, value));
     if (existingIndex !== -1) {
       return existingIndex;
