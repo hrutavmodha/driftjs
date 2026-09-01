@@ -94,12 +94,6 @@ export function getScopeValue(scope: any, name: string): any {
   return undefined;
 }
 
-export const _get = getScopeValue;
-
-if (typeof globalThis !== 'undefined' && !(globalThis as any)._get) {
-  (globalThis as any)._get = getScopeValue;
-}
-
 function safeSetScopeProp(scope: Record<string, any>, key: string, val: any): void {
   if (!scope || typeof scope !== 'object') return;
   if (key === '__proto__' || key === 'constructor' || key === 'prototype' || key === '__drift_mark_dirty__') {

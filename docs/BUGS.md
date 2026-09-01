@@ -10,66 +10,17 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 
 | Bug ID | Title & Summary | Category | Severity | Target Package | Status |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| [`BUG-001`](#bug-001-ssr-reactive_if-opcode-reads-only-4-operands-but-the-isa-emits-5) | SSR `REACTIVE_IF` Opcode Reads 4 Operands but ISA Emits 5 (Operand Alignment) | Correctness / Code Quality | **Low** | `driftjs-ssr` | **Open** |
-| [`BUG-002`](#bug-002-scopets-mutates-globalthis_get-at-module-load-time-as-a-side-effect) | `scope.ts` Mutates `globalThis._get` at Module Load Time as a Side Effect | Architecture / Portability | **Medium** | `driftjs-shared` | **Open** |
-| [`BUG-003`](#bug-003-driftclientvm-event-handler-scope-snapshotdiff-on-every-dom-event) | `DriftClientVM` Event Handler Scope Snapshot+Diff Optimization | Performance | **Medium** | `driftjs-dom` | **Open** |
-| [`BUG-004`](#bug-004-hydrateselectively-eager-case-unmount-breaks-vm--ishydrated-invariant) | `hydrateSelectively` Eager Case `unmount()` Breaks `.vm` / `.isHydrated` Invariant | Correctness / API Contract | **Low** | `driftjs-dom` | **Open** |
-| [`BUG-005`](#bug-005-router-runguardqueue-guard-arity-detection-via-guardlength-is-unreliable-after-transpilation) | Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable | Correctness | **Medium** | `driftjs-router` | **Open** |
-| [`BUG-006`](#bug-006-addconstant-duck-type-detection-of-acorn-nodes-via-type-string-incorrectly-converts-heterogeneous-arrays) | `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String | Correctness / Runtime Bug | **High** | `driftjs-compiler` | **Open** |
-| [`BUG-007`](#bug-007-getdynamicpcs-bytecode-scanner-missing-reactive_async-opcode-case--scan-aborts-early) | `getDynamicPcs` Bytecode Scanner Missing `REACTIVE_ASYNC` Opcode Case | Correctness / Runtime Bug | **High** | `driftjs-dom` | **Open** |
+| [`BUG-001`](#bug-001-driftclientvm-event-handler-scope-snapshotdiff-on-every-dom-event) | `DriftClientVM` Event Handler Scope Snapshot+Diff Optimization | Performance | **Medium** | `driftjs-dom` | **Open** |
+| [`BUG-002`](#bug-002-hydrateselectively-eager-case-unmount-breaks-vm--ishydrated-invariant) | `hydrateSelectively` Eager Case `unmount()` Breaks `.vm` / `.isHydrated` Invariant | Correctness / API Contract | **Low** | `driftjs-dom` | **Open** |
+| [`BUG-003`](#bug-003-router-runguardqueue-guard-arity-detection-via-guardlength-is-unreliable-after-transpilation) | Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable | Correctness | **Medium** | `driftjs-router` | **Open** |
+| [`BUG-004`](#bug-004-addconstant-duck-type-detection-of-acorn-nodes-via-type-string-incorrectly-converts-heterogeneous-arrays) | `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String | Correctness / Runtime Bug | **High** | `driftjs-compiler` | **Open** |
+| [`BUG-005`](#bug-005-getdynamicpcs-bytecode-scanner-missing-reactive_async-opcode-case--scan-aborts-early) | `getDynamicPcs` Bytecode Scanner Missing `REACTIVE_ASYNC` Opcode Case | Correctness / Runtime Bug | **High** | `driftjs-dom` | **Open** |
 
 ---
 
 ## 🔍 Detailed Bug Findings & Resolutions
 
-### `BUG-001`: SSR `REACTIVE_IF` Opcode Reads Only 4 Operands but the ISA Emits 5
-
-- **Package:** `driftjs-ssr`
-- **Severity:** Low
-- **Category:** Correctness / Code Quality
-- **Location:** [`packages/ssr/src/index.ts` L289–L313](file:///home/hrutav-modha/Documents/driftjs/packages/ssr/src/index.ts#L289-L313)
-- **Description:** In `DriftServerVM.execute()`, `case Opcode.REACTIVE_IF` reads operands at `pc+1` through `pc+4` (4 operands) then advances `pc += 6`. However, the generator emits `REACTIVE_IF` with **5 operands**:
-
-  ```
-  REACTIVE_IF  parentReg  condIdx  consIdx  altIdx  depsIdx   ← 5 operands, 6 total words
-  ```
-
-  The 5th operand `depsIdx` at `bytecode[pc + 5]` is silently skipped — this is intentional since SSR has no reactive engine, but it is undocumented. The operand should be explicitly named `const _depsIdx = bytecode[pc + 5];` with documentation.
-- **Fix:** Read but discard the `depsIdx` operand with documentation:
-
-  ```ts
-  const parentReg = bytecode[pc + 1]!;
-  const condIdx   = bytecode[pc + 2]!;
-  const consIdx   = bytecode[pc + 3]!;
-  const altIdx    = bytecode[pc + 4]!;
-  const _depsIdx  = bytecode[pc + 5]!; // Unused in SSR (no reactive engine)
-  pc += 6;
-  ```
-- **Status:** **Open**
-
----
-
-### `BUG-002`: `scope.ts` Mutates `globalThis._get` at Module Load Time as a Side Effect
-
-- **Package:** `driftjs-shared`
-- **Severity:** Medium
-- **Category:** Architecture / Portability / Side Effects
-- **Location:** [`packages/utils/src/scope.ts` L99–L101](file:///home/hrutav-modha/Documents/driftjs/packages/utils/src/scope.ts#L99-L101)
-- **Description:** Lines 99–101 unconditionally write a property to `globalThis` at module import time:
-
-  ```ts
-  if (typeof globalThis !== 'undefined' && !(globalThis as any)._get) {
-    (globalThis as any)._get = getScopeValue;
-  }
-  ```
-
-  This is a **global side effect** that pollutes the host environment. In a multi-tenant Edge runtime (Cloudflare Workers, Vercel Edge), multiple isolates sharing the same `globalThis` could conflict over `_get`. The `_get` function is already injected as the 6th closure parameter of every generated `__drift_fn__` closure, so the global assignment is completely redundant.
-- **Fix:** Remove lines 99–101 entirely.
-- **Status:** **Open**
-
----
-
-### `BUG-003`: `DriftClientVM` Event Handler Scope Snapshot+Diff Optimization
+### `BUG-001`: `DriftClientVM` Event Handler Scope Snapshot+Diff Optimization
 
 - **Package:** `driftjs-dom`
 - **Severity:** Medium
@@ -81,7 +32,7 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 
 ---
 
-### `BUG-004`: `hydrateSelectively` Eager Case `unmount()` Breaks `.vm` / `.isHydrated` Invariant
+### `BUG-002`: `hydrateSelectively` Eager Case `unmount()` Breaks `.vm` / `.isHydrated` Invariant
 
 - **Package:** `driftjs-dom`
 - **Severity:** Low
@@ -93,7 +44,7 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 
 ---
 
-### `BUG-005`: Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable After Transpilation
+### `BUG-003`: Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable After Transpilation
 
 - **Package:** `driftjs-router`
 - **Severity:** Medium
@@ -105,7 +56,7 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 
 ---
 
-### `BUG-006`: `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String
+### `BUG-004`: `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String
 
 - **Package:** `driftjs-compiler`
 - **Severity:** High
@@ -117,7 +68,7 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 
 ---
 
-### `BUG-007`: `getDynamicPcs` Bytecode Scanner Missing `REACTIVE_ASYNC` Opcode Case — Scan Aborts Early
+### `BUG-005`: `getDynamicPcs` Bytecode Scanner Missing `REACTIVE_ASYNC` Opcode Case — Scan Aborts Early
 
 - **Package:** `driftjs-dom`
 - **Severity:** High

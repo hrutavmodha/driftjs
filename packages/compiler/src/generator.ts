@@ -210,7 +210,7 @@ export class DriftGenerator {
             if (expr && typeof expr === 'object' && expr.type) {
               const codeStr = astToJS(expr);
               propsSpec[attr.name] = {
-                __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => (${codeStr})`
+                __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => (${codeStr})`
               };
             } else {
               propsSpec[attr.name] = expr;
@@ -574,11 +574,11 @@ export class DriftGenerator {
       let fnVal: any;
       if (isFunctionBlock) {
         fnVal = {
-          __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => ${codeStr}`
+          __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => ${codeStr}`
         };
       } else {
         fnVal = {
-          __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => (${codeStr})`
+          __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => (${codeStr})`
         };
       }
 
@@ -611,11 +611,11 @@ export class DriftGenerator {
       let fnVal: any;
       if (isFunctionBlock) {
         fnVal = {
-          __drift_fn__: `${asyncPrefix}(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => ${codeStr}`
+          __drift_fn__: `${asyncPrefix}(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => ${codeStr}`
         };
       } else {
         fnVal = {
-          __drift_fn__: `${asyncPrefix}(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => (${codeStr})`
+          __drift_fn__: `${asyncPrefix}(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => (${codeStr})`
         };
       }
 
@@ -684,10 +684,10 @@ export class DriftGenerator {
   private addConstant(value: any): number {
     if (value && typeof value === 'object' && value.type && typeof value.type === 'string') {
       const codeStr = astToJS(value);
-      value = { __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => (${codeStr})` };
+      value = { __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => (${codeStr})` };
     } else if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0]?.type) {
       const codeStr = astToJS(value);
-      value = { __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, _get) => { ${codeStr}; }` };
+      value = { __drift_fn__: `(scope, declaredVars, setScopeValue, inScopeChain, resolveIterable, getScopeValue) => { ${codeStr}; }` };
     }
 
     const existingIndex = this.constants.findIndex((c) => this.isConstantEqual(c, value));
@@ -916,7 +916,7 @@ export function astToJS(node: any, locals?: Set<string>): string {
   switch (node.type) {
     case 'Identifier':
       if (locals && locals.has(node.name)) return node.name;
-      return `(typeof _get === 'function' ? _get(scope, ${JSON.stringify(node.name)}) : (typeof inScopeChain === 'function' && inScopeChain(scope, ${JSON.stringify(node.name)}) ? scope[${JSON.stringify(node.name)}] : (typeof globalThis !== 'undefined' && globalThis && (${JSON.stringify(node.name)} in globalThis) ? globalThis[${JSON.stringify(node.name)}] : (scope || {})[${JSON.stringify(node.name)}])))`;
+      return `(typeof getScopeValue === 'function' ? getScopeValue(scope, ${JSON.stringify(node.name)}) : (typeof inScopeChain === 'function' && inScopeChain(scope, ${JSON.stringify(node.name)}) ? scope[${JSON.stringify(node.name)}] : (typeof globalThis !== 'undefined' && globalThis && (${JSON.stringify(node.name)} in globalThis) ? globalThis[${JSON.stringify(node.name)}] : (scope || {})[${JSON.stringify(node.name)}])))`;
 
     case 'Literal':
       if (typeof node.raw === 'string') return node.raw;
