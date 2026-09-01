@@ -188,4 +188,25 @@ describe('DriftClientVM – Zero-Proxy Async Reactivity & Microtask Batching', (
     await Promise.resolve();
     expect(root.textContent).toBe('loaded async');
   });
+
+  it('getDynamicPcs continues scanning and identifies dynamic instructions located after REACTIVE_ASYNC opcode', () => {
+    const vm = new DriftClientVM();
+    const mod = {
+      bytecode: [
+        Opcode.CREATE_ELEMENT, 0, 0, // div (3)
+        // REACTIVE_ASYNC (8)
+        Opcode.REACTIVE_ASYNC, 0, 1, 2, 3, 4, 5, 6,
+        // Dynamic SET_ATTR (5) after REACTIVE_ASYNC
+        Opcode.SET_ATTR, 0, 7, 8, 1,
+        // Dynamic INTERPOLATE_TEXT (3) after REACTIVE_ASYNC
+        Opcode.INTERPOLATE_TEXT, 1, 9,
+        Opcode.RETURN, 0,
+      ],
+      constants: ['div', 'p', 'alias', {}, {}, {}, ['dep'], 'data-val', 'val', 'text'],
+      declaredVars: ['val', 'text'],
+    };
+
+    const dynamicPcs = (vm as any).getDynamicPcs(mod);
+    expect(dynamicPcs).toEqual([11, 16]);
+  });
 });

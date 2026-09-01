@@ -654,6 +654,7 @@ export class DriftClientVM {
           pc += 6;
           break;
         case Opcode.REACTIVE_FOR:
+        case Opcode.REACTIVE_ASYNC:
           pc += 8;
           break;
         case Opcode.RETURN:

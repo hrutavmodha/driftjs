@@ -71,6 +71,10 @@ describe('Selective Hydration Suite', () => {
 
       btnAfter.click();
       expect(spanAfter!.textContent).toBe('1');
+
+      controller.unmount();
+      expect(controller.isHydrated).toBe(false);
+      expect(controller.vm).toBeNull();
     });
 
     it('hydrates with custom trigger function and handles cancel / unmount', async () => {

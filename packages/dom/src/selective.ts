@@ -94,6 +94,8 @@ export function hydrateOnIdle(
       cleanupPending();
       if (vmInstance) {
         vmInstance.unmount();
+        vmInstance = null;
+        isHydrated = false;
       }
     },
   };
@@ -188,6 +190,8 @@ export function hydrateWhenVisible(
       cleanupPending();
       if (vmInstance) {
         vmInstance.unmount();
+        vmInstance = null;
+        isHydrated = false;
       }
     },
   };
@@ -274,6 +278,8 @@ export function hydrateOnInteraction(
       cleanupPending();
       if (vmInstance) {
         vmInstance.unmount();
+        vmInstance = null;
+        isHydrated = false;
       }
     },
   };
@@ -358,6 +364,8 @@ export function hydrateOnMedia(
       cleanupPending();
       if (vmInstance) {
         vmInstance.unmount();
+        vmInstance = null;
+        isHydrated = false;
       }
     },
   };
@@ -413,6 +421,8 @@ export function hydrateSelectively(
         }
         if (vmInstance) {
           vmInstance.unmount();
+          vmInstance = null;
+          isHydrated = false;
         }
       },
     };
@@ -448,7 +458,7 @@ export function hydrateSelectively(
     case 'eager':
     default: {
       let isHydrated = true;
-      const vmInstance = hydrate(component, container, options);
+      let vmInstance: DriftClientVM | null = hydrate(component, container, options);
       return {
         get vm() {
           return vmInstance;
@@ -457,11 +467,14 @@ export function hydrateSelectively(
           return isHydrated;
         },
         ready: Promise.resolve(vmInstance),
-        hydrateNow: () => vmInstance,
+        hydrateNow: () => vmInstance ?? hydrate(component, container, options),
         cancel: () => {},
         unmount: () => {
           isHydrated = false;
-          vmInstance.unmount();
+          if (vmInstance) {
+            vmInstance.unmount();
+            vmInstance = null;
+          }
         },
       };
     }

@@ -11,10 +11,8 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 | Bug ID | Title & Summary | Category | Severity | Target Package | Status |
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | [`BUG-001`](#bug-001-driftclientvm-event-handler-scope-snapshotdiff-on-every-dom-event) | `DriftClientVM` Event Handler Scope Snapshot+Diff Optimization | Performance | **Medium** | `driftjs-dom` | **Open** |
-| [`BUG-002`](#bug-002-hydrateselectively-eager-case-unmount-breaks-vm--ishydrated-invariant) | `hydrateSelectively` Eager Case `unmount()` Breaks `.vm` / `.isHydrated` Invariant | Correctness / API Contract | **Low** | `driftjs-dom` | **Open** |
-| [`BUG-003`](#bug-003-router-runguardqueue-guard-arity-detection-via-guardlength-is-unreliable-after-transpilation) | Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable | Correctness | **Medium** | `driftjs-router` | **Open** |
-| [`BUG-004`](#bug-004-addconstant-duck-type-detection-of-acorn-nodes-via-type-string-incorrectly-converts-heterogeneous-arrays) | `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String | Correctness / Runtime Bug | **High** | `driftjs-compiler` | **Open** |
-| [`BUG-005`](#bug-005-getdynamicpcs-bytecode-scanner-missing-reactive_async-opcode-case--scan-aborts-early) | `getDynamicPcs` Bytecode Scanner Missing `REACTIVE_ASYNC` Opcode Case | Correctness / Runtime Bug | **High** | `driftjs-dom` | **Open** |
+| [`BUG-002`](#bug-002-router-runguardqueue-guard-arity-detection-via-guardlength-is-unreliable-after-transpilation) | Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable | Correctness | **Medium** | `driftjs-router` | **Open** |
+| [`BUG-003`](#bug-003-addconstant-duck-type-detection-of-acorn-nodes-via-type-string-incorrectly-converts-heterogeneous-arrays) | `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String | Correctness / Runtime Bug | **High** | `driftjs-compiler` | **Open** |
 
 ---
 
@@ -32,19 +30,7 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 
 ---
 
-### `BUG-002`: `hydrateSelectively` Eager Case `unmount()` Breaks `.vm` / `.isHydrated` Invariant
-
-- **Package:** `driftjs-dom`
-- **Severity:** Low
-- **Category:** Correctness / API Contract
-- **Location:** [`packages/dom/src/selective.ts` L449–L468](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/selective.ts#L449-L468)
-- **Description:** The eager case `unmount` handler sets `isHydrated = false` but the `vm` getter still returns the (now unmounted) `vmInstance`. After calling `ctrl.unmount()`, `ctrl.isHydrated` returns `false` while `ctrl.vm` returns a non-null dead VM — inconsistent with all other strategies where both become falsy after unmount.
-- **Fix:** After `vmInstance.unmount()`, null out the local `vmInstance` variable so `.vm` also returns `null`.
-- **Status:** **Open**
-
----
-
-### `BUG-003`: Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable After Transpilation
+### `BUG-002`: Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable After Transpilation
 
 - **Package:** `driftjs-router`
 - **Severity:** Medium
@@ -56,7 +42,7 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 
 ---
 
-### `BUG-004`: `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String
+### `BUG-003`: `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String
 
 - **Package:** `driftjs-compiler`
 - **Severity:** High
@@ -64,23 +50,6 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 - **Location:** [`packages/compiler/src/generator.ts` L684–L700](file:///home/hrutav-modha/Documents/driftjs/packages/compiler/src/generator.ts#L684-L700)
 - **Description:** `addConstant()` uses duck-typing to detect Acorn AST nodes by checking `typeof value[0] === 'object' && value[0]?.type`. This only checks the first element of an array, which could misidentify heterogeneous arrays.
 - **Fix:** Add strict validation or explicit AST wrappers to ensure only valid Acorn AST statement/expression nodes are transpiled.
-- **Status:** **Open**
-
----
-
-### `BUG-005`: `getDynamicPcs` Bytecode Scanner Missing `REACTIVE_ASYNC` Opcode Case — Scan Aborts Early
-
-- **Package:** `driftjs-dom`
-- **Severity:** High
-- **Category:** Correctness / Runtime Bug
-- **Location:** [`packages/dom/src/index.ts` L616–L670](file:///home/hrutav-modha/Documents/driftjs/packages/dom/src/index.ts#L616-L670)
-- **Description:** `getDynamicPcs()` scans bytecode to locate all dynamic instruction positions for `updateRowRegisters`. The switch handles `REACTIVE_IF` (+6), `REACTIVE_FOR` (+8), `RETURN` (+1), etc. — but has **no case for `REACTIVE_ASYNC`**, which the generator emits with **8 words**. The `default` branch sets `pc = bytecode.length`, terminating the scan immediately. Any module containing an `@async` block will return an incomplete `dynamicPcs` list, causing `updateRowRegisters` to silently skip all `INTERPOLATE_TEXT` and dynamic `SET_ATTR` instructions that appear **after** the async boundary.
-- **Fix:**
-  ```ts
-  case Opcode.REACTIVE_ASYNC:
-    pc += 8;  // parentReg + promiseIdx + aliasIdx + bodyIdx + fallbackIdx + catchIdx + depsIdx
-    break;
-  ```
 - **Status:** **Open**
 
 ---
