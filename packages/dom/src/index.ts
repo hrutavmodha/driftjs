@@ -147,30 +147,15 @@ export class DriftClientVM {
         } else {
           const vm = this;
           const wrappedHandler = function (this: any, ...args: any[]) {
-            const targetVM = (wrappedHandler as any)._vm || vm;
             const currentFn = (wrappedHandler as any)._fn;
             if (typeof currentFn !== 'function') return;
-            const scopeSnapshot = new Map<string, any>();
-            if (targetVM.declaredVars) {
-              for (const key of targetVM.declaredVars) {
-                scopeSnapshot.set(key, targetVM.scope[key]);
-              }
-            }
+
             const result = currentFn.apply(this, args);
-            const changedVars = new Set<string>();
-            if (targetVM.declaredVars) {
-              for (const key of targetVM.declaredVars) {
-                if (targetVM.scope[key] !== scopeSnapshot.get(key)) changedVars.add(key);
-              }
+
+            const targetVM = (wrappedHandler as any)._vm || vm;
+            if (targetVM.pendingDirtyVars.size > 0 || targetVM.pendingEffects.size > 0) {
+              targetVM.flushUpdates();
             }
-            for (const dirtyVar of targetVM.pendingDirtyVars) {
-              changedVars.add(dirtyVar);
-            }
-            if (changedVars.size > 0) {
-              targetVM.pendingDirtyVars.clear();
-              targetVM.triggerUpdates(changedVars);
-            }
-            if (targetVM.pendingDirtyVars.size > 0 || targetVM.pendingEffects.size > 0) targetVM.flushUpdates();
             return result;
           };
           (wrappedHandler as any)._fn = val;
