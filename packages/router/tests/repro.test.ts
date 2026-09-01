@@ -269,11 +269,10 @@ describe('DriftJS Router - Reproduction Test Cases', () => {
     });
 
     let guardCompleted = false;
-    router.beforeEach((to, from, next) => {
-      setTimeout(() => {
-        guardCompleted = true;
-        next(false); // abort navigation
-      }, 20);
+    router.beforeEach(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      guardCompleted = true;
+      return false; // abort navigation
     });
 
     await router.isReady();

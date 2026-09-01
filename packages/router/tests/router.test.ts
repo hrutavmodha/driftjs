@@ -91,16 +91,14 @@ describe('Router Core & Lifecycle Engine (driftjs-router)', () => {
     expect(router.currentRoute.path).toBe('/about'); // Still at /about
   });
 
-  it('executes beforeEach guards with next() callback and redirects', async () => {
+  it('executes beforeEach guards to redirect navigation', async () => {
     const history = createMemoryHistory('/');
     const router = createRouter({ history, routes: baseRoutes });
     await router.isReady();
 
-    router.beforeEach((to, from, next) => {
+    router.beforeEach((to) => {
       if (to.path === '/secret') {
-        next('/login');
-      } else {
-        next();
+        return '/login';
       }
     });
 

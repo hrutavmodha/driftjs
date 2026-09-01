@@ -108,40 +108,8 @@ async function runGuardQueue(
     let guardRes: NavigationGuardReturn;
 
     try {
-      if (guard.length >= 3) {
-        // Callback-based guard: await next() invocation
-        guardRes = await new Promise<NavigationGuardReturn>((resolve, reject) => {
-          let hasCalled = false;
-          const next = (res?: boolean | string | RouteLocationRaw | Error) => {
-            if (hasCalled) return;
-            hasCalled = true;
-            resolve(res);
-          };
-
-          try {
-            const returned = guard(to, from, next);
-            if (returned instanceof Promise) {
-              returned
-                .then((pRes) => {
-                  if (!hasCalled) {
-                    hasCalled = true;
-                    resolve(pRes);
-                  }
-                })
-                .catch(reject);
-            }
-          } catch (e) {
-            reject(e);
-          }
-        });
-      } else {
-        const returned = guard(to, from, () => {});
-        if (returned instanceof Promise) {
-          guardRes = await returned;
-        } else {
-          guardRes = returned;
-        }
-      }
+      const returned = guard(to, from);
+      guardRes = returned instanceof Promise ? await returned : returned;
     } catch (err: any) {
       return err instanceof Error ? err : new Error(String(err));
     }

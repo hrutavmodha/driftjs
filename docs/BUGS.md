@@ -11,8 +11,7 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 | Bug ID | Title & Summary | Category | Severity | Target Package | Status |
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | [`BUG-001`](#bug-001-driftclientvm-event-handler-scope-snapshotdiff-on-every-dom-event) | `DriftClientVM` Event Handler Scope Snapshot+Diff Optimization | Performance | **Medium** | `driftjs-dom` | **Open** |
-| [`BUG-002`](#bug-002-router-runguardqueue-guard-arity-detection-via-guardlength-is-unreliable-after-transpilation) | Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable | Correctness | **Medium** | `driftjs-router` | **Open** |
-| [`BUG-003`](#bug-003-addconstant-duck-type-detection-of-acorn-nodes-via-type-string-incorrectly-converts-heterogeneous-arrays) | `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String | Correctness / Runtime Bug | **High** | `driftjs-compiler` | **Open** |
+| [`BUG-002`](#bug-002-addconstant-duck-type-detection-of-acorn-nodes-via-type-string-incorrectly-converts-heterogeneous-arrays) | `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String | Correctness / Runtime Bug | **High** | `driftjs-compiler` | **Open** |
 
 ---
 
@@ -30,19 +29,7 @@ This document tracks identified bugs, duplication defects, native runtime re-inv
 
 ---
 
-### `BUG-002`: Router `runGuardQueue` Guard Arity Detection via `guard.length` Is Unreliable After Transpilation
-
-- **Package:** `driftjs-router`
-- **Severity:** Medium
-- **Category:** Correctness
-- **Location:** [`packages/router/src/router.ts` L107–L153](file:///home/hrutav-modha/Documents/driftjs/packages/router/src/router.ts#L107-L153)
-- **Description:** `runGuardQueue` uses `guard.length >= 3` to detect callback-style (`next`-based) navigation guards. `Function.length` is unreliable when functions use default parameters `(to, from, next = () => {}) => {}` or rest parameters `(...args) => {}`.
-- **Fix:** Always provide a tracking `next` function and resolve immediately if either `next()` is called or a non-undefined value is returned/resolved.
-- **Status:** **Open**
-
----
-
-### `BUG-003`: `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String
+### `BUG-002`: `addConstant` Duck-Type Detection of Acorn Nodes via `.type` String
 
 - **Package:** `driftjs-compiler`
 - **Severity:** High

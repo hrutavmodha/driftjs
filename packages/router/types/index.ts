@@ -124,12 +124,9 @@ export interface NavigationFailure extends Error {
 
 export type NavigationGuardReturn = void | boolean | string | RouteLocationRaw | Error;
 
-export type NavigationGuardNext = (valid?: boolean | string | RouteLocationRaw | Error) => void;
-
 export type NavigationGuard = (
   to: RouteLocationNormalized,
-  from: RouteLocationNormalized,
-  next: NavigationGuardNext
+  from: RouteLocationNormalized
 ) => NavigationGuardReturn | Promise<NavigationGuardReturn>;
 
 export type NavigationHookAfter = (
